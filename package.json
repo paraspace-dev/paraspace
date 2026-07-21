@@ -26,7 +26,10 @@
     "darwin"
   ],
   "scripts": {
-    "lint": "bin/lint"
+    "lint": "bin/lint",
+    "test": "test/run",
+    "test:cli": "test/run --cli",
+    "test:e2e": "test/run --e2e"
   },
   "bin": {
     "para": "bin/para"

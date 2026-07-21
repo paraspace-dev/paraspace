@@ -1,0 +1,33 @@
+# .paraspace/Parafile — the para e2e test fixture ("hello").
+#
+# This is NOT a template (it never ships in the npm package); it's the smallest
+# real para project the end-to-end suite can drive: an Alpine box that serves a
+# fixed sentinel over HTTP on :8080, so the tests can assert the whole path —
+# `para up` -> hooks -> boot readiness -> Caddy TLS -> bridge IP -> the app.
+#
+# Sourced as bash. The harness (test/run) overrides PARA_PROJECT, PARA_VOLUME and
+# PARA_HTTPS_PORT via the environment so a test run is sandboxed from your real
+# workspaces; the defaults here just keep a by-hand `para up` in this dir working.
+
+# Contract version these hooks target — para refuses on a mismatch.
+: "${PARA_VERSION:=1}"
+
+# Project identity (ownership, `para ls` scoping, shared-volume suffix). The
+# harness overrides this with a throwaway slug per run.
+: "${PARA_PROJECT:=paratest}"
+
+# The tiny Alpine base image the suite builds with test/fixtures/hello/build-image.sh
+# (NOT `para image-build`, which is Void+Docker specific). ~15 MB: bash + busybox
+# httpd + an app:1000 user.
+: "${PARA_IMAGE:=alpine-minimal}"
+
+# Wildcard domain; `*.paraspace.dev` already resolves to 127.0.0.1.
+: "${PARA_DOMAIN:=paraspace.dev}"
+
+# The dir under ~ that `para sh -c` cd's into. No repo is cloned here, so the
+# provision hook just `mkdir`s it — see hooks/provision.
+: "${PARA_CLONE_DIR:=app}"
+
+# One route: the workspace apex -> the busybox httpd the boot hook starts on :8080.
+#   https://<name>.paraspace.dev  ->  <container-ip>:8080
+PARA_ROUTES=( "8080" )

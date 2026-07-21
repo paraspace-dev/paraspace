@@ -1,0 +1,93 @@
+#!/usr/bin/env bash
+set -euo pipefail
+# ============================================================================
+# test/run — the para test suite.
+#
+# Two tiers:
+#   cli   — no incus. Argument handling, `para init`, help. Fast; CI-safe.
+#   e2e   — the real thing: builds a ~15 MB Alpine image, `para up`s a workspace,
+#           and asserts the whole path (hooks -> boot readiness -> Caddy TLS ->
+#           bridge IP -> the app) through actual para commands. Needs incus.
+#
+# Every run is sandboxed (throwaway XDG dirs + a non-default Caddy port + an
+# IP band carved from what's free on the bridge), so it never touches — or is
+# seen by — your real para workspaces. Teardown removes everything it created.
+#
+#   Usage: test/run [--cli|--e2e|--all] [--keep] [--no-build] [--failfast] [FILTER]
+#     --all       both tiers (default); e2e is skipped with a note if incus is absent
+#     --cli       CLI tier only
+#     --e2e       e2e tier only (errors if incus is unreachable)
+#     --keep      leave workspaces + the temp XDG tree for inspection
+#     --no-build  reuse the existing alpine-minimal image (skip the image build)
+#     --failfast  stop at the first failing test
+#     FILTER      run only tests whose description contains this substring
+# ============================================================================
+
+HERE="$(cd "$(dirname "$0")" && pwd)"
+REPO="$(cd "$HERE/.." && pwd)"
+export PARA="$REPO/bin/para"
+export FIXTURE_DIR="$HERE/fixtures/hello"
+
+tier=all
+filter=""
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --all)      tier=all; shift ;;
+    --cli)      tier=cli; shift ;;
+    --e2e)      tier=e2e; shift ;;
+    --keep)     export PARA_TEST_KEEP=1; shift ;;
+    --no-build) export PARA_TEST_NO_BUILD=1; shift ;;
+    --failfast) export PARA_TEST_FAILFAST=1; shift ;;
+    -h|--help)  sed -n '4,25p' "$0"; exit 0 ;;
+    -*)         echo "unknown flag: $1" >&2; exit 2 ;;
+    *)          filter="$1"; shift ;;
+  esac
+done
+
+# shellcheck source=lib/harness.sh
+. "$HERE/lib/harness.sh"
+# shellcheck source=lib/assert.sh
+. "$HERE/lib/assert.sh"
+# shellcheck source=lib/sandbox.sh
+. "$HERE/lib/sandbox.sh"
+
+incus_ok=0
+if command -v incus >/dev/null 2>&1 && incus info >/dev/null 2>&1; then incus_ok=1; fi
+
+run_e2e=0
+case "$tier" in
+  cli) ;;
+  e2e) [ "$incus_ok" -eq 1 ] || { echo "e2e tier needs a reachable incus daemon." >&2; exit 1; }; run_e2e=1 ;;
+  all) if [ "$incus_ok" -eq 1 ]; then run_e2e=1; else echo "${_t_gray:-}note: incus unreachable — running CLI tier only.${_t_off:-}" >&2; fi ;;
+esac
+
+if [ "$run_e2e" -eq 1 ]; then
+  sandbox_e2e
+  trap sandbox_teardown EXIT
+  # Three fixed, pre-tracked workspace names so teardown reclaims them even if a
+  # test aborts (tests run in subshells and can't grow the parent's tracking list).
+  export PARA_WS="para${$}a" PARA_WS2="para${$}b" PARA_WS3="para${$}c"
+  sandbox_track "$PARA_WS"; sandbox_track "$PARA_WS2"; sandbox_track "$PARA_WS3"
+  # The one expensive shared boot: bring the primary workspace up once. Read-only
+  # tests assert against it; if this fails the whole e2e tier is moot, so surface
+  # the log and stop.
+  echo "${_t_gray:-}==> provisioning shared workspace $PARA_WS (first boot)…${_t_off:-}" >&2
+  if ! "$PARA" up "$PARA_WS"; then
+    echo "FATAL: 'para up $PARA_WS' failed — see output above." >&2
+    exit 1
+  fi
+else
+  sandbox_base
+  trap 'rm -rf "$SANDBOX_ROOT"' EXIT
+fi
+
+# Source the selected tiers' test files (each defines test_* functions). The
+# paths are runtime globs, so shellcheck can't follow them — that's expected.
+shopt -s nullglob
+# shellcheck disable=SC1090
+[ "$tier" != e2e ] && for f in "$HERE"/cli/*.sh; do . "$f"; done
+# shellcheck disable=SC1090
+[ "$run_e2e" -eq 1 ] && for f in "$HERE"/e2e/*.sh; do . "$f"; done
+shopt -u nullglob
+
+run_all "$filter"

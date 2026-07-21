@@ -1,0 +1,55 @@
+# void-minimal — the barest paraspace box
+
+The smallest possible [para](../../README.md) template: it **installs nothing and
+boots nothing**. `para image-build` + `para up <name>` stands up a Void Linux
+workspace with a user and a shell, and that's it — `para sh <name>` drops you in.
+Every place you'd normally add a toolchain, a clone, or an app is marked with a
+comment pointing at where the code goes.
+
+Use it when you want to start from a clean box and grow your own setup, rather
+than trimming down the runnable [`void-docker-gh`](../void-docker-gh) template.
+
+```
+void-minimal/
+  .paraspace/
+    Parafile               # identity + a placeholder route (para needs ≥1)
+    image-build.sh         # user + writable /tmp; the pkgs="" install block is EMPTY
+    hooks/provision        # seed + link the shell rc; comments mark where a clone goes
+    hooks/boot             # no-op: nothing to boot (returns 0 immediately)
+    hooks/helpers          # colored output + small guards, sourced by the hooks
+    skel/zshrc             # a small shell rc, seeded onto the shared volume
+```
+
+## Try it
+
+```sh
+bin/para install                        # -> ~/.local/bin/para (once, from a checkout)
+para image-build                        # build the bare base image
+para up box                             # stand up a workspace named "box"
+para sh box                             # get a shell inside it
+```
+
+`para up` succeeds and the workspace runs, but `https://box.<PARA_DOMAIN>` will
+**502** — nothing listens on the placeholder route yet. That's expected for a bare
+box; it goes away once you add an app.
+
+## Grow it into a real project
+
+The scaffold tells you where each piece goes:
+
+- **`image-build.sh`** — the `pkgs=""` block is empty. Add your packages
+  (`pkgs="zsh tmux neovim git"`, or `docker docker-compose` for a stack), then
+  `para image-build`. Installing `zsh` makes the provision hook switch your login
+  shell to it so `skel/zshrc` applies.
+- **`hooks/provision`** — add a clone step, `.env` handling, and richer
+  shared-volume seeding. [`void-docker-gh`](../void-docker-gh/.paraspace/hooks/provision)
+  is this same hook fully written out (git-key auth included).
+- **`hooks/boot`** — put your app's start command here (e.g. `docker compose up
+  -d --wait`) and return 0 only once the routed service is listening.
+- **`Parafile`** — set `PARA_ORIGIN`/`PARA_CLONE_DIR`, and point `PARA_ROUTES` at
+  your service's real port.
+
+For a fuller starting point, see [`void-docker-gh`](../void-docker-gh) (a runnable
+docker demo) or [`void-jchook`](../void-jchook) (a full personal dev environment).
+
+Full schema + the hook/image contracts: [`../../docs/`](../../docs/README.md).

@@ -1,0 +1,40 @@
+# .paraspace/Parafile — per-project config for para. Sourced as bash: it sets the
+# few PARA_* variables para itself reads (version, image, what to clone, routes).
+# Everything else is a hook (.paraspace/hooks/). A real env var overrides any of these.
+#
+# Full schema: the ParaSpace docs — docs/parafile.md in the package.
+
+# para contract version these hooks target. para refuses (clearly) on a mismatch.
+: "${PARA_VERSION:=1}"
+
+# Project identity — the single key para uses for ownership, `para ls` scoping, and
+# the shared-volume name (para-home-<PARA_PROJECT>). Independent of where this dir
+# lives on disk, so moving/renaming the checkout keeps its workspaces bound to it.
+# A plain slug ([a-z0-9-]). (`para init` sets this to your project's directory name.)
+: "${PARA_PROJECT:=void-docker-gh}"
+
+# Base image `para up` launches — you build it with `para image-build`.
+# (`para init` sets this to your project's directory name.)
+: "${PARA_IMAGE:=void-docker-gh}"
+
+# Git URL para clones into each workspace. Change it to your project's repo.
+: "${PARA_ORIGIN:=git@github.com:jchook/docker-caddy.git}"
+
+# Directory under ~ to clone into.
+: "${PARA_CLONE_DIR:=docker-caddy}"
+
+# Wildcard domain the workspaces live under: https://<name>.$PARA_DOMAIN. Its
+# wildcard `*.$PARA_DOMAIN` must resolve to 127.0.0.1 — the default already does.
+: "${PARA_DOMAIN:=paraspace.dev}"
+
+# HTTP routes para publishes through its Caddy — one TLS site per "[sub:]port".
+# A bare port is the workspace apex: 8080 -> https://<name>.$PARA_DOMAIN
+PARA_ROUTES=( "8080" )
+
+# If your repository is private, enable this: gh authorizes this machine's para
+# key for you. Otherwise para prints the key and waits for you to add it by hand.
+# : "${PARA_GH_AUTH:=1}"
+
+# para copies the project's own .env into each clone if it has one. Point this at
+# a different base .env to seed instead, or set it empty to seed nothing.
+# : "${PARA_HOST_ENV:=$PROJECT_ROOT/.env}"

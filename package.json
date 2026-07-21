@@ -1,0 +1,44 @@
+{
+  "name": "paraspace",
+  "version": "0.1.0",
+  "description": "ParaSpace — parallel dev workspaces on Incus",
+  "keywords": [
+    "incus",
+    "lxc",
+    "docker",
+    "caddy",
+    "dev-workspace",
+    "parallel",
+    "sandbox",
+    "container",
+    "cli"
+  ],
+  "homepage": "https://github.com/paraspace-dev/paraspace#readme",
+  "bugs": "https://github.com/paraspace-dev/paraspace/issues",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/paraspace-dev/paraspace.git"
+  },
+  "license": "MIT",
+  "author": "Wes Roberts",
+  "os": [
+    "linux",
+    "darwin"
+  ],
+  "scripts": {
+    "lint": "bin/lint"
+  },
+  "bin": {
+    "para": "bin/para"
+  },
+  "files": [
+    "bin/para",
+    "README.md",
+    "LICENSE",
+    "docs",
+    "templates"
+  ],
+  "publishConfig": {
+    "access": "public"
+  }
+}

@@ -1,0 +1,42 @@
+# .paraspace/Parafile — per-project config for para. Sourced as bash: it sets the
+# few PARA_* variables para itself reads (version, image, routes). Everything else
+# is a hook (.paraspace/hooks/). A real env var overrides any of these.
+#
+# This is the BAREST template: it installs nothing and boots nothing. It stands a
+# Void Linux box up, gives you a shell (`para sh <name>`), and marks — in comments
+# throughout — where you'd add your toolchain, clone, and app. Grow it into
+# void-docker-gh (a runnable docker demo) as your project takes shape.
+#
+# Full schema: the ParaSpace docs — docs/parafile.md in the package.
+
+# para contract version these hooks target. para refuses (clearly) on a mismatch.
+: "${PARA_VERSION:=1}"
+
+# Project identity — the key para uses for ownership, `para ls` scoping, and the
+# shared-volume name (para-home-<PARA_PROJECT>). Independent of where this dir
+# lives on disk. A plain slug ([a-z0-9-]). (`para init` sets this to your dir name.)
+: "${PARA_PROJECT:=void-minimal}"
+
+# Base image `para up` launches — you build it with `para image-build`.
+# (`para init` sets this to your project's directory name.)
+: "${PARA_IMAGE:=void-minimal}"
+
+# Git URL para clones into each workspace. This barebones template clones NOTHING
+# (its provision hook has no clone step), so it's left unset. Point it at your repo
+# and add a clone step to hooks/provision — see templates/void-docker-gh — once you
+# have an app.
+# : "${PARA_ORIGIN:=git@github.com:you/your-repo.git}"
+
+# Directory under ~ to clone into (once you add a clone step).
+# : "${PARA_CLONE_DIR:=your-repo}"
+
+# Wildcard domain the workspaces live under: https://<name>.$PARA_DOMAIN. Its
+# wildcard `*.$PARA_DOMAIN` must resolve to 127.0.0.1 — the default already does.
+: "${PARA_DOMAIN:=paraspace.dev}"
+
+# HTTP routes para publishes through its Caddy — one TLS site per "[sub:]port".
+# para requires at least one route to bring a workspace up, so this is a
+# PLACEHOLDER: nothing listens on :8080 in a bare box, so https://<name>.$PARA_DOMAIN
+# will 502 until you run something there (add a boot step + point this at its port).
+# A bare port is the workspace apex: 8080 -> https://<name>.$PARA_DOMAIN
+PARA_ROUTES=( "8080" )

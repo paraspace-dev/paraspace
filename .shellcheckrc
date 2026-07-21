@@ -1,0 +1,5 @@
+# Resolve `source`d files relative to each script's own directory (SCRIPTDIR is
+# a shellcheck magic token for the dir of the file being checked). Lets the
+# hooks' `. "$(dirname "$0")/helpers"` be followed with -x — no per-file
+# `# shellcheck source=` directive. (bin/lint passes -x to enable following.)
+source-path=SCRIPTDIR

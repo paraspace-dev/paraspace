@@ -1,0 +1,47 @@
+#!/usr/bin/env bash
+set -euo pipefail
+# ============================================================================
+# lint — shellcheck every bash script in the package.
+#
+# para is pure shell, so this is its test suite: shellcheck over the CLI plus
+# the templates' hooks and image-build.sh. skel/zshrc is zsh — shellcheck can't
+# parse it — and is skipped (it has no bash shebang, so discovery drops it).
+#
+# Discovers targets by shebang (every tracked file whose first line names bash),
+# so a new hook is linted automatically with no list to maintain. Runs from
+# anywhere — it resolves the package root from its own location.
+#
+# Needs `shellcheck` on PATH; if it's absent but docker is, it falls back to the
+# pinned koalaman/shellcheck image, so a bare checkout and CI both just work.
+#   Usage: bin/lint
+# ============================================================================
+
+SHELLCHECK_IMAGE="koalaman/shellcheck:v0.10.0"
+
+root="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$root"
+
+# Collect bash scripts by shebang. `-not -path` prunes VCS/dependency dirs; the
+# first-line test picks bash (sh/zsh/non-scripts fall through). bash 3.2-safe
+# (no mapfile), matching para's own portability bar.
+files=()
+while IFS= read -r f; do
+  case "$(head -n1 "$f" 2>/dev/null)" in
+    '#!'*bash*) files+=("${f#./}") ;;
+  esac
+done < <(find . -type f \
+  -not -path './.git/*' -not -path '*/node_modules/*' | sort)
+
+[ "${#files[@]}" -gt 0 ] || { echo "lint: no bash scripts found" >&2; exit 1; }
+
+# -x: follow `source`d files (so each hook's `helpers` is checked too).
+if command -v shellcheck >/dev/null 2>&1; then
+  echo "==> shellcheck ${files[*]}" >&2
+  exec shellcheck -x "${files[@]}"
+elif command -v docker >/dev/null 2>&1; then
+  echo "==> shellcheck not found — via docker ($SHELLCHECK_IMAGE)" >&2
+  exec docker run --rm -v "$root:/mnt" -w /mnt "$SHELLCHECK_IMAGE" -x "${files[@]}"
+else
+  echo "lint: need 'shellcheck' (or 'docker' for the pinned image) on PATH" >&2
+  exit 1
+fi

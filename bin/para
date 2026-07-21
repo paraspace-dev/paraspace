@@ -1,0 +1,1670 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# ============================================================================
+# para — parallel dev workspaces on Incus
+# ----------------------------------------------------------------------------
+# Runs any number of full, isolated copies of a project side by side. Each
+# workspace is an unprivileged Incus system container with its own clone, its
+# own Docker stack, a static bridge IP, and a URL. A para-owned host Caddy
+# terminates TLS for the `*.<domain>` wildcard and reverse-proxies each
+# hostname to its container.
+#
+# Everything project-specific lives in a .paraspace/ dir at the project root
+# (Parafile + hooks); para itself bundles no assets.
+#
+# ---- Where the prose lives ------------------------------------------------
+#   Deliberately not restated here — one copy each, keep them honest:
+#     * the command surface, config precedence, and prerequisites
+#       -> usage_full() near the bottom of this file (`para --help`),
+#          mirrored in docs/commands.md
+#     * URLs, ports, DNS, certificate trust  -> docs/urls.md
+#     * the base image + .paraspace/image-build.sh  -> docs/image.md
+#     * adopting para in a project  -> docs/project-setup.md
+#     * Parafile keys -> docs/parafile.md;  hooks -> docs/hooks.md
+#     * design rationale + where state lives  -> docs/how-it-works.md
+# ============================================================================
+
+# ---- config (env > ~/.config/para/config > defaults) -----------------------
+# The config file holds KEY=VALUE lines for any PARA_* knob below; real
+# environment variables win over it. para writes it itself when it has to
+# pick a non-default value (e.g. PARA_POOL when the default pool is btrfs).
+PARA_CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/para"
+PARA_CONFIG="$PARA_CONFIG_DIR/config"
+if [ -f "$PARA_CONFIG" ]; then
+  while IFS='=' read -r _k _v; do
+    case "$_k" in
+      PARA_[A-Z_]*) [ -n "${!_k:-}" ] || printf -v "$_k" '%s' "$_v" ;;
+    esac
+  done < "$PARA_CONFIG"
+  unset _k _v
+fi
+
+# The para<->project CONTRACT version this para provides. Injected into hooks and
+# checked against a Parafile's PARA_VERSION (require_project). BUMP on a BREAKING
+# change to the interface — the project layout (the .paraspace/ dir + Parafile
+# location), the injected env vars, the ~/.para layout, the hook names/semantics,
+# or the Parafile keys. Additive changes (a new env var, a new optional hook) do
+# NOT bump it. `readonly` so neither the environment, the config file, nor a
+# Parafile (sourced later) can overwrite para's real contract.
+readonly PARA_CONTRACT=1
+
+# PARA_DOMAIN (the workspace wildcard domain) is PROJECT config — set in the
+# Parafile, defaulted in the fallbacks below — not a machine knob.
+PARA_POOL="${PARA_POOL:-default}"
+PARA_BRIDGE="${PARA_BRIDGE:-incusbr0}"
+# PARA_VOLUME (the shared home volume) is derived per-project below, once the
+# project is known — env still wins.
+PARA_USER="${PARA_USER:-app}"
+PARA_UID="${PARA_UID:-1000}"
+PARA_GID="${PARA_GID:-1000}"
+CT_PREFIX="para-"
+# Optional working-copy passthrough: the host:port para Caddy proxies
+# https://localhost to, so a stack you run on the HOST (not in a workspace) keeps
+# its familiar URL. Opt-in: an unset PORT emits no passthrough (a baked-in
+# default could equal PARA_HTTPS_PORT and have Caddy proxy to itself). Both are
+# para's own knobs (set them in the Parafile) — para does NOT read the project's
+# own stack env, so it stays project-agnostic.
+PARA_WORKCOPY_HOST="${PARA_WORKCOPY_HOST:-localhost}"
+PARA_WORKCOPY_PORT="${PARA_WORKCOPY_PORT:-}"
+# Port para Caddy binds for the *.$PARA_DOMAIN wildcard. Default 8443 binds
+# unprivileged everywhere, at the cost of a :8443 suffix on workspace URLs.
+# Port-less URLs are opt-in: PARA_HTTPS_PORT=443, which as non-root needs
+# cap_net_bind_service on the caddy binary (start warns with the one-liner).
+PARA_HTTPS_PORT="${PARA_HTTPS_PORT:-8443}"
+# Static-IP band within the bridge subnet (derived below): <prefix>.200-.249.
+PARA_IP_LO="${PARA_IP_LO:-200}"
+PARA_IP_HI="${PARA_IP_HI:-249}"
+
+# ---- the target project ----------------------------------------------------
+# para bundles NO assets — the project provides everything (Parafile, hooks,
+# skel, image-build.sh) under its own .paraspace/ dir. `para install` just puts the
+# script on PATH; everything else is found via PROJECT_ROOT below.
+#
+# PROJECT_ROOT is the project para operates on — found by walking up from $PWD for
+# a .paraspace/ dir (like git/compose find their config), so one global `para` can
+# drive any project. The whole para setup — the Parafile and the hooks/skel/
+# image-build.sh — lives under .paraspace/, hidden like .github or .git so it's
+# set-up-once plumbing, not day-to-day clutter. Best-effort at load: commands that
+# clone/boot/build assert it via require_project; project-agnostic ones (ls, rm,
+# sh, down, web, key) work from anywhere. PARA_PROJECT_DIR overrides the search.
+# PROJECT_ROOT is only a file LOCATOR — a project's IDENTITY is PARA_PROJECT
+# (below), independent of where the checkout lives, so moving/renaming the dir
+# never orphans a workspace. Full design + schema: docs/.
+find_project_root() {
+  local d="$PWD"
+  while [ "$d" != / ]; do
+    [ -d "$d/.paraspace" ] && { printf '%s\n' "$d"; return 0; }
+    d="$(dirname "$d")"
+  done
+  return 1
+}
+PROJECT_ROOT="${PARA_PROJECT_DIR:-$(find_project_root || true)}"
+HOST_ENV="${PROJECT_ROOT:+$PROJECT_ROOT/.env}"
+# PARA_ORIGIN (the git URL the clone hook clones) is PROJECT config, not para's to
+# guess: the clone is entirely the project's (it lives in .paraspace/hooks/, and para
+# never runs git). Declare it in the Parafile — para exports $PROJECT_ROOT before
+# sourcing it, so a Parafile at its own repo's TOPLEVEL can derive it with
+#   : "${PARA_ORIGIN:=$(git -C "$PROJECT_ROOT" remote get-url origin 2>/dev/null)}"
+# while a nested/template project pins it explicitly. (para deliberately does NOT
+# derive it from `origin` itself: for a project nested in a larger repo that walks
+# up to the ENCLOSING repo's origin and clones the wrong thing.) Whatever the
+# Parafile/env set flows to the hook via the PARA_* forwarding in run_hook.
+
+# The per-PROJECT knobs (routes, image, clone dir, hooks) live in .paraspace/Parafile
+# at PROJECT_ROOT, sourced as bash — same PARA_* mechanism as the machine config
+# above. It's authoritative; a real env var still wins; the fallbacks below fill
+# whatever it (and the environment) leave unset.
+PARAFILE="${PARAFILE:-${PROJECT_ROOT:+$PROJECT_ROOT/.paraspace/Parafile}}"
+# shellcheck source=/dev/null  # a per-project file, resolved at runtime
+[ -n "${PARAFILE:-}" ] && [ -f "$PARAFILE" ] && . "$PARAFILE"
+# Fallbacks: applied only when neither env nor the Parafile set them. A project's
+# Parafile normally sets these; the defaults just keep para working if it doesn't.
+: "${PARA_IMAGE:=para-dev}"
+: "${PARA_CLONE_DIR:=app}"
+# Project IDENTITY — the single key para uses for ownership, `para ls` scoping, and
+# the shared-volume name. Declared in the Parafile (`para init` bakes it to the dir
+# name); defaults to the project directory's basename so an undeclared project still
+# works. Deliberately NOT the on-disk path, so moving or renaming the checkout keeps
+# its workspaces bound to it. A plain slug — it's spliced into volume names and
+# printed in `para ls`. Only set/validated inside a project (empty is fine for the
+# project-agnostic commands).
+PARA_PROJECT="${PARA_PROJECT:-}"   # always defined for set -u (empty outside a project)
+if [ -n "$PROJECT_ROOT" ]; then
+  [ -n "$PARA_PROJECT" ] \
+    || PARA_PROJECT="$(printf '%s' "${PROJECT_ROOT##*/}" | tr '[:upper:]' '[:lower:]' | tr -c 'a-z0-9-' '-')"
+  PARA_PROJECT="${PARA_PROJECT#-}"; PARA_PROJECT="${PARA_PROJECT%-}"   # trim edge hyphens from sanitizing
+  [[ "$PARA_PROJECT" =~ ^[a-z0-9][a-z0-9-]*$ ]] \
+    || { printf 'para: PARA_PROJECT must be a plain slug ([a-z0-9-], no leading hyphen); got %s\n' "$PARA_PROJECT" >&2; exit 1; }
+fi
+# Wildcard domain the workspaces live under: https://<name>.$PARA_DOMAIN, so
+# `*.$PARA_DOMAIN` must resolve to 127.0.0.1. Recorded per-workspace at `up` time
+# (registry field 4) so a global para stays correct across projects on different
+# domains. The default's wildcard (`*.paraspace.dev`) already points at 127.0.0.1.
+: "${PARA_DOMAIN:=paraspace.dev}"
+# PARA_CLONE_DIR is spliced into guest shell commands (clone path, cd, hook
+# dispatch), so keep it a plain single path segment — no spaces, metacharacters,
+# leading dot, or slashes — rather than trusting the Parafile value blindly.
+# Inline error (not die): this runs during config load, before the helpers below.
+[[ "$PARA_CLONE_DIR" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]] \
+  || { printf 'para: PARA_CLONE_DIR must be a plain name ([A-Za-z0-9._-], no leading dot/slash); got %s\n' "$PARA_CLONE_DIR" >&2; exit 1; }
+# Shared home volume: per-project by default (para-home-<PARA_PROJECT>), so two
+# projects get INDEPENDENT home volumes — their own dotfiles + Claude/gh/ssh auth.
+# Point several projects at one name (PARA_VOLUME=para-home in their Parafile) to
+# authenticate once across them. PARA_PROJECT is already a plain slug, valid as-is
+# for incus's volume charset. (Empty outside a project — only ever printed there.)
+: "${PARA_VOLUME:=para-home-${PARA_PROJECT:-}}"
+# Base .env seeded into each clone (as ~/.para/host.env) before the provision hook
+# runs. If the env or Parafile SETS it, the path must exist — sync_project fails
+# fast on a missing one. If it's UNSET, para defaults to the project's own .env
+# when the project HAS one, and seeds nothing when it doesn't (so a project with
+# no .env just works). Set it EMPTY in the Parafile to always seed nothing.
+if [ -z "${PARA_HOST_ENV+set}" ]; then
+  PARA_HOST_ENV="$HOST_ENV"
+  [ -n "$PARA_HOST_ENV" ] && [ -f "$PARA_HOST_ENV" ] || PARA_HOST_ENV=""
+fi
+# Branch to clone into the workspace (default: origin's default branch). Set it
+# to iterate on the in-repo hooks/provisioning without merging first, e.g.
+# `PARA_CLONE_BRANCH=my-feature para up ws`. Applies at CLONE time only — to move
+# an existing workspace to another branch, `para rm` then `para up` it again.
+PARA_CLONE_BRANCH="${PARA_CLONE_BRANCH:-}"
+[ -z "$PARA_CLONE_BRANCH" ] || [[ "$PARA_CLONE_BRANCH" =~ ^[A-Za-z0-9][A-Za-z0-9._/-]*$ ]] \
+  || { printf 'para: PARA_CLONE_BRANCH must be a plain branch name ([A-Za-z0-9._/-]); got %s\n' "$PARA_CLONE_BRANCH" >&2; exit 1; }
+[ "${PARA_ROUTES+set}" = set ] || PARA_ROUTES=( "8080" )
+
+PARA_STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/para"
+REGISTRY="$PARA_STATE_DIR/workspaces"    # "name ip routes domain project" per line
+CADDYFILE="$PARA_STATE_DIR/Caddyfile"
+CADDY_PID="$PARA_STATE_DIR/caddy.pid"
+
+# ---- tiny helpers ----------------------------------------------------------
+log()  { printf '\033[36m==>\033[0m %s\n' "$*" >&2; }
+warn() { printf '\033[33mwarn:\033[0m %s\n' "$*" >&2; }
+die()  { printf '\033[31merror:\033[0m %s\n' "$*" >&2; exit 1; }
+need() { command -v "$1" >/dev/null 2>&1 || die "missing required command: $1"; }
+
+# May we prompt / run interactive subcommands (a `read`, `gh auth login`)? Needs
+# a TTY on stdin, unless PARA_NONINTERACTIVE is set to a non-empty value — cron/CI
+# /scripts set it (=1) to force the non-interactive path (print + exit, no block).
+interactive() { [ -z "${PARA_NONINTERACTIVE:-}" ] && [ -t 0 ]; }
+
+ct_name() { echo "$CT_PREFIX$1"; }
+
+# Resolve THIS script's real path through any symlink chain, then echo the package
+# root — one dir up from bin/. Covers every install mode: `npm i -g paraspace`
+# (bin/para is a symlink into node_modules), `npx`, and a source checkout (the
+# repo-root bin/para symlink). Plain `readlink`, NOT `readlink -f`, so it works on
+# macOS's BSD readlink too.
+pkg_root() {
+  local self="$0" dir link
+  while [ -L "$self" ]; do
+    dir="$(cd -P "$(dirname "$self")" && pwd)"
+    link="$(readlink "$self")"
+    case "$link" in /*) self="$link" ;; *) self="$dir/$link" ;; esac
+  done
+  cd -P "$(dirname "$self")/.." && pwd
+}
+
+# Locate the bundled templates. Ordered so `para init` works across install
+# modes: next to the CLI (npm/npx/checkout — via pkg_root), then the copy that
+# `para install` stages under XDG data (a plain file-copy install has no adjacent
+# templates/). Echoes the dir; non-zero if none found.
+templates_dir() {
+  local d
+  for d in "$(pkg_root)/templates" "${XDG_DATA_HOME:-$HOME/.local/share}/paraspace/templates"; do
+    [ -d "$d" ] && { printf '%s\n' "$d"; return 0; }
+  done
+  return 1
+}
+
+# The :port suffix para URLs carry — empty for :443 (port-less URLs), ":<port>"
+# otherwise. Used in printed URLs and Caddyfile site heads.
+url_port() { [ "$PARA_HTTPS_PORT" = 443 ] && echo "" || echo ":$PARA_HTTPS_PORT"; }
+
+validate_name() {
+  [[ "$1" =~ ^[a-z][a-z0-9-]{0,30}$ ]] \
+    || die "invalid name '$1' — lowercase letters, digits, hyphens; start with a letter (<=31 chars)"
+}
+
+ensure_dirs() { mkdir -p "$PARA_CONFIG_DIR" "$PARA_STATE_DIR"; touch "$REGISTRY"; }
+
+persist_config() { # persist_config KEY VALUE — update ~/.config/para/config
+  ensure_dirs
+  local tmp; tmp="$(mktemp)"
+  { if [ -f "$PARA_CONFIG" ]; then grep -v "^$1=" "$PARA_CONFIG" || true; fi; echo "$1=$2"; } > "$tmp"
+  mv "$tmp" "$PARA_CONFIG"
+  log "Saved $1=$2 to $PARA_CONFIG (env vars still override it)."
+}
+
+instance_exists() { incus info "$1" >/dev/null 2>&1; }
+
+# A para-<name> container carries its own identity in incus user config, so it's
+# self-describing: ownership survives a lost/cleared registry (cmd_up trusts the
+# stamp over the registry), and the whole registry is rebuildable from incus
+# (`para reconcile`). Stamped/refreshed on every `up`, mirroring the registry row.
+ct_meta()  { incus config get "$1" "$2" 2>/dev/null || true; }   # ct_meta <ct> <key>
+stamp_ct() { # stamp_ct <ct> <project> <routes-csv> <domain>
+  # key=value form (not the space-separated "key value"), which incus >= 7
+  # deprecates with a warning on every set. Values are slug/csv/token — no '='.
+  incus config set "$1" "user.para.project=$2"
+  incus config set "$1" "user.para.routes=$3"
+  incus config set "$1" "user.para.domain=$4"
+}
+instance_running() {
+  # Capture then match — do NOT pipe `incus info` into `grep -q`. `Status:`
+  # appears early in incus's output; grep -q exits on it while incus is still
+  # printing, incus takes SIGPIPE (rc 141), and under `set -o pipefail` that 141
+  # becomes the pipeline's result — a false "not running" for a running instance
+  # (flakier the longer the info output). A here-string has no such writer to
+  # kill, so grep -q's own exit code stands.
+  local info; info="$(incus info "$1" 2>/dev/null)" || true
+  grep -q '^Status: RUNNING' <<<"$info"
+}
+require_ws() { [ -n "$(ip_of "$1")" ] || die "no such workspace '$1' (see: para ls)"; }
+
+# Assert we're operating on a project (a .paraspace/ dir was found by walking up
+# from $PWD, or PARA_PROJECT_DIR was set). Commands that clone/boot/build a workspace
+# need one; project-agnostic commands (ls, rm, sh, down, web, key) do not.
+require_project() {
+  [ -n "$PROJECT_ROOT" ] \
+    || die "not inside a para project — no .paraspace/ directory found from \$PWD upward. cd into a project directory (one with a .paraspace/ dir holding a Parafile), or set PARA_PROJECT_DIR=/path/to/project."
+  # Contract handshake (opt-in): a Parafile that declares which para contract its
+  # hooks target (PARA_VERSION) gets a clear error on a mismatch instead of a
+  # silent break when a global para is updated. Not set => no check.
+  if [ -n "${PARA_VERSION:-}" ] && [ "$PARA_VERSION" != "$PARA_CONTRACT" ]; then
+    die "this project targets para contract $PARA_VERSION, but this para provides contract $PARA_CONTRACT. The para<->project interface changed in a breaking way — update para, or update the project's .paraspace/hooks/ + .paraspace/Parafile PARA_VERSION."
+  fi
+}
+ip_of() { awk -v n="$1" '$1==n{print $2}' "$REGISTRY" 2>/dev/null; }
+# Owning project (registry field 5, the recorded PARA_PROJECT slug) of a workspace,
+# or empty if unknown/unregistered.
+# MUST return 0 even on no-match / missing registry — it's called in an assignment
+# (`owner=$(project_of …)`) under set -e, so a nonzero here would abort the caller.
+project_of() { # project_of <name>
+  [ -f "$REGISTRY" ] || return 0
+  local n="$1" _name _ip _routes _domain _project
+  while read -r _name _ip _routes _domain _project; do
+    [ "$_name" = "$n" ] && { printf '%s\n' "$_project"; return 0; }
+  done < "$REGISTRY"
+  return 0
+}
+
+# Drop workspace <name>'s line from the registry (atomic rewrite via mktemp). A
+# missing registry is a no-op; never fails (used under set -e on rm/up).
+registry_remove() { # registry_remove <name>
+  local tmp; tmp="$(mktemp)"
+  awk -v n="$1" '$1!=n' "$REGISTRY" > "$tmp" 2>/dev/null || true
+  mv "$tmp" "$REGISTRY"
+}
+
+# Run a command inside a workspace as the workspace user, in their home.
+# Uses `su -` rather than `incus exec --user`: su runs initgroups, so the
+# user's SUPPLEMENTARY groups load too — crucially `docker`, without which the
+# stack hits "permission denied on /var/run/docker.sock". `-s /bin/bash`
+# keeps bash semantics regardless of the user's login shell (zsh).
+wexec() { # wexec <name> <bash-script>
+  local ct; ct="$(ct_name "$1")"; shift
+  incus exec "$ct" -- su - "$PARA_USER" -s /bin/bash -c "$1"
+}
+
+# Like wexec but with a controlling TTY, for interactive subcommands (e.g.
+# `gh auth login`). `-t` + `su --pty` for the SIGWINCH-forwarding reason spelled
+# out in cmd_claude; unlike cmd_claude/cmd_run this doesn't `exec` — it returns so
+# the caller can continue (retry the clone, etc.).
+wexec_tty() { # wexec_tty <name> <bash-script>
+  local ct; ct="$(ct_name "$1")"; shift
+  incus exec "$ct" -t -- su --pty - "$PARA_USER" -s /bin/bash -c "$1"
+}
+
+# ---- subnet / IP allocation ------------------------------------------------
+subnet_prefix() { # "192.168.100.1/24" -> "192.168.100"
+  local addr; addr="$(incus network get "$PARA_BRIDGE" ipv4.address 2>/dev/null || true)"
+  [ -n "$addr" ] || die "cannot read $PARA_BRIDGE ipv4.address (is the bridge up?)"
+  addr="${addr%/*}"; echo "${addr%.*}"
+}
+
+alloc_ip() {
+  local prefix used n ip
+  prefix="$(subnet_prefix)"
+  used="$(awk '{print $2}' "$REGISTRY" 2>/dev/null || true)"
+  for n in $(seq "$PARA_IP_LO" "$PARA_IP_HI"); do
+    ip="$prefix.$n"
+    grep -qxF "$ip" <<<"$used" || { echo "$ip"; return 0; }
+  done
+  die "no free static IPs in $prefix.$PARA_IP_LO-$PARA_IP_HI"
+}
+
+# ---- backend / volume ------------------------------------------------------
+assert_colima_version() {
+  local v major minor
+  v="$(colima version 2>/dev/null | awk '/colima version/{print $3}')" || return 0
+  [ -n "$v" ] || return 0
+  major="${v%%.*}"; minor="${v#*.}"; minor="${minor%%.*}"
+  if [ "${major:-0}" -eq 0 ] && [ "${minor:-0}" -lt 10 ]; then
+    warn "colima $v < 0.10 — container IPs may be unreachable (need --network-address, added in 0.10)."
+  fi
+}
+
+ensure_backend() {
+  case "$(uname -s)" in
+    Darwin)
+      need colima; need incus; need caddy
+      assert_colima_version
+      if ! incus info >/dev/null 2>&1; then
+        log "Starting colima (incus runtime)…"
+        colima start --runtime incus --network-address --cpu 4 --memory 12
+      fi
+      ;;
+    Linux)
+      need incus; need caddy
+      incus info >/dev/null 2>&1 \
+        || die "incus daemon not reachable — install + \`incus admin init\` first"
+      # A named cgroup-v1 hierarchy inside /sys/fs/cgroup (elogind on Void,
+      # openrc setups, some VPNs) makes LXC fail EVERY container start with a
+      # cryptic "Failed to create cgroup at_mnt". Warn before that happens.
+      local v1
+      v1="$(awk '$3=="cgroup" && $2 ~ /^\/sys\/fs\/cgroup\//{print $2}' /proc/mounts | tr '\n' ' ')"
+      [ -z "$v1" ] || warn "cgroup-v1 mounted inside /sys/fs/cgroup (${v1% }) — containers will fail to start until you run: sudo umount -l ${v1% }  (re-apply per boot)"
+      # Binding :$PARA_HTTPS_PORT (<1024) as a non-root user needs
+      # cap_net_bind_service on the caddy binary. Warn up-front with the exact
+      # fix rather than let the bind fail cryptically. getcap lives in
+      # libcap2-bin, which a minimal box may lack — skip the check if it's
+      # absent (start_caddy's failure message still catches the case).
+      if [ "$PARA_HTTPS_PORT" -lt 1024 ] && command -v getcap >/dev/null 2>&1; then
+        local cbin; cbin="$(readlink -f "$(command -v caddy)")"
+        getcap "$cbin" 2>/dev/null | grep -q cap_net_bind_service \
+          || warn "caddy can't bind :$PARA_HTTPS_PORT unprivileged — either 'sudo setcap cap_net_bind_service=+ep $cbin' (re-apply after a caddy upgrade), or drop the PARA_HTTPS_PORT override to use the default :8443 (no privileges needed; URLs then carry :8443)."
+      fi
+      ;;
+    *) die "unsupported OS: $(uname -s)" ;;
+  esac
+}
+
+pool_driver() { incus storage list -f csv 2>/dev/null | awk -F, -v p="$1" '$1==p{print $2}'; }
+
+# The filesystem a pool's volumes physically live on — that's what has to
+# support idmapped mounts for security.shifted. A zfs/btrfs *driver* pool IS
+# that fs by definition; a dir pool inherits whatever fs its source path sits
+# on (so a dir pool on a root-on-zfs box is still zfs — a trap ensure_pool's
+# dir-switch alone doesn't escape). Empty when it can't be told from here (e.g.
+# macOS, where incus runs in colima's VM, not on this host).
+pool_backing_fs() { # pool_backing_fs <pool>
+  local pool="$1" src
+  case "$(pool_driver "$pool")" in
+    zfs)   echo zfs ;;
+    btrfs) echo btrfs ;;
+    *) src="$(incus storage get "$pool" source 2>/dev/null)"
+       [ -n "$src" ] || src="/var/lib/incus/storage-pools/$pool"
+       findmnt -no FSTYPE -T "$src" 2>/dev/null ;;
+  esac
+}
+
+# Running OpenZFS version (the module version is authoritative), e.g. 2.2.2 —
+# empty if zfs isn't loaded on this host. The `|| true` is load-bearing: sed
+# exits non-zero when the file is absent (macOS, or any host without zfs), and
+# without it `zv="$(zfs_version)"` in ensure_idmap aborts under `set -e` before
+# any message — a silent `para up` failure on colima's zfs-typed pool.
+zfs_version() { sed 's/-.*//' /sys/module/zfs/version 2>/dev/null || true; }
+
+# version_ge A B — true when dotted-decimal version A >= B.
+version_ge() { [ "$1" = "$2" ] || [ "$(printf '%s\n%s\n' "$1" "$2" | sort -V | tail -1)" = "$1" ]; }
+
+# Preflight the one capability para actually needs from the host kernel/fs:
+# idmapped mounts, for the shared para-home volume (security.shifted). Without
+# them the workspace dies MID-BOOT with the cryptic "Failed to start device
+# parahome: Required idmapping abilities not available". Catch the two
+# real-world gaps up front with an actionable fix — a too-old kernel, or a pool
+# on ZFS older than OpenZFS 2.2 (the release that added idmapped-mount support;
+# ext4/xfs/btrfs are fine on any kernel new enough to report the feature). A
+# shiftfs fallback, if present, does the shifting instead, so skip when it is.
+# Only ever aborts on POSITIVE evidence; anything undetectable from here (macOS,
+# unknown incus versions) falls through and lets the real attach be the judge.
+ensure_idmap() {
+  grep -qw shiftfs /proc/filesystems 2>/dev/null && return 0   # shiftfs covers it
+  if [ "$(incus info 2>/dev/null | awk -F'"' \
+          '/^[[:space:]]*idmapped_mounts:[[:space:]]/{print $2; exit}')" = "false" ]; then
+    die "this host's kernel can't do idmapped mounts (incus reports idmapped_mounts \"false\"), which para's shared volume needs (security.shifted). Upgrade to a newer kernel — idmapped mounts need >= 5.12 (>= 5.15 for btrfs)."
+  fi
+  if [ "$(pool_backing_fs "$PARA_POOL")" = zfs ]; then
+    local zv; zv="$(zfs_version)"
+    if [ -n "$zv" ] && ! version_ge "$zv" 2.2; then
+      die "pool '$PARA_POOL' lives on ZFS $zv, but idmapped mounts (para's shared volume, security.shifted) need OpenZFS >= 2.2 — older zfs fails at workspace boot with 'Required idmapping abilities not available'. Fix: upgrade OpenZFS to >= 2.2, or move para onto an ext4/xfs pool:
+    incus storage create para-ext4 dir source=/path/on/ext4
+    para config-set PARA_POOL para-ext4
+  (a dir pool on ext4/xfs also gives nested Docker overlayfs, dodging the vfs footgun.)"
+    fi
+  fi
+}
+
+# Nested Docker on a btrfs/zfs(<2.2) pool silently falls back to the vfs storage
+# driver — the biggest footgun para guards against. On Linux, steer to a dir pool
+# (ext4-backed) and remember the choice in the config file. macOS is exempt:
+# colima's zfs 2.2 pool supports overlayfs.
+ensure_pool() {
+  local driver; driver="$(pool_driver "$PARA_POOL")"
+  if [ -z "$driver" ]; then
+    log "Storage pool '$PARA_POOL' not found — creating it (driver: dir)…"
+    incus storage create "$PARA_POOL" dir
+    [ "$PARA_POOL" = default ] || persist_config PARA_POOL "$PARA_POOL"
+    return
+  fi
+  case "$(uname -s)/$driver" in
+    Linux/btrfs|Linux/zfs)
+      warn "pool '$PARA_POOL' is $driver-backed — nested Docker would fall back to vfs; switching to dir pool 'para-dir'"
+      PARA_POOL=para-dir
+      [ -n "$(pool_driver para-dir)" ] || incus storage create para-dir dir
+      persist_config PARA_POOL para-dir
+      ;;
+  esac
+  # The switch above only catches a btrfs/zfs *driver*. A dir pool whose SOURCE
+  # sits on btrfs/zfs still hands nested Docker the vfs driver — pool_backing_fs
+  # sees through the dir driver to the real fs. Can't auto-fix it (the pool is
+  # where the user put it), so warn with the escape hatch. Linux only:
+  # pool_backing_fs is undeterminable from the host on macOS (incus runs in the VM).
+  if [ "$(uname -s)" = Linux ]; then
+    local backing; backing="$(pool_backing_fs "$PARA_POOL")"
+    case "$backing" in
+      btrfs|zfs) warn "pool '$PARA_POOL' is a dir pool, but its storage lives on $backing — nested Docker may still fall back to vfs (slow). Move para onto an ext4/xfs pool:
+    incus storage create para-ext4 dir source=/path/on/ext4
+    para config-set PARA_POOL para-ext4" ;;
+    esac
+  fi
+}
+
+ensure_volume() {
+  # The volume below is security.shifted — verify this host can actually do the
+  # idmapped mount it relies on before we hand the workspace a volume that would
+  # fail to attach at boot. Runs on both `para start` and `para up`, after
+  # ensure_pool has finalized $PARA_POOL.
+  ensure_idmap
+  if ! incus storage volume show "$PARA_POOL" "$PARA_VOLUME" >/dev/null 2>&1; then
+    log "Creating shared volume '$PARA_VOLUME' on pool '$PARA_POOL'…"
+    incus storage volume create "$PARA_POOL" "$PARA_VOLUME"
+    # security.shifted lets one volume attach to many containers at once with
+    # correct idmap-shifted ownership. Do NOT drop this.
+    incus storage volume set "$PARA_POOL" "$PARA_VOLUME" security.shifted=true
+  fi
+}
+
+# ---- Caddy -----------------------------------------------------------------
+# True only if OUR para Caddy is actually running. The pidfile lives under
+# XDG_STATE_HOME and SURVIVES A REBOOT, so `kill -0` alone is a footgun: after a
+# reboot the old caddy is gone and its PID may have been RECYCLED to an unrelated
+# process — kill -0 then succeeds, a false "running" that makes start_caddy skip the
+# start and leave routing silently down. So also confirm the live PID is caddy.
+caddy_running() {
+  [ -f "$CADDY_PID" ] || return 1
+  local pid; pid="$(cat "$CADDY_PID" 2>/dev/null)"
+  [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null || return 1
+  case "$(ps -p "$pid" -o comm= 2>/dev/null)" in *caddy*) return 0 ;; *) return 1 ;; esac
+}
+
+gen_caddyfile() {
+  ensure_dirs
+  local name ip   # declared local so the read-loop below doesn't clobber a caller's $name
+  # Working-copy passthrough (opt-in via PARA_WORKCOPY_PORT): para Caddy proxies
+  # https://localhost (+ the local.$PARA_DOMAIN alias) to a stack you run on the
+  # host at 127.0.0.1:$PARA_WORKCOPY_PORT. If that host stack terminates TLS with
+  # SNI (its own Caddy), header_up + tls_server_name dial it by
+  # $PARA_WORKCOPY_HOST so the handshake matches its site.
+  local wc_host="$PARA_WORKCOPY_HOST" wc_port="$PARA_WORKCOPY_PORT" up
+  up="$(url_port)"   # ":<port>" appended to every site address, empty for :443
+  # Refuse a passthrough that targets para Caddy's own port on loopback — the
+  # proxy would dial itself in a loop. Checked BEFORE the redirection below so a
+  # bad config doesn't leave a truncated Caddyfile behind.
+  if [ -n "$wc_port" ]; then
+    case "$wc_host" in
+      localhost|127.0.0.1|::1) [ "$wc_port" = "$PARA_HTTPS_PORT" ] \
+        && die "PARA_WORKCOPY_PORT ($wc_port) is para Caddy's own port — the passthrough would proxy to itself. Point it at your host stack's port." ;;
+    esac
+  fi
+  {
+    cat <<EOF
+{
+	# internal CA only — no ACME, so no need to bind :80.
+	auto_https disable_redirects
+}
+EOF
+    if [ -n "$wc_port" ]; then
+      cat <<EOF
+
+# Working copy passthrough: the familiar URLs keep working.
+https://localhost$up, https://local.$PARA_DOMAIN$up {
+	reverse_proxy https://127.0.0.1:$wc_port {
+		header_up Host $wc_host
+		transport http {
+			tls_server_name $wc_host
+			tls_insecure_skip_verify
+		}
+	}
+	tls internal
+}
+EOF
+    fi
+    local route sub port host routes domain project dom ws_routes
+    while read -r name ip routes domain project; do   # project (field 5) consumed so it can't leak into $domain
+      [ -z "${name:-}" ] && continue
+      # Routes (field 3) and domain (field 4) come from the registry PER WORKSPACE
+      # (recorded at `up` time from that workspace's own project) — so one global
+      # para is correct when projects have different routes/domains. Each route
+      # entry is "[sub:]port": bare = the apex host, "sub:port" = a subdomain.
+      # Upstreams are plain HTTP at the container IP; the project's stack makes the
+      # port listen on 0.0.0.0 there.
+      IFS=, read -ra ws_routes <<<"$routes"
+      dom="$domain"
+      printf '\n# Workspace %s:\n' "$name"
+      for route in "${ws_routes[@]}"; do
+        case "$route" in
+          *:*) sub="${route%%:*}"; port="${route##*:}" ;;
+          *)   sub="";            port="$route" ;;
+        esac
+        [ -n "$sub" ] && host="$sub.$name.$dom" || host="$name.$dom"
+        cat <<EOF
+
+https://$host$up {
+	reverse_proxy $ip:$port
+	tls internal
+}
+EOF
+      done
+    done < "$REGISTRY"
+  } > "$CADDYFILE"
+}
+
+start_caddy() {
+  gen_caddyfile
+  if caddy_running; then caddy reload --config "$CADDYFILE" --adapter caddyfile; return; fi
+  rm -f "$CADDY_PID"   # clear any stale pidfile (rejected above) before a fresh start
+  log "Starting para Caddy on :${PARA_HTTPS_PORT}…"
+  # Capture via a temp file, NOT $(caddy start …): `caddy start` daemonizes
+  # `caddy run`, which inherits the command-substitution pipe's write end and
+  # never closes it — so $(…) blocks on EOF forever even though Caddy is up.
+  # A file fd inherited by the daemon is harmless (no reader waits on it).
+  local out tmp rc=0
+  tmp="$(mktemp)"
+  caddy start --config "$CADDYFILE" --adapter caddyfile --pidfile "$CADDY_PID" >"$tmp" 2>&1 || rc=$?
+  out="$(cat "$tmp")"; rm -f "$tmp"
+  if [ "$rc" -ne 0 ]; then
+    echo "$out" >&2
+    if grep -q 'address already in use' <<<"$out"; then
+      die "port :$PARA_HTTPS_PORT is already taken — free it (e.g. stop whatever is publishing it) so para can own it, or point para elsewhere: set PARA_HTTPS_PORT in ~/.config/para/config."
+    fi
+    if [ "$PARA_HTTPS_PORT" -lt 1024 ]; then
+      die "caddy couldn't bind :$PARA_HTTPS_PORT — as a non-root user, ports <1024 need the bind capability on the caddy binary. Grant it once (re-apply after a caddy upgrade):
+    sudo setcap cap_net_bind_service=+ep $(readlink -f "$(command -v caddy)" 2>/dev/null || command -v caddy)
+  …or skip privileges entirely — drop the PARA_HTTPS_PORT override to use the default :8443 (URLs then carry :8443), then re-run 'para start'."
+    fi
+    die "caddy failed to start on :$PARA_HTTPS_PORT (see output above)."
+  fi
+  # Here, not just in cmd_start: the documented flow is a bare `para up`, which
+  # cold-starts Caddy through this path — the reminder must ride the actual flow.
+  warn "If browsers distrust the certs, run once:  caddy trust"
+}
+
+caddy_reload() { if caddy_running; then caddy reload --config "$CADDYFILE" --adapter caddyfile 2>/dev/null || true; fi; }
+
+# ---- container-side clone + stack ------------------------------------------
+_wait_ct() { # _wait_ct <ct>  — block until agent + DNS are up
+  # Two gates, checked separately so a timeout can say WHICH one never came up
+  # (a silent 120s stall here is otherwise indistinguishable from a hang): the
+  # incus agent must answer `exec`, then the guest must resolve github.com (all
+  # provisioning downloads need it). Log once per gate so the wait isn't silent.
+  local ct="$1" i agent_up=0
+  log "Waiting for $ct (agent + DNS)…"
+  for i in $(seq 1 60); do
+    if [ "$agent_up" -eq 0 ] && incus exec "$ct" -- true 2>/dev/null; then
+      agent_up=1; log "  agent up (${i}x2s)"
+    fi
+    if [ "$agent_up" -eq 1 ] \
+       && incus exec "$ct" -- getent hosts github.com >/dev/null 2>&1; then
+      log "  DNS resolves github.com (${i}x2s)"; return 0
+    fi
+    sleep 2
+  done
+  if [ "$agent_up" -eq 0 ]; then
+    die "container $ct: incus agent never answered in ~120s — the guest didn't boot far enough. Check 'incus list' / 'incus info --show-log $ct'."
+  fi
+  die "container $ct: agent is up but it can't resolve github.com in ~120s — this is guest DNS/outbound networking, not the para script. Check 'incus exec $ct -- getent hosts github.com' and 'incus network ls' (is the incus bridge up + forwarding?)."
+}
+wait_ready() { _wait_ct "$(ct_name "$1")"; }
+
+# Push the project's .paraspace/ contents (hooks + skel + anything) and the base
+# .env into ~/.para in the workspace, so the hooks have everything they need
+# BEFORE the clone exists (a clone-hook can't read the clone). para pushes it
+# wholesale and never interprets it — skel is the project's, not para's. Fresh
+# each `up`, so hook/skel edits take effect with no re-clone. PARA_HOST_ENV
+# set-but-missing is a misconfiguration → fail fast. (Host side is .paraspace/; the
+# guest staging dir stays ~/.para.)
+sync_project() { # sync_project <name>
+  local name="$1" ct home; ct="$(ct_name "$name")"; home="/home/$PARA_USER"
+  incus exec "$ct" -- rm -rf "$home/.para"
+  incus exec "$ct" -- mkdir -p "$home/.para"
+  incus file push -r "$PROJECT_ROOT/.paraspace/hooks" "$ct$home/.para/"
+  [ -d "$PROJECT_ROOT/.paraspace/skel" ] && incus file push -r "$PROJECT_ROOT/.paraspace/skel" "$ct$home/.para/"
+  if [ -n "${PARA_HOST_ENV:-}" ]; then
+    [ -f "$PARA_HOST_ENV" ] \
+      || die "PARA_HOST_ENV not found at $PARA_HOST_ENV — create the base .env, or set PARA_HOST_ENV= (empty) in the Parafile if the provision hook writes .env itself."
+    incus file push "$PARA_HOST_ENV" "$ct$home/.para/host.env"
+  fi
+  incus exec "$ct" -- chown -R "$PARA_UID:$PARA_GID" "$home/.para"
+  incus exec "$ct" -- sh -c "chmod +x $home/.para/hooks/* 2>/dev/null || true"
+}
+
+# Run a project HOOK — .paraspace/hooks/<name> from $PROJECT_ROOT (pushed in by
+# sync_project), executed with para context injected. Hooks own ALL provisioning
+# — seeding the shared volume, cloning, gh/ssh auth, .env, boot — so para stays a
+# pure mechanism. Runs in the workspace HOME (the clone may not exist yet; the
+# hook clones it and cds in itself). Interactive → wexec_tty so a hook can prompt
+# (gh device flow, the authorize-the-key pause); else wexec. `set -e` at the call
+# site fails `para up` if a hook fails.
+#
+# The PARA_* context locals below read as "unused" to shellcheck, but each is
+# consumed by the `${!PARA_@}` forwarder — dynamic name expansion it can't trace.
+# shellcheck disable=SC2034
+run_hook() { # run_hook <hook> <name>
+  local hook="$1" name="$2"
+  if [ ! -f "$PROJECT_ROOT/.paraspace/hooks/$hook" ]; then
+    log "No .paraspace/hooks/$hook in $PROJECT_ROOT — skipping (project defines no '$hook' hook)."
+    return 0
+  fi
+  log "Running project hook: .paraspace/hooks/$hook"
+  # The per-invocation / host-context vars the hook may want. Set as real PARA_*
+  # locals so the blanket forwarder below picks them up alongside the config +
+  # Parafile ones ($name is validated [a-z0-9-]; the rest are para's own values):
+  #   PARA_NAME/URL — this workspace; PARA_SHARED — the shared-volume mount;
+  #   PARA_HOSTNAME/GIT_NAME/GIT_EMAIL — host identity (gitconfig + ssh-key label).
+  local PARA_NAME="$name" PARA_SHARED="/para/shared"
+  local PARA_URL PARA_HOSTNAME PARA_GIT_NAME PARA_GIT_EMAIL
+  PARA_URL="https://$name.$PARA_DOMAIN$(url_port)"
+  PARA_HOSTNAME="$(hostname -s 2>/dev/null || hostname)"
+  PARA_GIT_NAME="$(git config --global user.name 2>/dev/null || true)"
+  PARA_GIT_EMAIL="$(git config --global user.email 2>/dev/null || true)"
+  # Forward EVERY PARA_* var in scope (config + Parafile + the locals above), so a
+  # project can pass its own knobs to hooks just by setting PARA_FOO in its Parafile
+  # — no para change, no hand-maintained list that drifts out of sync. `printf %q`
+  # keeps values with spaces/quotes (a user.name like O'Brien, an origin URL) intact
+  # through the guest `su -c` re-parse. Arrays (PARA_ROUTES) are skipped: %q on an
+  # array only captures element 0, so exporting it as a scalar would be misleading —
+  # a hook that needs routes reads them from the Parafile. The documented contract
+  # (docs/hooks.md) is the authoritative set; para internals also ride along as harmless
+  # guest env. `${!PARA_@}` + this loop is bash-3.2 safe.
+  local ctx="" _v _decl
+  for _v in "${!PARA_@}"; do
+    _decl="$(declare -p "$_v" 2>/dev/null)"
+    [[ "$_decl" == "declare -"[aA]* ]] && continue   # skip arrays/assoc-arrays
+    ctx+="$(printf 'export %s=%q; ' "$_v" "${!_v}")"
+  done
+  ctx+="exec bash ~/.para/hooks/$(printf '%q' "$hook")"
+  if interactive; then wexec_tty "$name" "$ctx"; else wexec "$name" "$ctx"; fi
+}
+
+# ---- subcommands -----------------------------------------------------------
+cmd_start() {
+  ensure_backend
+  ensure_dirs
+  ensure_pool
+  # The shared volume is per-project now, so it's created lazily on `para up`
+  # (when the project — hence PARA_VOLUME — is known), not here at machine start.
+  start_caddy
+  log "para is up. Caddy on :$PARA_HTTPS_PORT."
+}
+
+cmd_stop() {
+  if caddy_running; then
+    caddy stop 2>/dev/null || kill "$(cat "$CADDY_PID")" 2>/dev/null || true
+  fi
+  rm -f "$CADDY_PID"
+  log "para Caddy stopped. Workspaces and the incus/colima backend keep running."
+}
+
+cmd_up() {
+  local name="${1:-}"; [ -n "$name" ] || die "usage: para up <name>"
+  validate_name "$name"
+  require_project
+  # Names are unique per machine. Refuse if this name is already owned by ANOTHER
+  # project — otherwise `up` would adopt that project's container and clobber its
+  # registry row (container names are the flat `para-<name>` namespace). An empty
+  # owner means the name is free (not in the registry), so a new workspace proceeds.
+  local owner; owner="$(project_of "$name")"
+  if [ -n "$owner" ] && [ "$owner" != "$PARA_PROJECT" ]; then
+    die "workspace '$name' already exists in project '$owner'. Names are unique per machine — pick another name."
+  fi
+  # This workspace's routes, domain, and owning project, recorded in the registry
+  # (fields 3/4/5) so gen_caddyfile serves it by ITS project's routes+domain even
+  # when another project's `para` regenerates the machine-wide Caddyfile, and so
+  # `para ls` can scope to the current project. PARA_PROJECT (field 5) is a plain
+  # slug; routes are comma-joined, domain a token.
+  # Reject empty routes: an empty field 3 would shift every field the readers parse.
+  [ "${#PARA_ROUTES[@]}" -gt 0 ] || die "PARA_ROUTES is empty — set at least one route (\"[sub:]port\") in .paraspace/Parafile."
+  local rcsv; rcsv="$(IFS=,; echo "${PARA_ROUTES[*]}")"
+  ensure_backend; ensure_dirs; ensure_pool; ensure_volume
+  caddy_running || start_caddy
+  local ct; ct="$(ct_name "$name")"
+  local ip
+  if instance_exists "$ct"; then
+    # Authoritative ownership: the container itself records its owning project
+    # (stamped below), so a cleared or rebuilt registry can't launder a foreign
+    # container into this project — the registry check above can miss that (no
+    # row), this can't. An unstamped container (hand-made, or from before this
+    # existed) has no owner and is adoptable.
+    local ct_owned; ct_owned="$(ct_meta "$ct" user.para.project)"
+    [ -z "$ct_owned" ] || [ "$ct_owned" = "$PARA_PROJECT" ] \
+      || die "workspace '$name' already exists in project '$ct_owned' (stamped on its container). Names are unique per machine — pick another name."
+    # Idempotent up: the workspace already exists (e.g. it was stopped), so
+    # converge rather than error. Reuse its static IP (recovering it from the
+    # instance if the registry line was lost), (re)start it if stopped, and
+    # make sure the shared volume is attached. Everything below this branch
+    # (seed/link/clone/boot) is already re-runnable, so we just fall through —
+    # no separate `para restart` needed.
+    ip="$(ip_of "$name")"
+    [ -n "$ip" ] || ip="$(incus config device get "$ct" eth0 ipv4.address 2>/dev/null || true)"
+    # A registry row is space-joined "name ip routes domain project"; an empty ip
+    # would collapse it to four fields and shift every reader's parse (routes read
+    # as the ip, used as the Caddy upstream). Refuse rather than write a corrupt
+    # row — the container exists but we can't route to it.
+    [ -n "$ip" ] || die "workspace '$name' exists but its IP can't be determined (no registry row, no eth0 ipv4.address on the container). Inspect with 'incus config device show $ct', or 'para rm $name' and re-up it."
+    # Rewrite this workspace's line with current ip + routes/domain/project
+    # (idempotent — re-records every field).
+    registry_remove "$name"
+    echo "$name $ip $rcsv $PARA_DOMAIN $PARA_PROJECT" >> "$REGISTRY"
+    log "Workspace '$name' exists at ${ip:-?} — (re)starting and reconverging…"
+    incus start "$ct" 2>/dev/null || true   # harmless no-op if already running
+    # here-string, NOT `incus … | grep -q`: piping incus into grep -q risks the
+    # SIGPIPE-under-pipefail false-negative spelled out in instance_running — here
+    # it would spuriously re-attach an already-attached device and abort `up`.
+    grep -q '^parahome:' <<<"$(incus config device show "$ct")" \
+      || incus storage volume attach "$PARA_POOL" "$PARA_VOLUME" "$ct" parahome /para/shared
+  else
+    incus image info "$PARA_IMAGE" >/dev/null 2>&1 \
+      || die "base image '$PARA_IMAGE' not found — run 'para image-build' first"
+    ip="$(alloc_ip)"
+    log "Launching $ct at $ip (nesting on)…"
+    # --storage: keep the container root on $PARA_POOL. Without it the root lands
+    # on the profile's default pool, which on a btrfs/zfs(<2.2) machine silently
+    # gives nested Docker the vfs driver (the vfs footgun again).
+    incus launch "$PARA_IMAGE" "$ct" --storage "$PARA_POOL" \
+      -c security.nesting=true -d eth0,ipv4.address="$ip"
+    # Upsert, don't blind-append: a stale row for this name (its container removed
+    # out of band, so we took this new-container branch) would otherwise leave TWO
+    # rows for $name — duplicate Caddy site blocks that fail 'caddy start' with
+    # "duplicate site address" and make ip_of return two IPs. Mirror the idempotent
+    # branch above. (alloc_ip already returned a non-empty ip or died.)
+    registry_remove "$name"
+    echo "$name $ip $rcsv $PARA_DOMAIN $PARA_PROJECT" >> "$REGISTRY"   # "name ip routes domain project" — register early so rm/ls see partial state
+    incus storage volume attach "$PARA_POOL" "$PARA_VOLUME" "$ct" parahome /para/shared
+  fi
+  # Stamp this workspace's identity onto the container (refreshed each up, mirroring
+  # the registry row just written) so it stays self-describing for `para reconcile`
+  # and the ownership check above.
+  stamp_ct "$ct" "$PARA_PROJECT" "$rcsv" "$PARA_DOMAIN"
+  wait_ready "$name"
+  # A freshly-created volume's root is root-owned; make /para/shared writable by
+  # the workspace user before the (unprivileged) provision hook seeds it. No-op on
+  # an already-owned volume. para does this chown (it owns the volume) so the hook,
+  # which runs as the user, owns the contents it seeds.
+  incus exec "$ct" -- chown "$PARA_UID:$PARA_GID" /para/shared
+  # Provisioning is entirely the project's now: sync its para/ dir + base .env in,
+  # then run its hooks. `provision` seeds the shared volume, symlinks home, clones
+  # (+ auth), renders .env/override; `boot` brings the stack up (readiness
+  # contract). para itself does none of it — it's the mechanism around the hooks.
+  sync_project "$name"
+  run_hook provision "$name"
+  log "Booting the stack via the project's boot hook — first run pulls images, be patient…"
+  run_hook boot "$name"
+  gen_caddyfile; caddy_reload
+  log "Workspace '$name' ready → https://$name.$PARA_DOMAIN$(url_port)"
+}
+
+cmd_down() {
+  local name="${1:-}"; [ -n "$name" ] || die "usage: para down <name>"
+  validate_name "$name"
+  local ct; ct="$(ct_name "$name")"
+  instance_exists "$ct" || die "workspace '$name' not found"
+  # if/else, not `A && B || C`: the latter reports a FAILED stop as "already
+  # stopped" and swallows it. Distinguish the two.
+  if instance_running "$ct"; then
+    incus stop "$ct"
+  else
+    warn "workspace '$name' already stopped"
+  fi
+  log "Workspace '$name' stopped. (Data preserved — 'para up $name' resumes it.)"
+}
+
+cmd_rm() {
+  local name="${1:-}"; [ -n "$name" ] || die "usage: para rm <name>"
+  validate_name "$name"   # names are spliced into regexes below — reject metacharacters
+  ensure_dirs
+  local ct; ct="$(ct_name "$name")"
+  instance_exists "$ct" && { log "Deleting ${ct}…"; incus delete -f "$ct"; }
+  registry_remove "$name"
+  gen_caddyfile; caddy_reload
+  log "Removed workspace '$name'. (Shared volume '$PARA_VOLUME' is untouched.)"
+}
+
+# Rebuild the registry from incus. Each para-<name> container is self-describing
+# (project/routes/domain stamped at `up` time, ip on its eth0 device), so a lost or
+# drifted registry can be regenerated from the live containers — after a manual
+# wipe, or a restore onto a new box. Project-agnostic: refreshes EVERY project's
+# rows. Unstamped para-* containers (created before stamping) are skipped.
+#
+# NON-DESTRUCTIVE by default: it upserts a row per live container and LEAVES rows
+# whose container isn't listed — so an accidental run (wrong incus context, an
+# unmounted daemon) can't nuke a good registry down to nothing. `--prune` also
+# drops rows with no live stamped container (the "make it exactly match incus" mode).
+cmd_reconcile() {
+  ensure_dirs
+  need incus
+  incus info >/dev/null 2>&1 || die "incus daemon not reachable — start it first (e.g. 'para start')."
+  local prune=0
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      --prune) prune=1; shift ;;
+      *) die "usage: para reconcile [--prune]" ;;
+    esac
+  done
+  # Capture the list separately from iterating it: a FAILED `incus list` must not be
+  # read as "no workspaces" (that would wipe rows). Only an empty-but-successful
+  # list means genuinely none.
+  local names
+  names="$(incus list -c n -f csv 2>/dev/null)" \
+    || die "incus list failed — leaving the registry untouched."
+  local tmp; tmp="$(mktemp)"
+  [ "$prune" -eq 1 ] || cp "$REGISTRY" "$tmp"   # keep existing rows unless pruning
+  local ct name project routes domain ip found=0 skipped=0 t2
+  while IFS= read -r ct; do
+    [ -n "$ct" ] || continue
+    case "$ct" in "$CT_PREFIX"*) ;; *) continue ;; esac   # only para-managed containers
+    name="${ct#"$CT_PREFIX"}"
+    project="$(ct_meta "$ct" user.para.project)"
+    if [ -z "$project" ]; then
+      warn "skip '$ct' — no para ownership stamp (created before reconcile, or not para-managed)"
+      skipped=$((skipped + 1)); continue
+    fi
+    routes="$(ct_meta "$ct" user.para.routes)"
+    domain="$(ct_meta "$ct" user.para.domain)"
+    ip="$(incus config device get "$ct" eth0 ipv4.address 2>/dev/null || true)"
+    if [ -z "$ip" ]; then
+      # An empty ip would collapse the space-joined row to four fields and shift
+      # every reader's parse — skip rather than record an unroutable, corrupt row.
+      warn "skip '$ct' — no eth0 ipv4.address to record (can't build a routable row)"
+      skipped=$((skipped + 1)); continue
+    fi
+    t2="$(mktemp)"; awk -v n="$name" '$1!=n' "$tmp" > "$t2" 2>/dev/null || true; mv "$t2" "$tmp"
+    echo "$name $ip $routes $domain $project" >> "$tmp"   # upsert: replace this name's row
+    found=$((found + 1))
+  done <<< "$names"
+  mv "$tmp" "$REGISTRY"
+  gen_caddyfile; caddy_reload
+  log "Reconciled $found live workspace(s)$([ "$prune" -eq 1 ] && printf ', pruned stale rows')$([ "$skipped" -gt 0 ] && printf ' (%s skipped)' "$skipped")."
+}
+
+cmd_ls() {
+  ensure_dirs
+  local all=0 names=0
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      -a|--all) all=1;   shift ;;
+      --names)  names=1; shift ;;
+      *) die "usage: para ls [-a|--all] [--names]" ;;
+    esac
+  done
+  # Scope to the current project by default (registry field 5 == this PARA_PROJECT);
+  # --all — or running outside any project — covers every workspace, labeled by project.
+  local scope=""; [ "$all" -eq 0 ] && scope="$PARA_PROJECT"
+  # --names: bare workspace names, one per line, straight from the registry — no
+  # per-workspace `incus list` state probe, so it returns instantly. That speed is
+  # the point: it's the source that `para completions` feeds to Tab. Honors the same
+  # scope as the full listing, so --all --names spans projects. Names are validated
+  # [a-z0-9-], so downstream word-splitting is safe.
+  if [ "$names" -eq 1 ]; then
+    local n project
+    while read -r n _ _ _ project; do
+      [ -z "${n:-}" ] && continue
+      [ -n "$scope" ] && [ "$project" != "$scope" ] && continue
+      printf '%s\n' "$n"
+    done < "$REGISTRY"
+    return 0
+  fi
+  local name ip routes domain project state url
+  if [ -n "$scope" ]; then printf '%-22s %-16s %-9s %s\n' NAME IP STATE URL
+  else                     printf '%-14s %-22s %-16s %-9s %s\n' PROJECT NAME IP STATE URL; fi
+  # A global view (scope empty: --all or outside any project) groups by project
+  # (sort on field 5); a scoped listing is one project already, so leave it as-is.
+  while read -r name ip routes domain project; do
+    [ -z "${name:-}" ] && continue
+    [ -n "$scope" ] && [ "$project" != "$scope" ] && continue
+    # incus list's positional filter is a name SUBSTRING/regex, so `para-foo`
+    # would also match `para-foobar` and return two state rows. Ask for name+state
+    # and pick the exact row. (Piping into awk is SIGPIPE-safe — awk drains stdin.)
+    local ctn; ctn="$(ct_name "$name")"
+    state="$(incus list "$ctn" -c ns -f csv 2>/dev/null | awk -F, -v c="$ctn" '$1==c{print $2}')" || true
+    url="https://$name.$domain$(url_port)"
+    if [ -n "$scope" ]; then
+      printf '%-22s %-16s %-9s %s\n' "$name" "$ip" "${state:-MISSING}" "$url"
+    else
+      printf '%-14s %-22s %-16s %-9s %s\n' "$project" "$name" "$ip" "${state:-MISSING}" "$url"
+    fi
+  done < <(if [ -z "$scope" ]; then sort -k5,5 "$REGISTRY"; else cat "$REGISTRY"; fi)
+}
+
+cmd_sh() {
+  local name="" cmd="" have_cmd=0
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      # -c takes the whole command as ONE string, passed through to bash
+      # verbatim — no re-quoting here, so pipes/redirects/&& work as written.
+      # A flag-tracker, not [ -n "$cmd" ]: `-c ''` is a legal no-op command.
+      -c) shift; [ "$#" -gt 0 ] || die "usage: para sh <name> [-c <command>] — the whole command as one quoted string, e.g. para sh ws1 -c 'ls -l'"
+          [ "$have_cmd" -eq 0 ] || die "para sh takes one -c (got a second: $1)"
+          cmd="$1"; have_cmd=1; shift ;;
+      -*) die "usage: para sh <name> [-c <command>] — the whole command as one quoted string, e.g. para sh ws1 -c 'ls -l'" ;;
+      *)  [ -z "$name" ] || die "unexpected argument: $1"
+          name="$1"; shift ;;
+    esac
+  done
+  [ -n "$name" ] || die "usage: para sh <name> [-c <command>] — the whole command as one quoted string, e.g. para sh ws1 -c 'ls -l'"
+  require_ws "$name"
+  # `su -` for a login shell with the user's groups (docker) loaded and the
+  # shared zshrc sourced (which cd's into the clone). exec, so the workspace
+  # command's exit status becomes para's — `para sh x -c 'false' || handle` works.
+  if [ "$have_cmd" -eq 0 ]; then
+    exec incus exec "$(ct_name "$name")" -t -- su - "$PARA_USER"
+  fi
+  # Run IN THE CLONE, like the interactive shell and cmd_claude/cmd_run do —
+  # `para sh x -c 'git status'` meaning the project, not $HOME, is the whole
+  # point. -s /bin/bash skips the zshrc that does this cd for the interactive
+  # path, so do it here. `|| exit` (not &&) keeps an empty -c a legal no-op
+  # rather than a trailing-&& syntax error. Only PARA_CLONE_DIR is spliced
+  # host-side, and it's validated to a plain name up top. (SC2016)
+  local run='cd ~/'"$PARA_CLONE_DIR"' || exit; '"$cmd"
+  # A pty only when BOTH ends are terminals — the test incus's own auto-mode
+  # uses, and getting it wrong CORRUPTS DATA rather than merely looking off: a
+  # pty echoes NULs and translates \n to \r\n, so `para sh x -c … | tee`, `>
+  # file`, and `$(…)` all come back dirtied if we force -t just because stdin
+  # happens to be a terminal. Testing stdin alone hides this in CI (no tty
+  # either end) and breaks every interactive pipe. Be explicit in BOTH
+  # directions: -T when we have no terminal to give, since bare auto-mode looks
+  # at para's own fds and so would ignore PARA_NONINTERACTIVE.
+  if interactive && [ -t 1 ]; then
+    # su --pty for the SIGWINCH-forwarding reason spelled out in cmd_claude, and
+    # the same TERM guard: a host $TERM with no terminfo in the container
+    # hard-fails a TUI, and `-c 'vim …'` is the reason this branch exists.
+    # The '…' body runs in the GUEST — $TERM must stay literal there; only $run
+    # is spliced host-side. (SC2016)
+    # shellcheck disable=SC2016
+    exec incus exec "$(ct_name "$name")" -t -- su --pty - "$PARA_USER" -s /bin/bash -c '
+      infocmp "${TERM:-}" >/dev/null 2>&1 || export TERM=xterm-256color
+      '"$run"
+  fi
+  exec incus exec "$(ct_name "$name")" -T -- su - "$PARA_USER" -s /bin/bash -c "$run"
+}
+
+cmd_claude() {
+  local name="${1:-}"; [ -n "$name" ] || die "usage: para claude <name>"
+  require_ws "$name"
+  # --name labels the session, which Claude Code puts in the terminal
+  # window/tab title — so a full-screen claude is identifiable as this
+  # workspace. ($name is validated to [a-z0-9-], safe to interpolate.)
+  # `su --pty`: with `-c`, plain `su` forks the command as a child but keeps
+  # *itself* the terminal's foreground process, so the kernel delivers SIGWINCH
+  # (window resize) to su — which drops it — and claude never repaints for the
+  # new size (stuck-small TUI, misplaced cursor, duplicate lines). --pty makes
+  # su proxy the tty and forward resizes to the child. (`para sh` doesn't need
+  # it: bare `su -` execs the shell directly, so job control handles SIGWINCH.)
+  # TERM guard: fall back to a universally-present terminfo only when the host's
+  # $TERM (e.g. ghostty) isn't installed in the container, so tmux/claude don't
+  # hard-fail; otherwise pass the native terminal through untouched.
+  # The '…' body runs in the GUEST — the $vars are meant to stay literal there;
+  # only $name/$PARA_CLONE_DIR are spliced host-side via '"…"'. (SC2016)
+  # shellcheck disable=SC2016
+  exec incus exec "$(ct_name "$name")" -t -- su --pty - "$PARA_USER" -c '
+    infocmp "${TERM:-}" >/dev/null 2>&1 || export TERM=xterm-256color
+    cd ~/'"$PARA_CLONE_DIR"' && exec claude --name '"$name"'
+  '
+}
+
+cmd_run() {
+  local name="${1:-}"; [ -n "$name" ] || die "usage: para run <name>"
+  require_ws "$name"
+  # Launch (or re-attach) a per-workspace tmux session: window 1 is claude,
+  # window 2 a shell (named "claude"/"sh"). The workspace itself shows in
+  # status-left (#h = para-<name>) and the outer terminal title, so it stays
+  # obvious even when claude is full-screen. Re-running attaches the existing
+  # session instead of stacking duplicate windows. The single-quoted script
+  # runs in the guest; only $name is interpolated host-side (validated to
+  # [a-z0-9-], so safe unquoted). `su --pty` for the same reason as `para
+  # claude`: without it the tmux *client* (a `su -c` child) never sees SIGWINCH,
+  # so tmux stops tracking the outer terminal size and the panes don't reflow on
+  # resize. TERM guard: fall back to xterm-256color only when the host's $TERM
+  # has no terminfo in the container (else tmux would hard-fail); otherwise pass
+  # the native terminal through.
+  # The '…' body runs in the GUEST — the $vars are meant to stay literal there;
+  # only $name/$PARA_CLONE_DIR are spliced host-side via '"…"'. (SC2016)
+  # shellcheck disable=SC2016
+  exec incus exec "$(ct_name "$name")" -t -- su --pty - "$PARA_USER" -c '
+    infocmp "${TERM:-}" >/dev/null 2>&1 || export TERM=xterm-256color
+    ws='"$name"'
+    if tmux has-session -t "$ws" 2>/dev/null; then exec tmux attach -t "$ws"; fi
+    tmux new-session -d -s "$ws" -n claude -c ~/'"$PARA_CLONE_DIR"' "claude --name $ws"
+    tmux new-window  -t "$ws:"   -n sh     -c ~/'"$PARA_CLONE_DIR"'
+    tmux select-window -t "$ws:1"
+    exec tmux attach -t "$ws"
+  '
+}
+
+cmd_key() {
+  # Print this machine's para pubkey (on the shared volume) so it can be authorized
+  # on the git host. Needs a RUNNING workspace — any one reaches the same volume.
+  local ct; ct="$(first_running_ct)" \
+    || die "no running workspace to read the key from — start one first (e.g. 'para up <name>')"
+  incus exec "$ct" -- cat /para/shared/ssh/id_ed25519.pub
+}
+
+cmd_web() {
+  local name="${1:-}"; [ -n "$name" ] || die "usage: para web <name>"
+  local url; url="https://$name.$PARA_DOMAIN$(url_port)"
+  case "$(uname -s)" in
+    Darwin) open "$url" ;;
+    Linux)  xdg-open "$url" >/dev/null 2>&1 || echo "$url" ;;
+    *)      echo "$url" ;;
+  esac
+}
+
+cmd_config_set() {
+  [ "$#" -eq 2 ] || die "usage: para config-set PARA_KEY VALUE (persists to $PARA_CONFIG; env vars still override)"
+  # Only PARA_* keys are read back (see the config loader up top), so reject
+  # anything else rather than silently writing a line that never takes effect.
+  case "$1" in
+    PARA_[A-Z_]*) ;;
+    *) die "config keys must be PARA_* (the config loader ignores others) — got '$1'" ;;
+  esac
+  persist_config "$1" "$2"   # ensure_dirs (mkdir -p) + atomic replace, no hand-editing
+}
+
+cmd_config_import() {
+  local ws="${1:-}"; shift || true
+  if [ -z "$ws" ] || [ "$#" -lt 1 ]; then
+    die "usage: para config-import <name> <path>… (copies host dotfiles into $PARA_VOLUME)"
+  fi
+  validate_name "$ws"
+  # Copy — never mount — into the shared volume via the named workspace.
+  local ct; ct="$(ct_name "$ws")"
+  instance_running "$ct" || die "workspace '$ws' is not running — 'para up $ws' first"
+  local p base
+  for p in "$@"; do
+    [ -e "$p" ] || { warn "skip (not found): $p"; continue; }
+    base="$(basename "$p")"; base="${base#.}"   # ~/.zshrc -> zshrc, matching the volume layout
+    log "Importing $p → /para/shared/$base"
+    incus file push -r "$p" "$ct/para/shared/$base"
+  done
+  incus exec "$ct" -- chown -R "$PARA_UID:$PARA_GID" /para/shared
+}
+
+# First RUNNING workspace container, or non-zero if none. The shared volume is
+# the same across every workspace, so any running one is a valid door to it — but
+# the registry's first line may be a stopped workspace, so scan for a live one.
+first_running_ct() {
+  ensure_dirs
+  local name _ip ct
+  while read -r name _ip _; do
+    [ -n "${name:-}" ] || continue
+    ct="$(ct_name "$name")"
+    instance_running "$ct" && { echo "$ct"; return 0; }
+  done < "$REGISTRY"
+  return 1
+}
+
+# Re-push THIS PROJECT's skel (zshrc, tmux, claude, nvim config) onto the shared
+# volume so a host-side dotfile edit goes live in every workspace with no
+# re-clone — the provision hook seeds it once; this refreshes it. Reads
+# $PROJECT_ROOT/.paraspace/skel (the project's, not para's bundled default —
+# matters under a global install). Deliberately does NOT touch user state:
+# the generated gitconfig, claude.json, the ssh keypair, nvim-data, or the
+# gh/bun-cache dirs. Symlinks pick up the refresh on the next shell/nvim launch.
+# (Targets the first running workspace by default; pass a name to be explicit —
+# under multi-project, pass one of THIS project's workspaces.)
+cmd_config_sync() { # cmd_config_sync [<name>]
+  require_project
+  local ct skel="$PROJECT_ROOT/.paraspace/skel"
+  [ -d "$skel" ] || die "no .paraspace/skel in $PROJECT_ROOT to sync."
+  if [ -n "${1:-}" ]; then
+    validate_name "$1"; ct="$(ct_name "$1")"
+    instance_running "$ct" || die "workspace '$1' is not running — 'para up $1' first"
+  else
+    ct="$(first_running_ct)" || die "no running workspace to reach the volume — 'para up <name>' first"
+  fi
+  log "Syncing $PARA_PROJECT's skel → shared volume via ${ct#"$CT_PREFIX"}…"
+  incus file push "$skel/zshrc"    "$ct/para/shared/zshrc"
+  incus file push -r "$skel/tmux"   "$ct/para/shared/"
+  incus file push -r "$skel/claude" "$ct/para/shared/"
+  # statusline runs as a bare path — restore the exec bit (push drops mode).
+  incus exec "$ct" -- chmod +x /para/shared/claude/statusline.sh
+  # nvim config only (never nvim-data — that's installed plugins/parsers). `incus
+  # file push -r` merges into the existing dir: edits/additions land, but files
+  # deleted on the host aren't pruned. Full reset: delete the shared nvim dir and
+  # re-`para up`.
+  incus file push -r "$skel/nvim" "$ct/para/shared/"
+  incus exec "$ct" -- chown -R "$PARA_UID:$PARA_GID" \
+    /para/shared/zshrc /para/shared/tmux /para/shared/claude /para/shared/nvim
+  log "Synced. Open a new shell (or re-source nvim) in any workspace to pick it up."
+}
+
+# The stack's external images, for pre-pull into the base image. Sourced from
+# the repo (never hardcoded) so the list tracks the actual stack: compose
+# `image:` values plus Dockerfile `FROM` bases (skipping references to earlier
+# build stages, which aren't pullable images). De-duped.
+stack_images() {
+  {
+    sed -nE "s/^[[:space:]]*image:[[:space:]]*[\"']?([^\"']+)[\"']?[[:space:]]*\$/\1/p" \
+      "$PROJECT_ROOT/docker-compose.yml" 2>/dev/null || true
+    awk '
+      toupper($1)=="FROM" { if (!($2 in stage)) print $2 }
+      toupper($1)=="FROM" && toupper($3)=="AS" { stage[$4]=1 }
+    ' "$PROJECT_ROOT/Dockerfile" 2>/dev/null || true
+  } | sort -u
+}
+
+# Scaffold para into the CURRENT directory from a bundled template. By default
+# copies only the template's .paraspace/ (its Parafile + hooks + skel +
+# image-build.sh) — so you can add para to an existing repo — SKIPPING any file
+# that already exists (never clobbers; --force to overwrite). --full lays down the
+# whole template tree (its demo compose + app) for a greenfield start. --list shows
+# the available templates. Does NOT need a backend or a project — pure filesystem.
+cmd_init() {
+  local tmpl="" force=0 full=0 list=0 names=0
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      --list)      list=1; shift ;;
+      --names)     names=1; shift ;;
+      -f|--force)  force=1; shift ;;
+      --full)      full=1; shift ;;
+      -*)          die "usage: para init [<template>] [--list|--names|-f|--force|--full]" ;;
+      *) if [ -z "$tmpl" ]; then tmpl="$1"; shift; else die "unexpected argument: $1"; fi ;;
+    esac
+  done
+  local tdir; tdir="$(templates_dir)" \
+    || die "no templates found — install via 'npm i -g paraspace', or 'para install' from a checkout."
+  # --names: bare template names, one per line — the machine-readable twin of
+  # --list (which prints a titled, indented view). Feeds `para init` completion.
+  if [ "$names" -eq 1 ]; then
+    local t; for t in "$tdir"/*/; do [ -d "$t" ] && printf '%s\n' "$(basename "$t")"; done
+    return 0
+  fi
+  if [ "$list" -eq 1 ]; then
+    log "Available templates (in $tdir):"
+    local t; for t in "$tdir"/*/; do [ -d "$t" ] && printf '  %s\n' "$(basename "$t")"; done
+    return 0
+  fi
+  tmpl="${tmpl:-void-docker-gh}"
+  local src="$tdir/$tmpl"
+  [ -d "$src" ] || die "no such template '$tmpl' (see: para init --list)."
+  # Plumbing-only (default) walks the template's .paraspace/; --full walks the whole
+  # tree. Relative paths are computed against $src either way, so plumbing-only
+  # still lands under .paraspace/ in the target.
+  local root="$src/.paraspace" note=".paraspace/ only — use --full for the whole tree"
+  [ "$full" -eq 1 ] && { root="$src"; note="full tree"; }
+  [ -d "$root" ] || die "template '$tmpl' has nothing to scaffold at $root."
+  log "Scaffolding '$tmpl' into $PWD ($note)…"
+  local added=0 skipped=0 parafile_added=0 f rel dest
+  while IFS= read -r f; do
+    rel="${f#"$src"/}"
+    [ "$rel" = README.md ] && continue          # the template's own README, not yours
+    dest="$PWD/$rel"
+    if [ -e "$dest" ] && [ "$force" -eq 0 ]; then
+      printf '  skip (exists): %s\n' "$rel" >&2; skipped=$((skipped + 1)); continue
+    fi
+    mkdir -p "$(dirname "$dest")"
+    cp "$f" "$dest"
+    case "$rel" in .paraspace/hooks/*|.paraspace/image-build.sh) chmod +x "$dest" ;; esac
+    [ "$rel" = .paraspace/Parafile ] && parafile_added=1
+    printf '  add: %s\n' "$rel" >&2; added=$((added + 1))
+  done < <(find "$root" -type f)
+  # Personalize the freshly-scaffolded Parafile with this dir's name: PARA_IMAGE
+  # (names the base image) and PARA_PROJECT (the stable project id, so identity
+  # survives a later move/rename). Only when WE added the Parafile (never rewrite
+  # one the user already had).
+  if [ "$parafile_added" -eq 1 ]; then
+    local img slug; img="$(basename "$PWD")"
+    if [[ "$img" =~ ^[A-Za-z0-9._-]+$ ]]; then
+      slug="$(printf '%s' "$img" | tr '[:upper:]' '[:lower:]' | tr -c 'a-z0-9-' '-')"
+      slug="${slug#-}"; slug="${slug%-}"
+      sed -i.bak -E "s|^(: \"\\\$\{PARA_IMAGE:=)[^}]*(\}\")|\1$img\2|" "$PWD/.paraspace/Parafile"
+      [ -n "$slug" ] && sed -i.bak -E "s|^(: \"\\\$\{PARA_PROJECT:=)[^}]*(\}\")|\1$slug\2|" "$PWD/.paraspace/Parafile"
+      rm -f "$PWD/.paraspace/Parafile.bak"
+    fi
+  fi
+  log "Done — $added added, $skipped skipped."
+  if [ "$added" -gt 0 ]; then
+    log "Next: edit .paraspace/Parafile (PARA_ORIGIN, PARA_ROUTES), then 'para image-build' + 'para up <name>'."
+  fi
+}
+
+# Install para as a global command: copy the script to PREFIX/bin/para (so `para`
+# works from any project dir, found by walking up for a .paraspace/ dir) and stage
+# the templates under XDG data so `para init` can find them (npm/npx/
+# checkout installs find them next to the CLI; a plain copy-install can't). PREFIX
+# defaults to ~/.local. Re-run to update.
+cmd_completions() {
+  # Emit a shell completion script to stdout: `source <(para completions bash)`
+  # (or zsh) in your rc. One bash implementation serves both shells — zsh runs it
+  # through bashcompinit. It completes subcommands, per-command flags, and (the
+  # useful part) workspace names for the name-taking verbs, sourced live from
+  # `para ls --names` so it always reflects the current project's workspaces.
+  case "${1:-}" in
+    bash) ;;
+    zsh)
+      # Bridge preamble: bashcompinit provides the bash `complete`/`compgen`
+      # builtins, but registers through zsh's completion system — so init compinit
+      # first, and only if a configured shell (oh-my-zsh, etc.) hasn't already.
+      cat <<'ZSH_PREAMBLE'
+if ! whence compdef >/dev/null 2>&1; then autoload -U +X compinit && compinit; fi
+autoload -U +X bashcompinit && bashcompinit
+ZSH_PREAMBLE
+      ;;
+    # No shell given (or -h): print the enable-it guide to stderr and stop, so a
+    # bare `para completions` teaches rather than errors — and a forgotten arg in
+    # `source <(para completions)` sources nothing (stdout stays empty) instead of
+    # slurping the guide. exit 0: this is help, not a misuse.
+    ""|-h|--help)
+      cat >&2 <<'GUIDE'
+para completions — Tab completion for para (subcommands, flags, workspace names)
+
+Print a completion script and source it from your shell rc:
+
+  bash   add to ~/.bashrc:   source <(para completions bash)
+  zsh    add to ~/.zshrc:    source <(para completions zsh)
+
+Then open a new shell (or re-source the rc). Workspace names are scoped to
+the current project and read live, so new workspaces show up automatically.
+GUIDE
+      exit 0 ;;
+    *) die "unknown shell '$1' — para completions <bash|zsh> (see: para completions --help)" ;;
+  esac
+  cat <<'BASH_COMPLETION'
+_para() {
+  local cur cmd
+  cur="${COMP_WORDS[COMP_CWORD]}"
+  cmd="${COMP_WORDS[1]:-}"
+
+  local subcommands="start stop up down rm reconcile ls sh claude run key web \
+config-set config-import config-sync init install image-build completions help"
+
+  # Position 1 is the subcommand itself.
+  if [ "$COMP_CWORD" -eq 1 ]; then
+    COMPREPLY=( $(compgen -W "$subcommands" -- "$cur") )
+    return
+  fi
+
+  # A leading dash means the user wants this subcommand's flags.
+  if [ "${cur:0:1}" = "-" ]; then
+    local flags=""
+    case "$cmd" in
+      ls)          flags="-a --all --names" ;;
+      reconcile)   flags="--prune" ;;
+      sh)          flags="-c" ;;
+      init)        flags="--list --names -f --force --full" ;;
+      image-build) flags="-q --quiet -v --verbose -i --from-current --incremental" ;;
+    esac
+    COMPREPLY=( $(compgen -W "$flags" -- "$cur") )
+    return
+  fi
+
+  # Existing-workspace names at position 2. `up` is included: it's idempotent, so
+  # re-up'ing an existing workspace is a real path — and the suggestions don't get
+  # in the way of typing a brand-new name.
+  case "$cmd" in
+    up|down|rm|sh|claude|run|web|config-sync)
+      [ "$COMP_CWORD" -eq 2 ] && COMPREPLY=( $(compgen -W "$(para ls --names 2>/dev/null)" -- "$cur") )
+      ;;
+    init)
+      # Template names for `para init <template>` (position 2 only).
+      [ "$COMP_CWORD" -eq 2 ] && COMPREPLY=( $(compgen -W "$(para init --names 2>/dev/null)" -- "$cur") )
+      ;;
+    completions)
+      [ "$COMP_CWORD" -eq 2 ] && COMPREPLY=( $(compgen -W "bash zsh" -- "$cur") )
+      ;;
+  esac
+}
+complete -F _para para
+BASH_COMPLETION
+}
+
+cmd_install() {
+  local prefix="${1:-$HOME/.local}"
+  local root; root="$(pkg_root)"
+  local bindir="$prefix/bin"
+  log "Installing para → $bindir/para…"
+  mkdir -p "$bindir"
+  cp "$root/bin/para" "$bindir/para" && chmod +x "$bindir/para"
+  if [ -d "$root/templates" ]; then
+    local data="${XDG_DATA_HOME:-$HOME/.local/share}/paraspace"
+    log "Staging templates → $data/templates…"
+    mkdir -p "$data"; rm -rf "$data/templates"; cp -R "$root/templates" "$data/templates"
+  fi
+  log "Installed."
+  case ":$PATH:" in
+    *":$bindir:"*) : ;;
+    *) warn "$bindir is not on PATH — add it:  export PATH=\"$bindir:\$PATH\"" ;;
+  esac
+  log "Now: 'para init' in a project to scaffold .paraspace/, or 'para up <name>' if it already has one."
+  log "Tab completion (optional): add  source <(para completions bash)  — or zsh — to your shell rc."
+}
+
+cmd_image_build() {
+  # Silence incus's carriage-return progress spinners (the "Retrieving image"
+  # and "Image pack: N%" firehose): harmless overwriting in place in a terminal,
+  # but hundreds of lines once captured to a file/pipe/monitor. Auto-quiet when
+  # stderr isn't a TTY so logged runs stay clean; -q forces it, -v keeps the
+  # bars. `q` is a scalar expanded UNQUOTED (empty -> no arg) — not a `("${a[@]}")`
+  # array, which trips "unbound variable" under set -u on macOS's bash 3.2.
+  local q=""; [ -t 2 ] || q="-q"
+  require_project   # pre-pulls the project's stack images + publishes PARA_IMAGE
+  # --from-current: layer this build onto the EXISTING $PARA_IMAGE instead of a
+  # pristine `images:voidlinux`. The whole provisioning payload is idempotent
+  # (install-only-missing packages, guarded user create, guarded bun/claude,
+  # `ln -sf`, a `sed` that no-ops on the second pass, digest-only `docker pull`),
+  # so a re-run applies just the delta in ~a minute instead of redoing the full
+  # multi-minute install + 2.4GB pre-pull. Iterate with this; do one plain (from
+  # pristine) build before you commit, so the published image is reproducible
+  # from source and hasn't accreted drift from a chain of incremental layers.
+  local from_current=0
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      -q|--quiet)   q="-q"; shift ;;
+      -v|--verbose) q="";   shift ;;
+      -i|--from-current|--incremental) from_current=1; shift ;;
+      *) die "usage: para image-build [-q|--quiet|-v|--verbose] [-i|--from-current|--incremental]" ;;
+    esac
+  done
+  ensure_backend
+  ensure_pool
+  # NOT `local`: the EXIT-trap cleanup below runs after this function has
+  # unwound, so a `local builder` is out of scope there and `set -u` aborts the
+  # trap with "builder: unbound variable" — stranding the very builder the trap
+  # exists to remove. A script-scope var stays visible at trap-fire time.
+  builder="para-image-build"
+  local payload="$PROJECT_ROOT/.paraspace/image-build.sh"
+  [ -f "$payload" ] || die "missing provisioning payload: $payload"
+  instance_exists "$builder" && { log "Removing stale builder…"; incus delete -f "$builder"; }
+  # Clean up the builder (and any half-published temp image) on any exit — a
+  # failed/interrupted provision must not strand them. The INT/TERM trap just
+  # exits, which fires the EXIT trap; that way Ctrl-C tears the builder down too
+  # (see the background+wait note below). Both vars are script-scope, so they're
+  # still set when the trap fires post-unwind.
+  cleanup_builder() {
+    incus image delete "${PARA_IMAGE}-new" >/dev/null 2>&1 || true
+    incus delete -f "$builder" >/dev/null 2>&1 || true
+  }
+  trap cleanup_builder EXIT
+  trap 'echo >&2; warn "interrupted — tearing down builder…"; exit 130' INT TERM
+  local base="images:voidlinux"
+  if [ "$from_current" -eq 1 ]; then
+    incus image info "$PARA_IMAGE" >/dev/null 2>&1 \
+      || die "no existing '$PARA_IMAGE' image to build from — run a plain 'para image-build' first"
+    base="$PARA_IMAGE"
+    log "Incremental build: layering onto existing '$PARA_IMAGE' (nesting on)…"
+  else
+    log "Launching builder (nesting on)…"
+  fi
+  incus $q launch "$base" "$builder" --storage "$PARA_POOL" -c security.nesting=true
+  _wait_ct "$builder"
+  # The provisioning payload below is bash (arrays, [[ ]]) run via `bash -s`.
+  # The Void base image already ships bash, but its bundled xbps is a rolling-
+  # release snapshot that can be too stale to install against until it's updated
+  # — so update xbps here first, before the payload runs its own full
+  # `xbps-install -Syu`. `-u` on a named package installs it when absent, so
+  # this also re-materialises bash defensively (covering a future base image
+  # that drops it) in the same shot. Costs ~a second. stderr is left visible on
+  # purpose: the whole build depends on this landing.
+  # Skip it on --from-current: $PARA_IMAGE already has bash + a current xbps.
+  if [ "$from_current" -eq 0 ]; then
+    log "Updating xbps (and ensuring bash) for the provisioning payload…"
+    incus exec "$builder" -- sh -c 'xbps-install -Syu xbps bash >/dev/null'
+  fi
+  local -a images=(); local _img
+  while IFS= read -r _img; do [ -n "$_img" ] && images+=("$_img"); done < <(stack_images)
+  if [ "$from_current" -eq 1 ]; then
+    log "Re-provisioning delta onto '$PARA_IMAGE' (${#images[@]} pre-pulled image(s) verified, not re-downloaded)…"
+  else
+    log "Provisioning the base image, pre-pulling ${#images[@]} stack image(s) — several minutes…"
+  fi
+  # Hand the pre-pull list to the payload out-of-band via an env var (tags are
+  # space-joined; none contain spaces), NOT as positional args — that keeps the
+  # payload's $@ free for future arg forwarding. ${images[*]} joins on IFS's
+  # first char (space); avoids mapfile (bash 4+ only) for macOS-bash portability.
+  # Run provisioning in the BACKGROUND and `wait` on it, so Ctrl-C works. A
+  # foreground `incus exec` blocks para in a way bash can't interrupt until the
+  # child returns — and without a PTY (-t, which we can't use since stdin is the
+  # payload) incus never relays SIGINT into the container, so the build would
+  # churn on and the cleanup trap couldn't fire. Backgrounding lets SIGINT
+  # interrupt `wait` and run the INT trap, whose exit force-deletes the builder
+  # (killing the in-container provisioning). `set -e` still aborts on a non-zero
+  # provision exit, which fires the EXIT trap the same way.
+  # PARA_USER/UID/GID travel the same way: the payload creates that user (the
+  # Void base image has none), and every `incus file push --uid`/chown in the
+  # rest of para targets the same ids — so passing them here keeps the baked
+  # user in lockstep with the running config instead of a hardcoded literal.
+  incus exec "$builder" \
+    --env "PARA_PREPULL_IMAGES=${images[*]}" \
+    --env "PARA_USER=$PARA_USER" --env "PARA_UID=$PARA_UID" --env "PARA_GID=$PARA_GID" \
+    -- bash -s < "$payload" &
+  wait "$!"
+  local driver; driver="$(incus exec "$builder" -- docker info --format '{{.Driver}}' 2>/dev/null || true)"
+  case "$driver" in
+    overlay|overlayfs|overlay2) log "docker storage driver: $driver ✓" ;;
+    *) die "docker driver is '$driver', not overlay(fs) — nested Docker would be slow. Use a dir/ext4 pool (see plan Prerequisites)." ;;
+  esac
+  log "Publishing image as '$PARA_IMAGE'…"
+  # Force-stop, don't wait for a graceful shutdown. incus's default `stop` sends
+  # the container's init an ACPI-style shutdown signal and waits for it to halt;
+  # Void's runit (unlike Ubuntu's systemd) doesn't answer it, so a plain stop
+  # times out ("Failed shutting down instance … context deadline exceeded"). A
+  # builder about to be snapshotted has nothing to flush cleanly — and we publish
+  # from a frozen snapshot anyway (below) — so a hard stop is both safe and the
+  # only init-agnostic way to reliably bring it down.
+  incus stop -f "$builder"
+  # Publish from a frozen SNAPSHOT, not the live instance. On the dir pool,
+  # `incus publish "$builder"` races the rootfs still settling after stop and
+  # fails a random lstat mid-pack ("no such file or directory" on a file that
+  # plainly exists — a different one each run). A snapshot is a consistent
+  # point-in-time copy, so the pack can't race.
+  incus snapshot create "$builder" publish
+  # Publish to a TEMP alias, then swap. The old delete-then-publish ordering
+  # destroyed the working image *before* publishing, so any publish failure left
+  # the box with NO image. Now the live image is only dropped once the new one
+  # is in hand. --reuse in case a prior aborted run left the temp alias behind.
+  incus $q publish "$builder/publish" --reuse --alias "${PARA_IMAGE}-new"
+  incus image delete "$PARA_IMAGE" >/dev/null 2>&1 || true
+  incus image alias rename "${PARA_IMAGE}-new" "$PARA_IMAGE"
+  incus delete -f "$builder"
+  trap - EXIT INT TERM
+  log "Base image '$PARA_IMAGE' ready. Now: para up <name>"
+}
+
+# Bare `para`: the handful of commands that carry day-to-day use. Anything
+# else is one `para --help` away — keep this list short on purpose.
+usage_brief() {
+  cat <<'EOF'
+para — parallel dev workspaces on Incus
+
+  para up <name>      create (or resume) a workspace and boot its stack
+  para ls             list this project's workspaces
+  para run <name>     tmux session in the workspace (claude + a shell)
+  para sh <name>      shell into a workspace
+  para web <name>     open the workspace in a browser
+  para down <name>    stop a workspace     para rm <name>   delete it
+
+  para init           scaffold .paraspace/ into the current project
+  para --help         every command, flags, and configuration
+EOF
+  exit "${1:-0}"
+}
+
+usage_full() {
+  # Outside a project PARA_VOLUME is still the bare "para-home-" stem (the
+  # project half is unknown), which reads as a typo — say so instead.
+  local vol="$PARA_VOLUME"
+  [ -n "$PARA_PROJECT" ] || [ "$PARA_VOLUME" != "para-home-" ] || vol="para-home-<project>  (resolved inside a project)"
+  cat <<EOF
+para — parallel dev workspaces on Incus
+
+Runs any number of full, isolated copies of a project side by side. Each
+workspace is an unprivileged Incus system container with its own clone, its own
+Docker stack, a static bridge IP, and a URL
+(https://<name>.\$PARA_DOMAIN:\$PARA_HTTPS_PORT). A para-owned host Caddy
+terminates TLS for the wildcard and reverse-proxies each hostname to its
+container.
+
+Everything project-specific lives in a .paraspace/ dir at the project root
+(Parafile + hooks); para itself bundles no assets.
+
+USAGE
+  para <command> [args]
+
+WORKSPACES
+  up <name>                launch a workspace: clone, provision, boot the stack.
+                           Idempotent — on an existing or stopped workspace it
+                           (re)starts and reconverges instead of erroring
+  down <name>              stop its container; data + registry entry are kept,
+                           'para up <name>' resumes it
+  rm <name>                delete a workspace and its container
+  ls [-a|--all] [--names]  list this project's workspaces (IP, state, URL).
+                           --all covers every project, labeled by project;
+                           --names prints bare names (feeds completion).
+                           Combinable: --all --names spans projects
+  sh <name> [-c <command>] shell into the clone, in the login shell the
+                           project's image gives \$PARA_USER. With -c, run one
+                           command in the clone instead — the whole command as
+                           ONE quoted string, stdin/stdout piped through, exit
+                           status becomes para's, so
+                           'para sh ws1 -c "git status"' scripts cleanly:
+                             * a non-interactive LOGIN BASH: /etc/profile and
+                               ~/.bash_profile apply, the interactive rc your
+                               skel/ installs (e.g. ~/.zshrc) does not — PATH
+                               entries added there are absent. Need them:
+                               -c 'zsh -ic "…"'
+                             * a pty only when para's own stdin AND stdout are
+                               terminals, so pipes and \$(…) stay byte-clean.
+                               PARA_NONINTERACTIVE=1 forces the no-pty path
+  run <name>               tmux session: claude in window 1, a shell in
+                           window 2; re-attaches if already running
+  claude <name>            straight into \`claude\` in the clone
+  web <name>               open https://<name>.\$PARA_DOMAIN:\$PARA_HTTPS_PORT
+                           (port-less when PARA_HTTPS_PORT is 443)
+  reconcile [--prune]      rebuild the registry from Incus — every para-<name>
+                           container records its own project/routes/domain.
+                           Recovers a wiped registry or a restore onto a new
+                           box. Non-destructive; --prune drops rows whose
+                           container is gone
+
+HOST
+  start                    bring up the backend (macOS: colima) and para Caddy
+                           on :\$PARA_HTTPS_PORT. 'para up' does this for you;
+                           the shared home volume is created lazily by 'up',
+                           once the project — hence PARA_VOLUME — is known
+  stop                     stop para Caddy; workspaces + backend untouched
+
+PROJECT & IMAGE
+  init [<template>] [--list|--names|-f|--force|--full]
+                           scaffold .paraspace/ into the current dir from a
+                           bundled template (default: void-docker-gh), skipping
+                           files that already exist. --list/--names show the
+                           available templates, -f/--force overwrites, --full
+                           copies the whole template tree
+  image-build [-q|-v] [-i] build + publish the base image from the project's
+                           .paraspace/image-build.sh, pre-pulling the stack's
+                           external images. -q/--quiet and -v/--verbose force
+                           or keep incus progress bars (auto-quiet when not a
+                           TTY); -i/--from-current (alias --incremental) layers
+                           onto the existing image for fast iteration instead
+                           of starting from pristine Void
+
+CONFIG & AUTH
+  key                      print this machine's para pubkey — authorize it on
+                           your git host once per machine to push from a
+                           workspace
+  config-set KEY VALUE     persist a PARA_* override to \$PARA_CONFIG
+                           (real environment variables still win)
+  config-import <name> <path>…
+                           copy host dotfiles into workspace <name>'s shared
+                           volume
+  config-sync [<name>]     re-push skel/ (zshrc, tmux, claude, nvim config) to
+                           the shared volume; dotfile edits go live in every
+                           workspace with no image rebuild
+  install [prefix]         install this script to PREFIX/bin/para (default
+                           PREFIX: ~/.local) and stage templates for
+                           'para init', so para works from any project dir.
+                           Re-run to update
+  completions <bash|zsh>   print a shell completion script to stdout; load it
+                           with: source <(para completions bash)
+
+Only 'up', 'image-build', and 'config-sync' must run inside a project (a
+.paraspace/ dir, found from \$PWD upward); everything else works anywhere.
+
+CONFIGURATION
+  Precedence is: environment > machine config > Parafile > default. The
+  machine config is a KEY=VALUE file; write it with 'para config-set'.
+  Resolved here:
+
+    PARA_DOMAIN       $PARA_DOMAIN
+    PARA_HTTPS_PORT   $PARA_HTTPS_PORT
+    PARA_IMAGE        $PARA_IMAGE
+    PARA_POOL         $PARA_POOL
+    PARA_BRIDGE       $PARA_BRIDGE
+    PARA_VOLUME       $vol
+
+  Fixed paths, derived from XDG and not overridable:
+
+    machine config    $PARA_CONFIG
+    state (registry)  $PARA_STATE_DIR
+
+PREREQUISITES (one-time per machine)
+  * Wildcard DNS *.\$PARA_DOMAIN -> 127.0.0.1 — already true for the default
+    domain paraspace.dev; only your business if you set your own PARA_DOMAIN
+  * Incus reachable:
+      Linux  'incus admin init' with a dir/ext4-backed pool, so nested Docker
+             resolves to overlayfs rather than vfs; point PARA_POOL at it
+      macOS  brew install colima incus caddy; 'para start' runs colima for you
+             (needs colima >= 0.10 — budget several GB of RAM per workspace)
+  * Trust para Caddy's local CA once:  caddy trust
+  * Build the base image:  para image-build
+
+Docs: README.md and docs/ (commands.md, parafile.md, hooks.md, image.md,
+urls.md, how-it-works.md). Contract version: $PARA_CONTRACT.
+EOF
+  exit "${1:-0}"
+}
+
+main() {
+  local cmd="${1:-}"; shift || true
+  case "$cmd" in
+    start)         cmd_start "$@" ;;
+    stop)          cmd_stop "$@" ;;
+    up)            cmd_up "$@" ;;
+    down)          cmd_down "$@" ;;
+    rm)            cmd_rm "$@" ;;
+    reconcile)     cmd_reconcile "$@" ;;
+    ls)            cmd_ls "$@" ;;
+    sh)            cmd_sh "$@" ;;
+    claude)        cmd_claude "$@" ;;
+    run)           cmd_run "$@" ;;
+    key)           cmd_key "$@" ;;
+    web)           cmd_web "$@" ;;
+    config-set)    cmd_config_set "$@" ;;
+    config-import) cmd_config_import "$@" ;;
+    config-sync)   cmd_config_sync "$@" ;;
+    init)          cmd_init "$@" ;;
+    install)       cmd_install "$@" ;;
+    completions)   cmd_completions "$@" ;;
+    image-build)   cmd_image_build "$@" ;;
+    "")                usage_brief 0 ;;
+    -h|--help|help)    usage_full 0 ;;
+    # para wraps `incus exec`, so container muscle memory reaches for `exec`
+    # first. Point at the real spelling rather than making them go hunting;
+    # cheaper than a second verb for the same thing (see docs/commands.md).
+    exec) die "no 'exec' command — run one command in a workspace with: para sh <name> -c '<command>'" ;;
+    *) die "unknown command '$cmd' (try: para --help)" ;;
+  esac
+}
+
+main "$@"

@@ -1,0 +1,62 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Guest provisioning for the void-minimal base image. Runs as root inside a fresh
+# `images:voidlinux` (glibc) container, invoked by `para image-build`. This is the
+# BAREST image: it installs nothing. It just stands up a workspace user on the
+# Void base (which — with para's build bootstrap — already ships bash, sudo,
+# ca-certificates, coreutils, and a current xbps), enough for an interactive
+# shell via `para sh`.
+#
+# This is yours — para owns no image. The `pkgs=""` block below is where your
+# toolchain goes; a boot hook that runs an app is where hooks/boot goes. Grow this
+# into templates/void-docker-gh (docker + a clone + a real boot) as you go.
+
+# Workspace user to bake in. Passed by `para image-build`; defaults keep a
+# standalone run working. useradd -m lands the home at /home/$PARA_USER.
+PARA_USER="${PARA_USER:-app}"
+PARA_UID="${PARA_UID:-1000}"
+PARA_GID="${PARA_GID:-1000}"
+
+# ---- packages (empty by default — this box installs nothing) ----------------
+# Add what your app needs here, space-separated, then rebuild with `para
+# image-build`. Leave it empty for a bare box. Common first additions:
+#   pkgs="zsh tmux neovim git curl"          # a richer interactive shell + editor
+#   pkgs="docker docker-compose github-cli"  # a container stack (see void-docker-gh)
+# When you install zsh, the provision hook switches the login shell to it so the
+# seeded skel/zshrc applies (this bare box logs you into bash).
+echo "==> packages"
+pkgs=""
+missing=()
+for p in $pkgs; do xbps-query "$p" >/dev/null 2>&1 || missing+=("$p"); done
+if [ "${#missing[@]}" -gt 0 ]; then
+  # Full-upgrade FIRST so the new packages match the rest of the base image —
+  # installing against freshly-synced repodata without a full -Syu is Void's
+  # classic partial-upgrade footgun (a new package pulls a lib newer than a
+  # held-back one and shlib resolution breaks). Skipped entirely while pkgs="".
+  xbps-install -Syu xbps >/dev/null 2>&1 || true
+  xbps-install -Syu -y >/dev/null
+  xbps-install -Sy "${missing[@]}" >/dev/null
+else
+  echo "  (none — bare box)"
+fi
+
+# Void incus ships /tmp as 0755 root:root; a normal install is sticky 1777. Without
+# the sticky world-writable bit, uid-1000 $PARA_USER can't create /tmp/<tool> dirs
+# (bun, claude, etc. die with EACCES). /tmp is on the rootfs, so this persists.
+echo "==> writable /tmp (sticky 1777)"
+chmod 1777 /tmp
+
+# ---- workspace user + passwordless sudo -------------------------------------
+# The Void base ships only root; para expects $PARA_USER at $PARA_UID/$PARA_GID
+# (what every `incus file push --uid`/chown targets). Login shell is bash here
+# (nothing installed zsh); the provision hook chsh's to zsh if you add it. Guarded
+# so a `--from-current` re-run (user already baked) is a no-op.
+echo "==> $PARA_USER user ($PARA_UID:$PARA_GID) + passwordless sudo"
+getent group "$PARA_USER" >/dev/null 2>&1 || groupadd -g "$PARA_GID" "$PARA_USER"
+id -u "$PARA_USER" >/dev/null 2>&1 \
+  || useradd -m -u "$PARA_UID" -g "$PARA_GID" -s /bin/bash "$PARA_USER"
+echo "$PARA_USER ALL=(ALL) NOPASSWD:ALL" > "/etc/sudoers.d/90-$PARA_USER-nopasswd"
+chmod 0440 "/etc/sudoers.d/90-$PARA_USER-nopasswd"
+
+echo "==> provisioning complete (bare box — add your toolchain above)"

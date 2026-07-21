@@ -1,0 +1,44 @@
+#!/usr/bin/env bash
+set -euo pipefail
+# para provision hook — runs INSIDE the workspace, in $HOME, before boot.
+#
+# The barest useful provision: seed the shell rc onto the shared volume and link
+# it in. No clone, no .env, no app — this box runs nothing. The comments at the
+# bottom mark where each of those grows in; templates/void-docker-gh is the same
+# hook fully fleshed out (shared-volume seeding, git-key auth, .env handling).
+#
+# It's idempotent: para re-runs it on every `para up`.
+
+. "$(dirname "$0")/helpers"
+
+skel="$HOME/.para/skel"
+shared="$PARA_SHARED"
+
+# ---- 1. seed the shared volume (once) --------------------------------------
+# Whatever lives here is shared by every workspace of this project. For a bare
+# box that's just the shell rc; grow it (gitconfig, an ssh key, dotfiles) as you
+# add a clone and tools.
+if [ ! -f "$shared/.seeded" ]; then
+  stage "Seeding shared volume (one-time)"
+  mkdir -p "$shared"
+  [ -f "$skel/zshrc" ] && cp "$skel/zshrc" "$shared/zshrc"
+  touch "$shared/.seeded"
+fi
+
+# ---- 2. link the shared surface into $HOME ---------------------------------
+[ -f "$shared/zshrc" ] && ln -sfn "$shared/zshrc" ~/.zshrc
+
+# This bare image logs you into bash. The moment you add `zsh` to
+# .paraspace/image-build.sh and rebuild, switch the login shell so the seeded
+# zshrc applies. Harmless (and skipped) until then.
+if command -v zsh >/dev/null 2>&1 && [ "$SHELL" != "$(command -v zsh)" ]; then
+  sudo chsh -s "$(command -v zsh)" "$PARA_USER" 2>/dev/null || true
+fi
+
+# ---- where this grows ------------------------------------------------------
+# This box clones nothing and boots nothing. When you have an app:
+#   • add its toolchain to .paraspace/image-build.sh (the empty `pkgs=""` block)
+#   • clone it here — copy the shared-volume seeding, git-key authorization, and
+#     .env handling from templates/void-docker-gh/.paraspace/hooks/provision
+#   • bring it up in .paraspace/hooks/boot, and point PARA_ROUTES at its port
+stage "Bare box provisioned — see the comments here + hooks/boot to add an app"

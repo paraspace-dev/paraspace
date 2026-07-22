@@ -1,6 +1,0 @@
-{
-	auto_https disable_redirects
-}
-http://127.0.0.1:18083 {
-	respond "DDD"
-}

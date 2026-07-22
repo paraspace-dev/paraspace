@@ -11,6 +11,16 @@ test/run route      # run only tests whose description contains "route"
 
 `npm test`, `npm run test:cli`, and `npm run test:e2e` map to the same.
 
+> **Run the e2e tier locally before you merge.** Only the CLI tier runs in CI
+> ([`.github/workflows/test.yml`](../.github/workflows/test.yml)) — the e2e tier
+> needs a live incus daemon that GitHub-hosted runners don't have, so **nothing
+> automated will catch an e2e regression for you.** Whenever you touch the
+> `up`/route/lifecycle/volume mechanism, run `test/run --e2e` (or `test/run`) on
+> Linux and confirm it's green before merging a PR or marking it ready for review.
+> The e2e tier is **Linux-only** (native incus, or a Linux VM on macOS); on a Mac
+> host the CLI tier is all you get. See [Known
+> limitations](#known-limitations-of-the-e2e-sandbox).
+
 ## What each tier covers
 
 **CLI tier** (`test/cli/`) — no incus. Argument handling, `para --help`, and
@@ -91,6 +101,45 @@ throwaway XDG tree can fence off:
   e2e tier does not run there — use the CLI tier on macOS. (`build-image.sh` is
   host-agnostic; it builds a Linux container through whatever incus the CLI
   reaches.)
+
+## Writing a test
+
+A test is just a `test_*` bash function dropped into a file under `cli/` or
+`e2e/` — no registration, no boilerplate. The harness
+([`lib/harness.sh`](lib/harness.sh)) autodiscovers every `test_*` function by
+name and runs each in its own subshell; a test **passes when its function returns
+zero** and **fails on any non-zero return**. The `assert_*` helpers in
+[`lib/assert.sh`](lib/assert.sh) return non-zero on failure, so a bare
+`assert_eq …` line is a hard checkpoint. Helper functions that aren't tests must
+*not* be named `test_*` (prefix them `_`, like `_ls_state`) or they'll be run as
+tests. A few rules keep the suite honest:
+
+- **Pick the right tier.** If it needs no incus — argument handling, `--help`,
+  `init`, or a refusal that fires *before* any backend call (name validation,
+  contract-version and cross-project-ownership checks) — it belongs in `cli/` so
+  CI actually runs it. Anything that boots a workspace goes in `e2e/`.
+- **Write order-independent tests.** Execution order is **not** guaranteed: the
+  harness runs functions in `declare -F` (alphabetical-by-name) order, not file or
+  source order. Never assume one test ran before another. Read-only e2e tests
+  share the primary workspace (`$PARA_WS`, brought up once by [`run`](run)) and
+  must not disturb it; any test that mutates lifecycle state gets its own
+  workspace (`$PARA_WS2`/`$PARA_WS3`, pre-tracked for teardown) and cleans up
+  after itself.
+- **Check every step's exit status.** The harness deliberately does *not* run
+  tests under `set -e` (they routinely run commands expected to fail). So a
+  non-final assert whose result you don't check is silently masked by the
+  function's later success — end such lines with `|| return 1`. Use `para_do` for
+  mutating para calls (it stays quiet on success and surfaces para's output on
+  failure) and `assert_fails` for "para must reject this".
+- **Wait on async state with `eventually`, never a fixed `sleep`.** Boot, routing,
+  and state transitions are asynchronous; `eventually <secs> <cmd…>` retries until
+  the command succeeds or the timeout elapses. Reach for `http_get <ws>` to curl a
+  workspace through the run's Caddy hermetically (`--resolve`, para's internal CA).
+- **Bind assertions to a specific workspace.** Assert on *this* workspace's `para
+  ls` row (`awk '$1==n{print $3}'`), not "does RUNNING appear somewhere" — in a
+  shared registry another row can otherwise mask a bad state here.
+- **Keep it ShellCheck-clean.** Test files are linted by `bin/lint` (discovered by
+  their shebang) exactly like `bin/para`. Run `bin/lint` before you push.
 
 ## Layout
 

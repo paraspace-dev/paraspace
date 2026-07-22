@@ -66,7 +66,12 @@ seam, decide breaking-vs-additive deliberately and update both the constant and
   volume seams (`up` → hooks → boot readiness → Caddy → the app). It's Docker-free
   by design, so it does not cover the nested-Docker/compose boot path. Run
   `test/run --e2e` after changing the `up`/route/lifecycle mechanism; every run is
-  sandboxed from your real workspaces.
+  sandboxed from your real workspaces. The e2e tier is **Linux-only** (native
+  incus, or a Linux VM on macOS) and **not run in CI** — only the CLI tier is — so
+  run it locally and confirm it's green before merging or marking a PR ready.
+  Tests are autodiscovered `test_*` functions run in name order, so write them
+  **order-independent**; see [`test/README.md`](./test/README.md) for the full
+  conventions (tier choice, `|| return 1`, `eventually`, per-workspace asserts).
 - The `zsh` `skel/` is intentionally not linted (ShellCheck parses only sh/bash).
 - `plans/` holds design notes for in-flight work; not shipped in the npm `files`.
 

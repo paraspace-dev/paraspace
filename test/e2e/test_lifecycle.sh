@@ -8,7 +8,7 @@ test_down_up_resume_and_rm() {
 
   # Bring it up and confirm it serves.
   "$PARA" up "$ws" >/dev/null 2>&1 || return 1
-  eventually 30 sh -c "curl -sk --resolve \"$ws.${PARA_DOMAIN:-paraspace.dev}:$PARA_HTTPS_PORT:127.0.0.1\" \"https://$ws.${PARA_DOMAIN:-paraspace.dev}:$PARA_HTTPS_PORT/\" | grep -q para-e2e-ok" \
+  eventually 30 sh -c "curl -sk --max-time 10 --resolve \"$ws.${PARA_DOMAIN:-paraspace.dev}:$PARA_HTTPS_PORT:127.0.0.1\" \"https://$ws.${PARA_DOMAIN:-paraspace.dev}:$PARA_HTTPS_PORT/\" | grep -q para-e2e-ok" \
     || return 1
 
   # down: container stops, registry row preserved.
@@ -20,7 +20,7 @@ test_down_up_resume_and_rm() {
   # up again: resumes the SAME workspace (idempotent up on a stopped one) and
   # reconverges the boot hook, so it serves again.
   "$PARA" up "$ws" >/dev/null 2>&1 || return 1
-  eventually 30 sh -c "curl -sk --resolve \"$ws.${PARA_DOMAIN:-paraspace.dev}:$PARA_HTTPS_PORT:127.0.0.1\" \"https://$ws.${PARA_DOMAIN:-paraspace.dev}:$PARA_HTTPS_PORT/\" | grep -q para-e2e-ok" \
+  eventually 30 sh -c "curl -sk --max-time 10 --resolve \"$ws.${PARA_DOMAIN:-paraspace.dev}:$PARA_HTTPS_PORT:127.0.0.1\" \"https://$ws.${PARA_DOMAIN:-paraspace.dev}:$PARA_HTTPS_PORT/\" | grep -q para-e2e-ok" \
     || return 1
 
   # rm: gone from the registry and from incus.

@@ -62,10 +62,11 @@ seam, decide breaking-vs-additive deliberately and update both the constant and
   static gate.
 - **Behavioral tests live in [`test/`](./test/README.md)** (`test/run`, or
   `npm test`): a CLI tier (no incus, runs in CI) and an e2e tier that drives a
-  real Incus workspace off a tiny Alpine fixture and asserts the whole path
-  (`up` → hooks → boot readiness → Caddy → the app). Run `test/run --e2e` after
-  changing the `up`/route/lifecycle mechanism; every run is sandboxed from your
-  real workspaces.
+  real Incus workspace off a tiny Alpine fixture and asserts the incus/Caddy/hook/
+  volume seams (`up` → hooks → boot readiness → Caddy → the app). It's Docker-free
+  by design, so it does not cover the nested-Docker/compose boot path. Run
+  `test/run --e2e` after changing the `up`/route/lifecycle mechanism; every run is
+  sandboxed from your real workspaces.
 - The `zsh` `skel/` is intentionally not linted (ShellCheck parses only sh/bash).
 - `plans/` holds design notes for in-flight work; not shipped in the npm `files`.
 

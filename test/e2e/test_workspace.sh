@@ -34,7 +34,10 @@ test_shared_volume_is_mounted() {
 }
 
 test_sh_c_propagates_exit_status() {
-  # para sh -c must exit with the guest command's status, so it composes.
-  assert_fails "$PARA" sh "$PARA_WS" -c 'exit 7'
+  # para sh -c must exit with the guest command's status, so it composes. The
+  # `|| return 1` is load-bearing: the harness runs tests without `set -e`, so a
+  # non-final assert whose result isn't checked would be masked by the trailing
+  # `exit 0` and the test could never fail on broken propagation.
+  assert_fails "$PARA" sh "$PARA_WS" -c 'exit 7' || return 1
   "$PARA" sh "$PARA_WS" -c 'exit 0'
 }

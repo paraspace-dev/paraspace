@@ -61,9 +61,14 @@ case "$tier" in
   all) if [ "$incus_ok" -eq 1 ]; then run_e2e=1; else echo "${_t_gray:-}note: incus unreachable — running CLI tier only.${_t_off:-}" >&2; fi ;;
 esac
 
+# Arm teardown BEFORE any setup that can fail (sandbox_base creates the temp XDG
+# tree on its first line; sandbox_ip_band / build-image.sh can fail after that).
+# sandbox_teardown is defensive — empty workspace list, unset volume, absent Caddy
+# are all no-ops — so it's safe for the CLI tier too.
+trap sandbox_teardown EXIT
+
 if [ "$run_e2e" -eq 1 ]; then
   sandbox_e2e
-  trap sandbox_teardown EXIT
   # Three fixed, pre-tracked workspace names so teardown reclaims them even if a
   # test aborts (tests run in subshells and can't grow the parent's tracking list).
   export PARA_WS="para${$}a" PARA_WS2="para${$}b" PARA_WS3="para${$}c"
@@ -78,7 +83,6 @@ if [ "$run_e2e" -eq 1 ]; then
   fi
 else
   sandbox_base
-  trap 'rm -rf "$SANDBOX_ROOT"' EXIT
 fi
 
 # Source the selected tiers' test files (each defines test_* functions). The

@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# harness.sh — the tiny test runner. Autodiscovers `test_*` functions (like the
-# steg CLI suite) and runs each, reporting pass/fail with timing. A test PASSES
-# when its function returns zero; the assert.sh helpers return non-zero to fail.
+# harness.sh — the tiny test runner. Autodiscovers `test_*` functions and runs
+# each, reporting pass/fail with timing. A test PASSES when its function returns
+# zero; the assert.sh helpers return non-zero to fail.
 #
-# Unlike the steg harness this does NOT exit on first failure — an e2e run is
-# expensive to reach, so we run every test and summarize, then exit non-zero if
-# any failed. Set PARA_TEST_FAILFAST=1 to stop at the first failure instead.
+# It does NOT exit on first failure — an e2e run is expensive to reach, so we run
+# every test and summarize, then exit non-zero if any failed. Set
+# PARA_TEST_FAILFAST=1 to stop at the first failure instead.
 
 # Colors only on a tty.
 if [ -t 1 ]; then

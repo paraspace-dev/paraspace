@@ -6,7 +6,7 @@ Real tests for `para`. Two tiers, one entrypoint:
 test/run            # both tiers (e2e is skipped with a note if incus is absent)
 test/run --cli      # CLI tier only — no incus, fast, runs in CI
 test/run --e2e      # e2e tier only — needs a reachable incus daemon
-test/run routing    # run only tests whose description contains "routing"
+test/run route      # run only tests whose description contains "route"
 ```
 
 `npm test`, `npm run test:cli`, and `npm run test:e2e` map to the same.
@@ -21,9 +21,12 @@ ShellCheck gate ([`bin/lint`](../bin/lint)).
 **e2e tier** (`test/e2e/`) — the real mechanism, exercised through actual `para`
 commands against a live Incus workspace:
 
-- `para up` → the project's hooks → the boot readiness contract → Caddy TLS →
-  the container's bridge IP → the app, asserted with a real HTTPS request that
-  returns the boot hook's sentinel (`test_workspace`, `test_idempotency`);
+- the routing path — `para up` → the project's hooks → the boot readiness
+  contract → Caddy TLS → the container's bridge IP → the app — asserted with a
+  real HTTPS request that returns the boot hook's sentinel (`test_workspace`,
+  `test_idempotency`). Note this is the *Docker-free* path: the fixture serves
+  with busybox `httpd`, so it does **not** exercise para's nested-Docker/compose
+  boot (the image contract's core), only the incus/Caddy/hook/volume seams;
 - `para sh -c` running as the uid-1000 user, byte-clean, exit-status-propagating;
 - the `down` → `up` (resume) → `rm` lifecycle (`test_lifecycle`);
 - the per-project shared volume, shared across a project's workspaces
@@ -59,6 +62,29 @@ Every run is sandboxed so it never touches your real para state:
 Teardown removes the run's workspaces, its shared volume, its Caddy, and the temp
 tree. The `alpine-minimal` image is left cached. Flags: `--keep` (leave it all
 for inspection), `--failfast` (stop at the first failure).
+
+## Known limitations of the e2e sandbox
+
+The isolation is strong but not absolute — a few things are outside what a
+throwaway XDG tree can fence off:
+
+- **Caddy's admin port (`:2019`) is not sandboxable.** para's generated Caddyfile
+  sets no `admin` directive, so its Caddy binds the default admin endpoint — and
+  Caddy binds it with `SO_REUSEPORT`, so a sandbox Caddy and a real para Caddy
+  would *both* hold `:2019` and para's admin calls (`caddy reload`/`stop`) would
+  be load-balanced across them — an `up` in the test run could reload, or a stop
+  could kill, your real Caddy. So `sandbox_e2e` refuses to run while another Caddy
+  owns `:2019` and tells you to `para stop` first. Teardown kills the run's own
+  Caddy by its pidfile pid (never via the shared admin API). A proper fix (a
+  configurable admin endpoint) belongs in para itself.
+- **IP allocation is a setup-time snapshot.** The band is carved from what's free
+  on the bridge when the run starts (including stopped workspaces' reservations).
+  para's own `alloc_ip` never re-consults incus, so starting a *real* `para up` in
+  another terminal mid-run can still collide. Don't do that while an e2e run is in
+  flight.
+- **`para up` requires outbound DNS.** para gates readiness on resolving
+  `github.com` inside the guest, so the e2e tier needs working outbound DNS (the
+  image build needs the network anyway — the tier isn't offline-capable).
 
 ## Layout
 

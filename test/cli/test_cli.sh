@@ -14,7 +14,7 @@ test_help_lists_the_command_surface() {
 }
 
 test_init_scaffolds_a_paraspace_dir() {
-  local d; d="$(mktemp -d)"
+  local d; d="$(mktemp -d "${TMPDIR:-/tmp}/para-init.XXXXXX")"
   ( cd "$d" && env -u PARA_PROJECT_DIR "$PARA" init void-minimal >/dev/null 2>&1 )
   assert test -f "$d/.paraspace/Parafile"        || { rm -rf "$d"; return 1; }
   assert test -f "$d/.paraspace/hooks/provision" || { rm -rf "$d"; return 1; }

@@ -6,8 +6,8 @@ set -euo pipefail
 #
 # The hello fixture serves a fixed sentinel from a static dir with busybox httpd
 # (baked into the Alpine image as /usr/sbin/httpd). The body of index.html carries
-# the workspace name, so test_routing can prove it reached THIS workspace and not
-# some other site on the shared Caddy.
+# the workspace name, so the routing test can prove it reached THIS workspace and
+# not some other site on the shared Caddy.
 
 . "$(dirname "$0")/helpers"
 

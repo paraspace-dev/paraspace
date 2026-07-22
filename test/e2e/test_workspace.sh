@@ -16,9 +16,10 @@ test_http_route_serves_the_sentinel() {
 test_workspace_is_listed_and_running() {
   local names; names="$("$PARA" ls --names 2>/dev/null)"
   assert_contains "$names" "$PARA_WS" "ls --names includes the workspace" || return 1
-  local ls; ls="$("$PARA" ls 2>/dev/null)"
-  assert_contains "$ls" "$PARA_WS"  "ls shows the workspace" || return 1
-  assert_contains "$ls" "RUNNING"   "ls reports RUNNING"
+  # Bind the state to THIS workspace's row (field 3), not "RUNNING appears
+  # somewhere" — otherwise another row being RUNNING could mask a bad state here.
+  local state; state="$("$PARA" ls 2>/dev/null | awk -v n="$PARA_WS" '$1==n{print $3}')"
+  assert_eq "RUNNING" "$state" "the workspace's row reports RUNNING"
 }
 
 test_sh_c_runs_as_the_uid_1000_user() {

@@ -14,7 +14,7 @@ test_shared_volume_is_visible_across_workspaces() {
 
   # Bring up a second workspace of the SAME project — it attaches the same
   # para-home-<project> volume at /para/shared.
-  "$PARA" up "$reader" >/dev/null 2>&1 || return 1
+  para_do up "$reader" || return 1
 
   # The reader sees the writer's file.
   local got; got="$("$PARA" sh "$reader" -c 'cat /para/shared/xfer' 2>/dev/null)"

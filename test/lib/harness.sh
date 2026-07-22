@@ -51,7 +51,9 @@ run_test() {
 # any test failed.
 run_all() {
   local filter="${1:-}" fn desc
-  for fn in $(declare -F | awk '/ test_/ {print $NF}'); do
+  # `$NF ~ /^test_/` anchors to functions NAMED test_* (not helpers that merely
+  # contain the substring), so a `_ls_state`-style helper is never auto-run.
+  for fn in $(declare -F | awk '$NF ~ /^test_/ {print $NF}'); do
     desc="${fn#test_}"; desc="${desc//_/ }"
     if [ -n "$filter" ]; then
       case "$desc" in *"$filter"*) ;; *) continue ;; esac

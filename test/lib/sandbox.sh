@@ -27,6 +27,12 @@ sandbox_base() {
   export XDG_DATA_HOME="$SANDBOX_ROOT/data"
   export XDG_CACHE_HOME="$SANDBOX_ROOT/cache"
   mkdir -p "$XDG_STATE_HOME" "$XDG_CONFIG_HOME" "$XDG_DATA_HOME" "$XDG_CACHE_HOME"
+  # Neutralize any inherited para identity from the caller's environment. This is
+  # SAFETY-CRITICAL: teardown deletes $PARA_VOLUME, so a developer who exports
+  # PARA_VOLUME (e.g. the docs-recommended shared name para-home) must not have it
+  # leak in and get their real volume deleted by a `--cli` run. sandbox_e2e sets
+  # its own run-unique values after this.
+  unset PARA_VOLUME PARA_PROJECT PARA_PROJECT_DIR
   # A non-default port so the run's Caddy can't collide with a real para Caddy on
   # :8443, and its own pidfile (under the temp XDG_STATE_HOME) governs only it.
   export PARA_HTTPS_PORT="${PARA_TEST_PORT:-9443}"
@@ -70,8 +76,15 @@ sandbox_used_octets() {
 # kill — the developer's real Caddy. So we refuse to run e2e while another Caddy
 # owns :2019, rather than risk cross-contaminating it. Uses bash /dev/tcp, no
 # extra tools. (The typical culprit is a running `para` Caddy — `para stop` it.)
+# Prefer `ss` (a definitive listener check on Linux, where the e2e tier runs); fall
+# back to bash /dev/tcp. /dev/tcp fails OPEN (reports "free" if the connect can't be
+# made), so `ss` is the safer primary when present.
 sandbox_caddy_admin_free() {
-  ! (exec 3<>/dev/tcp/127.0.0.1/2019) 2>/dev/null
+  if command -v ss >/dev/null 2>&1; then
+    ! ss -ltn 2>/dev/null | grep -q '127\.0\.0\.1:2019 '
+  else
+    ! (exec 3<>/dev/tcp/127.0.0.1/2019) 2>/dev/null
+  fi
 }
 
 # Carve a free, contiguous window of <count> static IPs out of [200,249] and
@@ -132,13 +145,17 @@ sandbox_teardown() {
   done
   # The shared volume para lazily created for this project. It lands on whichever
   # pool para settled on — para-dir (the nested-Docker default) or, if that switch
-  # didn't fire, default — so try both.
-  if [ -n "${PARA_VOLUME:-}" ]; then
-    local p
-    for p in para-dir default; do
-      incus storage volume delete "$p" "$PARA_VOLUME" >/dev/null 2>&1 || true
-    done
-  fi
+  # didn't fire, default — so try both. GUARDED to our run-unique name pattern
+  # (sandbox_e2e sets para-home-paratest-$$): teardown must NEVER delete a volume
+  # it didn't create, even if PARA_VOLUME somehow carried in from the environment.
+  case "${PARA_VOLUME:-}" in
+    para-home-paratest-*)
+      local p
+      for p in para-dir default; do
+        incus storage volume delete "$p" "$PARA_VOLUME" >/dev/null 2>&1 || true
+      done
+      ;;
+  esac
   # Kill the run's own Caddy directly by its sandboxed pidfile — NOT via `para
   # stop`. `para stop` stops Caddy through the admin API on :2019, which Caddy
   # binds with SO_REUSEPORT: with any other caddy alive that admin stop is

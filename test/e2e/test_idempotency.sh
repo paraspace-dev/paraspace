@@ -5,8 +5,8 @@
 
 test_up_is_idempotent() {
   # A second up must return zero (reconverge, not error).
-  "$PARA" up "$PARA_WS" >/dev/null 2>&1 || return 1
-  # …and the route still serves the sentinel afterwards.
+  para_do up "$PARA_WS" || return 1
+  # …and the route still serves the sentinel for THIS workspace afterwards.
   local body; body="$(http_get "$PARA_WS")"
-  assert_contains "$body" "para-e2e-ok" "still serving after re-up"
+  assert_contains "$body" "para-e2e-ok $PARA_WS" "still serving after re-up"
 }

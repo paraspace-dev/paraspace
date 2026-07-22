@@ -9,6 +9,20 @@ assert() {
   if ! "$@"; then echo "  assert failed: $*" >&2; return 1; fi
 }
 
+# para_do <para-args...> — run a para command for its SIDE EFFECT (up/down/rm/…).
+# Silent on success; on failure it echoes para's combined output and returns
+# non-zero, so a red test is debuggable instead of a bare `✗`. Use this for
+# mutating calls whose stdout you don't need; capture stdout directly (not via
+# this) when a test asserts on it.
+para_do() {
+  local out
+  if ! out="$("$PARA" "$@" 2>&1)"; then
+    printf '    para %s failed:\n' "$1" >&2
+    printf '    | %s\n' "$out" >&2
+    return 1
+  fi
+}
+
 # assert_eq <expected> <actual> [label]
 assert_eq() {
   if [ "$1" != "$2" ]; then

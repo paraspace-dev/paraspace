@@ -85,6 +85,12 @@ throwaway XDG tree can fence off:
 - **`para up` requires outbound DNS.** para gates readiness on resolving
   `github.com` inside the guest, so the e2e tier needs working outbound DNS (the
   image build needs the network anyway — the tier isn't offline-capable).
+- **The e2e tier is Linux / native-incus only.** It reads the incus bridge
+  (`incusbr0`) directly and carves a machine-global IP band, which assumes a
+  native Linux incus. para also supports macOS (incus in a colima VM), but the
+  e2e tier does not run there — use the CLI tier on macOS. (`build-image.sh` is
+  host-agnostic; it builds a Linux container through whatever incus the CLI
+  reaches.)
 
 ## Layout
 

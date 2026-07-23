@@ -62,7 +62,7 @@ case "$tier" in
 esac
 
 # Arm teardown BEFORE any setup that can fail (sandbox_base creates the temp XDG
-# tree on its first line; sandbox_ip_band / build-image.sh can fail after that).
+# tree on its first line; sandbox_ip_band / the image build can fail after that).
 # sandbox_teardown is defensive — empty workspace list, unset volume, absent Caddy
 # are all no-ops — so it's safe for the CLI tier too.
 trap sandbox_teardown EXIT

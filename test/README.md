@@ -49,12 +49,16 @@ serves a fixed sentinel over HTTP with busybox `httpd`. It is **not** a template
 (it never ships in the npm package) and it does **not** use Docker — that keeps
 the box ~15 MB and the whole path Docker-free.
 
-`para image-build` is deliberately not used: it hardwires a Void base + a
-docker-overlay check, so it can't build a tiny Docker-free Alpine image.
-[`build-image.sh`](fixtures/hello/build-image.sh) does the equivalent with plain
-incus — `apk add bash busybox-extras sudo`, an `app:1000` user — and publishes it
-as the `alpine-minimal` alias. The e2e setup builds it once (cached across runs;
-`--no-build` reuses it, `build-image.sh --force` rebuilds).
+The image is built by **`para image-build`**, from the fixture's own
+[`.paraspace/image-build.sh`](fixtures/hello/.paraspace/image-build.sh)
+(`apk add bash busybox-extras sudo`, an `app:1000` user) on the
+`PARA_BASE_IMAGE`/`PARA_IMAGE_BOOTSTRAP` its Parafile declares
+(`images:alpine/edge` + `apk add --no-cache bash`), published as the
+`alpine-minimal` alias. That's deliberate: the fixture is the non-Void,
+Docker-free second consumer, so every e2e run re-proves that `image-build`
+carries no distro or Docker assumptions of its own. The e2e setup builds it once
+(cached across runs; `--no-build` skips the check entirely, `PARA_TEST_REBUILD=1`
+forces a rebuild).
 
 ## Isolation
 
@@ -98,9 +102,9 @@ throwaway XDG tree can fence off:
 - **The e2e tier is Linux / native-incus only.** It reads the incus bridge
   (`incusbr0`) directly and carves a machine-global IP band, which assumes a
   native Linux incus. para also supports macOS (incus in a colima VM), but the
-  e2e tier does not run there — use the CLI tier on macOS. (`build-image.sh` is
-  host-agnostic; it builds a Linux container through whatever incus the CLI
-  reaches.)
+  e2e tier does not run there — use the CLI tier on macOS. (The image build
+  itself is host-agnostic; it builds a Linux container through whatever incus
+  the CLI reaches.)
 
 ## Writing a test
 

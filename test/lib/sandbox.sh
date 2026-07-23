@@ -125,8 +125,20 @@ sandbox_e2e() {
     return 1
   }
   sandbox_ip_band 4 || return 1
+  # The fixture's base image, built through para itself — `para image-build`
+  # reads the fixture's Parafile (PARA_PROJECT_DIR above) for the Alpine base,
+  # the bash bootstrap, and the payload. Doing it this way means an e2e run also
+  # exercises image-build against a non-Void, Docker-free consumer.
+  # Cached across runs: the image is a pure function of the fixture and the
+  # rebuild is the slow part, so an existing alias is reused. --no-build skips
+  # even the check; PARA_TEST_REBUILD=1 forces a fresh build.
+  local img="${PARA_IMAGE:-alpine-minimal}"
   if [ "${PARA_TEST_NO_BUILD:-0}" != 1 ]; then
-    PARA_IMAGE="${PARA_IMAGE:-alpine-minimal}" bash "$FIXTURE_DIR/build-image.sh"
+    if [ "${PARA_TEST_REBUILD:-0}" = 1 ] || ! incus image info "$img" >/dev/null 2>&1; then
+      "$PARA" image-build || return 1
+    else
+      echo "sandbox: reusing cached image '$img' (PARA_TEST_REBUILD=1 rebuilds)" >&2
+    fi
   fi
 }
 
@@ -135,7 +147,8 @@ sandbox_track() { SANDBOX_WORKSPACES+=("$1"); }
 
 # Remove everything this run created: its workspaces, its shared volume, its
 # Caddy, and the temp XDG tree. The Alpine image is left cached (rebuild is the
-# slow part); pass --clean-image to build-image.sh yourself to drop it.
+# slow part); `incus image delete alpine-minimal` drops it, or run with
+# PARA_TEST_REBUILD=1 to rebuild it in place.
 sandbox_teardown() {
   [ "${PARA_TEST_KEEP:-0}" = 1 ] && { echo "sandbox: --keep set, leaving workspaces + $SANDBOX_ROOT" >&2; return 0; }
   local ws

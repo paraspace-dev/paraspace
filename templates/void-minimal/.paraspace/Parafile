@@ -39,8 +39,8 @@
 # shows no URL. Once you run something, list its port here — a bare port is the
 # workspace apex:
 #   PARA_ROUTES="8080"              # -> https://<name>.$PARA_DOMAIN
-#   PARA_ROUTES="3000,api:3001"     # several: commas, spaces or newlines
-PARA_ROUTES=""
+#   PARA_ROUTES="3000,api:3001"     # several: commas, spaces, tabs or newlines
+PARA_ROUTES="${PARA_ROUTES-}"
 
 # ---- optional -----------------------------------------------------------------
 # para's own defaults, spelled out so you don't have to go look them up. Uncomment

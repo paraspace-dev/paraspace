@@ -45,7 +45,7 @@ into the hook's environment. So beyond the documented set below, **any
 change needed. The same is true of your own keys in the user config, which is
 how you pass a machine-wide knob to your hooks.
 
-Two caveats on where a value may come from: the [per-project
+One caveat on where a value may come from: the [per-project
 keys](./parafile.md#1-per-project-keys-are-refused-from-the-user-config) —
 `PARA_PROJECT`, `PARA_CLONE_DIR` and `PARA_ORIGIN` among them — are **not** read
 from the user config, so set those in the `Parafile`.

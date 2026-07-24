@@ -6,6 +6,25 @@
 # --all run (pinning para at the e2e fixture); the init tests unset it and run in
 # a fresh temp dir so they scaffold cleanly.
 
+# A PATH dir whose backend commands all fail, so `para up` stops deterministically
+# at ensure_backend — the first thing after the routes gate. Without it, `up` runs
+# on into ensure_pool/ensure_volume and creates REAL storage on any machine that
+# has incus. Echoes the dir; caller removes it.
+_cli_stub_backend() {
+  local stub c
+  stub="$(mktemp -d "${TMPDIR:-/tmp}/para-stub.XXXXXX")"
+  for c in incus caddy colima; do printf '#!/bin/sh\nexit 1\n' > "$stub/$c"; chmod +x "$stub/$c"; done
+  printf '%s\n' "$stub"
+}
+
+# "rejected" if `para up` complained about PARA_ROUTES, else "accepted". Route
+# validation lives in cmd_up (NOT config load), so `para ls` would not exercise it.
+_cli_routes_verdict() { # _cli_routes_verdict <projdir> <stubdir> [cwd]
+  local out
+  out="$(cd "${3:-$PWD}" && env PATH="$2:$PATH" PARA_PROJECT_DIR="$1" "$PARA" up ws 2>&1)" || true
+  case "$out" in *PARA_ROUTES*) printf 'rejected\n' ;; *) printf 'accepted\n' ;; esac
+}
+
 test_help_lists_the_command_surface() {
   local out; out="$("$PARA" --help 2>&1)"
   assert_contains "$out" "up"          "help mentions up"          || return 1
@@ -123,7 +142,7 @@ test_up_accepts_an_explicitly_empty_route_list() {
   # nothing has touched disk by then.
   local d stub
   d="$(mktemp -d "${TMPDIR:-/tmp}/para-emptyroutes.XXXXXX")"
-  stub="$(mktemp -d "${TMPDIR:-/tmp}/para-stub.XXXXXX")"
+  stub="$(_cli_stub_backend)"
   # All three backend commands are stubbed, not just incus: ensure_backend probes
   # a different one first per platform (colima on Darwin, and `need caddy` runs
   # before the daemon check on Linux), so stubbing only incus made the failure
@@ -142,36 +161,37 @@ test_up_accepts_an_explicitly_empty_route_list() {
 }
 
 test_routes_reject_malformed_entries() {
-  # PARA_ROUTES entries are spliced into Caddy site addresses AND into the
-  # registry's space-separated field 3, so an entry with a space — or an empty one
-  # from a stray comma — would shift every reader's parse: `para ls` drops the
-  # workspace, and gen_caddyfile emits an upstream Caddy rejects, which fails
-  # `caddy reload` and kills routing for every workspace on the machine.
-  local d; d="$(mktemp -d "${TMPDIR:-/tmp}/para-badroutes.XXXXXX")"
+  # Entries are spliced into Caddy site addresses AND into the registry's
+  # space-separated field 3, so an entry with a space — or an empty one from a
+  # stray comma — would shift every reader's parse: `para ls` drops the workspace,
+  # and gen_caddyfile emits an upstream Caddy rejects, which fails `caddy reload`
+  # and kills routing for every workspace on the machine.
+  local d stub; d="$(mktemp -d "${TMPDIR:-/tmp}/para-badroutes.XXXXXX")"
+  stub="$(_cli_stub_backend)"
   mkdir -p "$d/.paraspace"
-  local out rc bad
-  # '3000:app' is the sub:port order reversed — para publishes https://<sub>… so
-  # left is where you arrive and right is where it goes, as in `docker -p`. The
-  # reverse must be refused rather than silently misrouted; an all-digit DNS label
-  # is legal, so accepting both orders could not be disambiguated.
+  # '3000:app' is sub:port reversed — para publishes https://<sub>…, so left is
+  # where you arrive and right is where it goes, as in `docker -p`. An all-digit
+  # DNS label is legal, so both orders could not be told apart; refuse the reverse.
+  local bad
   for bad in '3000,,api:3001' '80 90x' 'no-port' '-' '3000:app'; do
     printf 'PARA_VERSION=1\nPARA_PROJECT=badroutes\nPARA_ROUTES="%s"\n' "$bad" > "$d/.paraspace/Parafile"
-    rc=0; out="$(env PARA_PROJECT_DIR="$d" "$PARA" ls 2>&1)" || rc=$?
-    [ "$rc" -ne 0 ] || { rm -rf "$d"; echo "  PARA_ROUTES=\"$bad\" was accepted" >&2; return 1; }
+    if [ "$(_cli_routes_verdict "$d" "$stub")" != rejected ]; then
+      rm -rf "$d" "$stub"; echo "  PARA_ROUTES=\"$bad\" was accepted" >&2; return 1
+    fi
   done
-  rm -rf "$d"
-  assert_contains "$out" "[sub:]port" "refusal shows the expected shape"
+  rm -rf "$d" "$stub"
 }
 
 test_routes_accept_flexible_separators() {
   # Entries may be separated by commas, spaces, tabs or newlines, so a project
   # with several routes can lay them out readably; para canonicalizes whatever it
-  # gets to one comma-separated form. Every spelling below must load cleanly —
-  # `para ls` exercises the whole parse/validate/canonicalize path with no incus.
-  local d; d="$(mktemp -d "${TMPDIR:-/tmp}/para-sep.XXXXXX")"
+  # gets to one comma-separated form. Driven through `up` because that is where
+  # parse_routes runs — an earlier version of this test used `para ls`, which
+  # stopped exercising the parser the moment validation moved out of config load.
+  local d stub; d="$(mktemp -d "${TMPDIR:-/tmp}/para-sep.XXXXXX")"
+  stub="$(_cli_stub_backend)"
   mkdir -p "$d/.paraspace"
-  local spelling rc
-  # shellcheck disable=SC1004  # the embedded newlines are the point of the case
+  local spelling
   for spelling in \
       '"3000,api:3001"' \
       '"3000, api:3001, db:8081"' \
@@ -181,25 +201,108 @@ test_routes_accept_flexible_separators() {
   api:3001
 "'; do
     printf 'PARA_VERSION=1\nPARA_PROJECT=sep\nPARA_ROUTES=%s\n' "$spelling" > "$d/.paraspace/Parafile"
-    rc=0; env PARA_PROJECT_DIR="$d" "$PARA" ls >/dev/null 2>&1 || rc=$?
-    [ "$rc" -eq 0 ] || { rm -rf "$d"; echo "  rejected a valid spelling: $spelling" >&2; return 1; }
+    if [ "$(_cli_routes_verdict "$d" "$stub")" != accepted ]; then
+      rm -rf "$d" "$stub"; echo "  rejected a valid spelling: $spelling" >&2; return 1
+    fi
   done
-  rm -rf "$d"
+  rm -rf "$d" "$stub"
 }
 
 test_routes_can_come_from_the_environment() {
-  # As a plain scalar, PARA_ROUTES follows the same precedence as every other key
-  # — so a one-off `PARA_ROUTES=… para up` works. That was impossible while it was
-  # a bash array (the environment carries only scalars), and is the visible half of
-  # why it stopped being one. A Parafile-declared value is still overridden by the
-  # environment, like any other scalar key.
-  local d; d="$(mktemp -d "${TMPDIR:-/tmp}/para-envroutes.XXXXXX")"
+  # As a plain scalar, PARA_ROUTES follows the same precedence as every other key,
+  # so a one-off `PARA_ROUTES=… para up` works — impossible while it was an array.
+  #
+  # This asserts the RESOLVED VALUE, not an exit code. The first version of this
+  # test checked only `rc == 0`, which the Parafile's own valid value already
+  # guaranteed — so it passed while the property was false: every bundled template
+  # assigned PARA_ROUTES plainly (a leftover of the array era, which had no choice)
+  # and therefore clobbered the environment. The templates now use the `${X-…}`
+  # form, and the probe below can only pass if the env value actually won.
+  local d stub; d="$(mktemp -d "${TMPDIR:-/tmp}/para-envroutes.XXXXXX")"
+  stub="$(_cli_stub_backend)"
+  # A scaffolded Parafile, so this tests what users actually get.
+  ( cd "$d" && env -u PARA_PROJECT_DIR "$PARA" init >/dev/null 2>&1 )
+  # An env value para MUST reject. If the Parafile's "8080" won instead, `up` gets
+  # past routes and dies on the stubbed backend — so the routes complaint appearing
+  # is proof the environment was read.
+  local out rc=0
+  out="$(env PATH="$stub:$PATH" PARA_PROJECT_DIR="$d" PARA_ROUTES='@@notaroute@@' "$PARA" up ws 2>&1)" || rc=$?
+  rm -rf "$d" "$stub"
+  [ "$rc" -ne 0 ] || { echo "  up succeeded with a malformed PARA_ROUTES in the environment" >&2; return 1; }
+  assert_contains "$out" "@@notaroute@@" "the environment's value is the one para validated"
+}
+
+test_routes_reject_values_caddy_would_refuse() {
+  # Shape is not enough. These all LOOK like "[sub:]port" but make Caddy reject the
+  # whole config — and `caddy_reload` swallows that error, so para would report the
+  # workspace ready while the route silently didn't exist, and the next cold start
+  # would fail for EVERY workspace on the machine. Verified against `caddy adapt`:
+  # port 99999 -> "invalid start port: value out of range"; two entries resolving
+  # to one hostname -> "ambiguous site definition".
+  local d stub; d="$(mktemp -d "${TMPDIR:-/tmp}/para-caddybad.XXXXXX")"
+  stub="$(_cli_stub_backend)"
   mkdir -p "$d/.paraspace"
-  printf 'PARA_VERSION=1\nPARA_PROJECT=envroutes\nPARA_ROUTES="8080"\n' > "$d/.paraspace/Parafile"
-  local rc=0
-  env PARA_PROJECT_DIR="$d" PARA_ROUTES="3000,api:3001" "$PARA" ls >/dev/null 2>&1 || rc=$?
+  local bad out rc
+  for bad in '99999' '0' '3000,3001' 'api:3000,api:3001' 'a-:3000'; do
+    printf 'PARA_VERSION=1\nPARA_PROJECT=caddybad\nPARA_ROUTES="%s"\n' "$bad" > "$d/.paraspace/Parafile"
+    rc=0; out="$(env PATH="$stub:$PATH" PARA_PROJECT_DIR="$d" "$PARA" up ws 2>&1)" || rc=$?
+    case "$out" in
+      *PARA_ROUTES*) ;;
+      *) rm -rf "$d" "$stub"; echo "  PARA_ROUTES=\"$bad\" was not rejected" >&2; return 1 ;;
+    esac
+  done
+  rm -rf "$d" "$stub"
+}
+
+test_routes_do_not_glob_against_the_cwd() {
+  # The split has to be unquoted to divide on IFS, which also exposes it to
+  # PATHNAME expansion — so without `set -f` a value like "30*" resolved against
+  # whatever files were in $PWD, and the canonical routes depended on which
+  # directory you ran para from. Same Parafile, two cwds, same verdict.
+  local d stub g; d="$(mktemp -d "${TMPDIR:-/tmp}/para-glob.XXXXXX")"
+  stub="$(_cli_stub_backend)"
+  g="$(mktemp -d "${TMPDIR:-/tmp}/para-globcwd.XXXXXX")"
+  mkdir -p "$d/.paraspace"; : > "$g/3000"; : > "$g/3005"
+  printf 'PARA_VERSION=1\nPARA_PROJECT=globtest\nPARA_ROUTES="30*"\n' > "$d/.paraspace/Parafile"
+  local a b
+  a="$(_cli_routes_verdict "$d" "$stub" "$d")"
+  b="$(_cli_routes_verdict "$d" "$stub" "$g")"
+  rm -rf "$d" "$stub" "$g"
+  assert_eq "$a" "$b" "the verdict on '30*' does not depend on the current directory"
+}
+
+test_routes_refuse_the_legacy_array_form() {
+  # Before this branch PARA_ROUTES was a bash array. Left undetected it degrades
+  # SILENTLY — `$PARA_ROUTES` on an array yields element zero, so
+  # ( "3000" "api:3001" ) would publish :3000 and drop the rest with no word said.
+  local d stub; d="$(mktemp -d "${TMPDIR:-/tmp}/para-arr.XXXXXX")"
+  stub="$(_cli_stub_backend)"
+  mkdir -p "$d/.paraspace"
+  printf 'PARA_VERSION=1\nPARA_PROJECT=arr\nPARA_ROUTES=( "3000" "api:3001" )\n' > "$d/.paraspace/Parafile"
+  local out rc=0
+  out="$(env PATH="$stub:$PATH" PARA_PROJECT_DIR="$d" "$PARA" up ws 2>&1)" || rc=$?
+  rm -rf "$d" "$stub"
+  [ "$rc" -ne 0 ] || { echo "  the legacy array form was accepted (routes would be silently dropped)" >&2; return 1; }
+  assert_contains "$out" "not an array" "the refusal explains the migration"
+}
+
+test_a_bad_parafile_does_not_brick_recovery_commands() {
+  # Route validation runs at `up`, not at config load. It used to `exit 1` during
+  # load, so one stray character in one project's Parafile took out `para ls`,
+  # `para rm`, `para reconcile` and even `para --help` — for every project — from
+  # anywhere inside that tree, including the help that documents the fix.
+  local d; d="$(mktemp -d "${TMPDIR:-/tmp}/para-brick.XXXXXX")"
+  mkdir -p "$d/.paraspace"
+  printf 'PARA_VERSION=1\nPARA_PROJECT=brick\nPARA_ROUTES="3000, ,8080"\n' > "$d/.paraspace/Parafile"
+  local cmd rc
+  for cmd in ls --help; do
+    rc=0; env PARA_PROJECT_DIR="$d" "$PARA" "$cmd" >/dev/null 2>&1 || rc=$?
+    [ "$rc" -eq 0 ] || { rm -rf "$d"; echo "  'para $cmd' was blocked by an unrelated project's bad routes" >&2; return 1; }
+  done
+  # …while `up`, which actually consumes them, still refuses.
+  local out; out="$(env PARA_PROJECT_DIR="$d" "$PARA" up ws 2>&1)" || true
   rm -rf "$d"
-  [ "$rc" -eq 0 ] || { echo "  a valid PARA_ROUTES from the environment was rejected" >&2; return 1; }
+  assert_contains "$out" "PARA_ROUTES" "up still rejects the bad value"
 }
 
 test_image_defaults_to_the_project_slug() {
@@ -269,10 +372,11 @@ test_user_config_ignores_per_project_keys() {
 
 test_template_helpers_do_not_drift() {
   # hooks/helpers is byte-identical across the bundled templates on purpose, and
-  # deliberately NOT factored into templates/_common: it has to sit BESIDE the
-  # hooks that source it — shellcheck resolves `. "$(dirname "$0")/helpers"` via
-  # source-path=SCRIPTDIR, and sync_project pushes only .paraspace/hooks/ into a
-  # workspace. So the copies are asserted to stay in step instead.
+  # cannot be factored into a shared overlay: it has to sit BESIDE the hooks that
+  # source it — shellcheck resolves `. "$(dirname "$0")/helpers"` via
+  # source-path=SCRIPTDIR, sync_project pushes only .paraspace/hooks/ into a
+  # workspace, and each template dir is documented as runnable on its own. So the
+  # copies are asserted to stay in step instead.
   local repo ref="" f rc=0 n=0
   repo="$(cd "$(dirname "$PARA")/.." && pwd)"
   for f in "$repo"/templates/*/.paraspace/hooks/helpers; do

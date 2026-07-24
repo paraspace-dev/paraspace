@@ -47,8 +47,9 @@ Drop this `.paraspace/` into your own repo — `para init` copies it in and sets
 project's identity (`PARA_PROJECT`) to your directory name, which the base image
 name derives from. Then edit `.paraspace/`:
 
-- **`Parafile`** — point `PARA_ORIGIN` at your repo, list your `PARA_ROUTES`
-  (`"[sub:]port"` each), set `PARA_CLONE_DIR`.
+- **`Parafile`** — point `PARA_ORIGIN` at your repo and list your `PARA_ROUTES`
+  (`"[sub:]port"` each, comma/space/newline separated). To clone somewhere other
+  than `~/app`, uncomment `PARA_CLONE_DIR` in the optional block.
 - **`hooks/provision`** — grow the shared-volume seeding and `.env` handling for
   your stack. It's yours; make it as robust as you like.
 - **`hooks/boot`** — the readiness contract: return 0 only once every routed

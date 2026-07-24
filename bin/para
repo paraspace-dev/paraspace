@@ -211,6 +211,14 @@ fi
 # (registry field 4) so a global para stays correct across projects on different
 # domains. The default's wildcard (`*.paraspace.dev`) already points at 127.0.0.1.
 : "${PARA_DOMAIN:=paraspace.dev}"
+# Validated like PARA_CLONE_DIR below, and for a sharper reason: PARA_DOMAIN is
+# registry field 4 AND is deliberately settable box-wide from the user config, so a
+# value with a space (`para config-set PARA_DOMAIN "my dev"`) would write a 6-field
+# row — scoped `ls` drops the workspace, and a later `up` refuses it as belonging to
+# a project named after the spilled fragment, unrecoverable without hand-editing the
+# registry. It is also spliced into Caddy site addresses.
+[[ "$PARA_DOMAIN" =~ ^[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?$ ]] \
+  || { printf 'para: PARA_DOMAIN must be a hostname ([A-Za-z0-9.-], no spaces); got %s\n' "$PARA_DOMAIN" >&2; exit 1; }
 # PARA_CLONE_DIR is spliced into guest shell commands (clone path, cd, hook
 # dispatch), so keep it a plain single path segment — no spaces, metacharacters,
 # leading dot, or slashes — rather than trusting the Parafile value blindly.
@@ -260,42 +268,19 @@ PARA_CLONE_BRANCH="${PARA_CLONE_BRANCH:-}"
 # same posture as PARA_BASE_IMAGE). ROUTES_DECLARED carries that distinction past
 # the normalization, and is deliberately NOT named PARA_* so run_hook's blanket
 # forwarder doesn't ship a para internal into every hook's environment.
-if [ "${PARA_ROUTES+set}" = set ]; then ROUTES_DECLARED=1; else ROUTES_DECLARED=0; PARA_ROUTES=""; fi
-# Parse LIBERALLY, store CANONICALLY. Entries may be separated by commas, spaces,
-# tabs or newlines, so a project with several routes can lay them out to be read:
-#
-#   PARA_ROUTES="3000"                 PARA_ROUTES="
-#   PARA_ROUTES="3000,api:3001"          3000
-#   PARA_ROUTES="3000 api:3001"          api:3001
-#                                        db:8081
-#                                      "
-#
-# Whichever spelling a Parafile uses, para normalizes it to the comma-separated
-# form, so everything downstream sees exactly ONE format: the registry's field 3
-# (space-separated and positional — a raw multi-line value would corrupt every
-# reader), the container stamp, gen_caddyfile, and the hook environment. Entries
-# are therefore ATOMIC: "[sub:]port" with no whitespace inside one, which is the
-# price of letting whitespace separate them. Order is sub:port — left is where you
-# arrive, right is where it goes, as in `docker -p` and `ssh -L`.
-_oifs="$IFS"; IFS=$', \t\n'
-# shellcheck disable=SC2206  # splitting $PARA_ROUTES on IFS is the entire point
-_routes=( $PARA_ROUTES )
-if [ "${#_routes[@]}" -gt 0 ]; then
-  # Validate BEFORE canonicalizing. Entries are spliced into Caddy site addresses
-  # and into the registry, where an empty entry (a stray comma) or one bearing a
-  # space would shift every field the readers parse: `para ls` silently drops the
-  # workspace, and gen_caddyfile emits an upstream Caddy rejects, failing
-  # `caddy reload` and taking routing down for every workspace on the box.
-  # Rejecting "-" here also keeps the no-routes registry sentinel unambiguous.
-  for _r in "${_routes[@]}"; do
-    [[ "$_r" =~ ^([A-Za-z0-9][A-Za-z0-9-]*:)?[0-9]{1,5}$ ]] \
-      || { printf 'para: PARA_ROUTES entries must be "[sub:]port" — a port, optionally prefixed by a subdomain (e.g. "3000" or "3000,api:3001"); got %s\n' "$_r" >&2; exit 1; }
-  done
-  IFS=,; PARA_ROUTES="${_routes[*]}"
-else
-  PARA_ROUTES=""   # unset, empty, or whitespace-only: this workspace serves no HTTP
-fi
-IFS="$_oifs"; unset _oifs _routes _r
+# `declare -p`, not `${PARA_ROUTES+set}`: the `+set` form tests element ZERO, so
+# it reports the legacy `PARA_ROUTES=()` array spelling as unset. This only has to
+# answer "did the Parafile mention this key at all"; what the value IS gets sorted
+# out at `up` (parse_routes, below).
+if declare -p PARA_ROUTES >/dev/null 2>&1; then ROUTES_DECLARED=1; else ROUTES_DECLARED=0; PARA_ROUTES=""; fi
+# NOTHING ELSE HAPPENS HERE, deliberately. Route parsing and validation used to
+# run at config load and `exit 1` on a bad value — which meant one stray character
+# in one project's Parafile bricked `para ls`, `para rm`, `para reconcile` and even
+# `para --help`, for every project, from anywhere inside that tree. That breaks the
+# rule stated up top: the project-agnostic commands work from anywhere. Validation
+# now lives in parse_routes and runs only where routes are actually consumed —
+# `cmd_up` — so a broken Parafile can never cost you the commands you'd use to
+# recover from it.
 
 PARA_STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/para"
 REGISTRY="$PARA_STATE_DIR/workspaces"    # "name ip routes domain project" per line
@@ -382,6 +367,87 @@ url_port() { [ "$PARA_HTTPS_PORT" = 443 ] && echo "" || echo ":$PARA_HTTPS_PORT"
 validate_name() {
   [[ "$1" =~ ^[a-z][a-z0-9-]{0,30}$ ]] \
     || die "invalid name '$1' — lowercase letters, digits, hyphens; start with a letter (<=31 chars)"
+}
+
+# Parse, validate and CANONICALIZE $PARA_ROUTES in place. Called from cmd_up (the
+# only place routes are consumed), never at config load — see the note there.
+#
+# Entries may be separated by commas, spaces, tabs or newlines, so a project with
+# several routes can lay them out to be read:
+#
+#   PARA_ROUTES="3000"                 PARA_ROUTES="
+#   PARA_ROUTES="3000,api:3001"          3000
+#   PARA_ROUTES="3000 api:3001"          api:3001
+#                                        db:8081
+#                                      "
+#
+# Whichever spelling is used, this leaves PARA_ROUTES as the comma-separated form,
+# so everything downstream sees exactly ONE format: the registry's field 3
+# (space-separated and positional — a raw multi-line value would corrupt every
+# reader), the container stamp, gen_caddyfile, and the hook environment. Entries
+# are therefore ATOMIC: "[sub:]port" with no whitespace inside one, the price of
+# letting whitespace separate them. Order is sub:port — left is where you arrive,
+# right is where it goes, as in `docker -p` and `ssh -L`.
+parse_routes() {
+  # The pre-scalar spelling was a bash array. Left alone it would degrade
+  # silently: `$PARA_ROUTES` on an array yields element ZERO, so
+  # `( "3000" "api:3001" )` would quietly publish :3000 and drop the rest. Refuse
+  # with the migration instead — losing a route without a word is the failure this
+  # key's whole design is meant to prevent.
+  case "$(declare -p PARA_ROUTES 2>/dev/null)" in
+    "declare -"[aA]*)
+      die "PARA_ROUTES is a string now, not an array — replace PARA_ROUTES=( \"3000\" \"api:3001\" ) with PARA_ROUTES=\"3000,api:3001\" in .paraspace/Parafile (commas, spaces or newlines all separate entries). See docs/parafile.md." ;;
+  esac
+  # `set -f` while splitting: the expansion has to be unquoted to split on IFS,
+  # which also subjects it to PATHNAME EXPANSION — without this, PARA_ROUTES="30*"
+  # would resolve against whatever files happen to be in your $PWD, so the
+  # canonical value would depend on which directory you ran para from.
+  local _oifs="$IFS" _r _sub _port _host
+  local -a _routes=()
+  set -f
+  IFS=$', \t\n'
+  # shellcheck disable=SC2206  # splitting on IFS is the entire point; globbing is off
+  _routes=( $PARA_ROUTES )
+  IFS="$_oifs"
+  set +f
+  if [ "${#_routes[@]}" -eq 0 ]; then
+    PARA_ROUTES=""   # unset, empty, or whitespace-only: this workspace serves no HTTP
+    return 0
+  fi
+  # Entries reach TWO fragile places: the registry's positional field 3, and a
+  # Caddy site address. Shape alone isn't enough for the second — Caddy rejects an
+  # out-of-range port outright, and `caddy_reload` swallows that error, so `up`
+  # would report success while the route silently didn't exist and the NEXT cold
+  # start would fail for every workspace on the box. So check the value, not just
+  # the pattern. (Rejecting "-" also keeps the no-routes registry sentinel
+  # unambiguous.)
+  local _seen=""
+  for _r in "${_routes[@]}"; do
+    [[ "$_r" =~ ^([A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?:)?[0-9]{1,5}$ ]] \
+      || die "PARA_ROUTES entry '$_r' is not \"[sub:]port\" — a port, optionally prefixed by a subdomain (e.g. \"3000\" or \"3000,api:3001\"). Separate entries with commas, spaces or newlines."
+    case "$_r" in
+      *:*) _sub="${_r%%:*}"; _port="${_r##*:}" ;;
+      *)   _sub="";          _port="$_r" ;;
+    esac
+    # Caddy parses the upstream port as a uint16; 0 and >65535 are hard errors.
+    if [ "$_port" -lt 1 ] || [ "$_port" -gt 65535 ]; then
+      die "PARA_ROUTES entry '$_r' has port $_port — must be 1-65535 (Caddy rejects anything else, and the reload failure would take down routing for every workspace)."
+    fi
+    # Two entries resolving to the same hostname become two Caddy site blocks with
+    # the same address — "ambiguous site definition", which fails the whole config,
+    # not just this workspace. `3000,3001` (two apex sites) is the easy mistake.
+    _host="${_sub:-<apex>}"
+    case ",$_seen," in
+      *",$_host,"*)
+        if [ -n "$_sub" ]; then
+          die "PARA_ROUTES declares subdomain '$_sub' more than once — each entry needs its own hostname, or Caddy refuses the whole config."
+        else
+          die "PARA_ROUTES declares more than one bare port — only one entry can be the workspace apex. Give the others a subdomain, e.g. \"3000,api:3001\"."
+        fi ;;
+    esac
+    _seen="$_seen,$_host"
+  done
+  IFS=,; PARA_ROUTES="${_routes[*]}"; IFS="$_oifs"
 }
 
 ensure_dirs() { mkdir -p "$PARA_CONFIG_DIR" "$PARA_STATE_DIR"; touch "$REGISTRY"; }
@@ -907,6 +973,10 @@ cmd_up() {
   # slug; routes are comma-joined, domain a token.
   [ "$ROUTES_DECLARED" -eq 1 ] \
     || die "PARA_ROUTES is not set in .paraspace/Parafile — declare the ports para should publish, e.g. PARA_ROUTES=\"3000,api:3001\". For a workspace with no HTTP routes at all, declare it empty: PARA_ROUTES=\"\"."
+  # Validate + canonicalize here, not at config load, so a bad value costs you this
+  # command and not `ls`/`rm`/`reconcile`/`--help`. Leaves PARA_ROUTES comma-joined,
+  # which is what the registry row, the container stamp and the hook env all carry.
+  parse_routes
   # Field 3 is positional, so a route-less workspace records the "-" sentinel — an
   # empty field would shift domain and project one place left in every reader's
   # `read -r name ip routes domain project`.
@@ -915,6 +985,25 @@ cmd_up() {
   caddy_running || start_caddy
   local ct; ct="$(ct_name "$name")"
   local ip
+  # BEFORE anything is created. PARA_UID/GID are overridable (env or user config)
+  # so a project can align host and guest ids, but every chown below targets them —
+  # and if they've moved since the image was built, those chowns land on a uid with
+  # no passwd entry and the shared volume becomes unwritable, far from the cause.
+  #
+  # The guarantee is narrow and worth stating exactly: `para image build` records
+  # the PARA_UID:PARA_GID *para was configured with* at build time, and this
+  # compares it against the ids configured now. It is NOT a claim about what the
+  # payload created — para assumes nothing about image-build.sh, which may ignore
+  # the ids it's handed. It catches the case that actually bites, and nothing more.
+  #
+  # Checked on BOTH branches (the chowns run for an existing workspace too) and
+  # ahead of `incus launch`, the registry write and the volume attach — refusing
+  # after those would leave a half-built workspace that `para ls` reports RUNNING.
+  # An unstamped image (built before this existed, or since deleted) isn't
+  # second-guessed.
+  local baked; baked="$(incus image get-property "$PARA_IMAGE" user.para.uid 2>/dev/null || true)"
+  [ -z "$baked" ] || [ "$baked" = "$PARA_UID:$PARA_GID" ] \
+    || die "image '$PARA_IMAGE' was built with PARA_UID:PARA_GID $baked, but it is $PARA_UID:$PARA_GID now — para's chowns would target a uid the image likely has no passwd entry for. Rebuild with 'para image build', or drop the override."
   if instance_exists "$ct"; then
     # Authoritative ownership: the container itself records its owning project
     # (stamped below), so a cleared or rebuilt registry can't launder a foreign
@@ -967,25 +1056,6 @@ cmd_up() {
     echo "$name $ip $rcsv $PARA_DOMAIN $PARA_PROJECT" >> "$REGISTRY"   # "name ip routes domain project" — register early so rm/ls see partial state
     incus storage volume attach "$PARA_POOL" "$PARA_VOLUME" "$ct" parahome /para/shared
   fi
-  # PARA_UID/GID are overridable (env or user config) so a project can align host
-  # and guest ids, but every chown below targets them — and if they've moved since
-  # the image was built, those chowns land on a uid with no passwd entry and the
-  # shared volume becomes unwritable, far from the cause.
-  #
-  # The guarantee here is narrow and worth stating exactly: `para image build`
-  # records the PARA_UID:PARA_GID *para was configured with* at build time, and
-  # this compares it against the PARA_UID:PARA_GID configured now. It is NOT a
-  # claim about what the payload actually created — para assumes nothing about
-  # image-build.sh, which is free to ignore the ids it's handed. It catches the
-  # case that actually bites (config moved, image didn't), and nothing more.
-  #
-  # Checked on BOTH branches: the chowns run for an existing workspace too, so
-  # gating this on container creation would miss the everyday re-`up` path. An
-  # unstamped image (built before this existed, or since deleted) is not
-  # second-guessed.
-  local baked; baked="$(incus image get-property "$PARA_IMAGE" user.para.uid 2>/dev/null || true)"
-  [ -z "$baked" ] || [ "$baked" = "$PARA_UID:$PARA_GID" ] \
-    || die "image '$PARA_IMAGE' was built with PARA_UID:PARA_GID $baked, but it is $PARA_UID:$PARA_GID now — para's chowns would target a uid the image likely has no passwd entry for. Rebuild with 'para image build', or drop the override."
   # Stamp this workspace's identity onto the container (refreshed each up, mirroring
   # the registry row just written) so it stays self-describing for `para reconcile`
   # and the ownership check above.
@@ -1083,6 +1153,10 @@ cmd_reconcile() {
     # would collapse the row to four fields and shift every reader's parse.
     [ -n "$routes" ] || routes="-"
     domain="$(ct_meta "$ct" user.para.domain)"
+    # Same positional-field guard as $routes above and $ip below — an unstamped or
+    # unreadable domain would collapse the row to four fields and shift every
+    # reader's parse. "-" is never a valid domain, so it reads as "unknown".
+    [ -n "$domain" ] || domain="-"
     ip="$(incus config device get "$ct" eth0 ipv4.address 2>/dev/null || true)"
     if [ -z "$ip" ]; then
       # An empty ip would collapse the space-joined row to four fields and shift
@@ -1265,13 +1339,19 @@ cmd_key() {
 
 cmd_web() {
   local name="${1:-}"; [ -n "$name" ] || die "usage: para web <name>"
-  # Routes come from the REGISTRY (field 3), not the current Parafile: `web` is
-  # project-agnostic and the workspace may belong to another project. "-" is the
-  # no-routes sentinel — opening its apex would just land on a Caddy 404/refusal.
-  local wroutes; wroutes="$(awk -v n="$name" '$1==n{print $3}' "$REGISTRY" 2>/dev/null || true)"
+  validate_name "$name"
+  # Routes AND domain come from the REGISTRY (fields 3 and 4), not the current
+  # Parafile: `web` is project-agnostic and the workspace may belong to another
+  # project, on another domain. Reading $PARA_DOMAIN here would open the wrong
+  # host for someone else's workspace — cmd_ls gets this right, so match it.
+  local wroutes wdomain
+  wroutes="$(awk -v n="$name" '$1==n{print $3}' "$REGISTRY" 2>/dev/null || true)"
+  wdomain="$(awk -v n="$name" '$1==n{print $4}' "$REGISTRY" 2>/dev/null || true)"
+  [ -n "$wroutes" ] || die "no such workspace '$name' (see: para ls)"
+  # "-" is the no-routes sentinel — there is no Caddy site to open.
   [ "$wroutes" != "-" ] \
     || die "workspace '$name' publishes no HTTP routes (its project declares an empty PARA_ROUTES) — there is no URL to open."
-  local url; url="https://$name.$PARA_DOMAIN$(url_port)"
+  local url; url="https://$name.${wdomain:-$PARA_DOMAIN}$(url_port)"
   case "$(uname -s)" in
     Darwin) open "$url" ;;
     Linux)  xdg-open "$url" >/dev/null 2>&1 || echo "$url" ;;
@@ -1401,28 +1481,21 @@ cmd_init() {
     || die "no templates found — install via 'npm i -g paraspace', or 'para install' from a checkout."
   # --names: bare template names, one per line — the machine-readable twin of
   # --list (which prints a titled, indented view). Feeds `para init` completion.
-  # An underscore prefix marks a non-template directory — `_common` is the shared
-  # overlay every scaffold gets, not something you can `para init`. Skipped in both
-  # listings so it never shows up as a choice.
   if [ "$names" -eq 1 ]; then
-    local t; for t in "$tdir"/*/; do
-      case "$(basename "$t")" in _*) continue ;; esac
-      [ -d "$t" ] && printf '%s\n' "$(basename "$t")"
-    done
+    local t; for t in "$tdir"/*/; do [ -d "$t" ] && printf '%s\n' "$(basename "$t")"; done
     return 0
   fi
   if [ "$list" -eq 1 ]; then
     log "Available templates (in $tdir):"
-    local t; for t in "$tdir"/*/; do
-      case "$(basename "$t")" in _*) continue ;; esac
-      [ -d "$t" ] && printf '  %s\n' "$(basename "$t")"
-    done
+    local t; for t in "$tdir"/*/; do [ -d "$t" ] && printf '  %s\n' "$(basename "$t")"; done
     return 0
   fi
   tmpl="${tmpl:-void-docker-gh}"
-  # `_`-prefixed dirs are overlays, not templates (they're hidden from --list /
-  # --names above) — refuse them by name too, rather than scaffolding one.
-  case "$tmpl" in _*) die "'$tmpl' is a shared overlay, not a template (see: para init --list)." ;; esac
+  # A template is a plain directory name under templates/ — never a path. Without
+  # this, `para init ../..` would scaffold an arbitrary tree into $PWD.
+  case "$tmpl" in
+    */*|..|.) die "template name must be a plain directory name (see: para init --list); got '$tmpl'" ;;
+  esac
   local src="$tdir/$tmpl"
   [ -d "$src" ] || die "no such template '$tmpl' (see: para init --list)."
   # Plumbing-only (default) walks the template's .paraspace/; --full walks the whole
@@ -1432,41 +1505,20 @@ cmd_init() {
   [ "$full" -eq 1 ] && { root="$src"; note="full tree"; }
   [ -d "$root" ] || die "template '$tmpl' has nothing to scaffold at $root."
   log "Scaffolding '$tmpl' into $PWD ($note)…"
-  # TWO passes: the chosen template, then the shared templates/_common overlay
-  # (plumbing every template would otherwise carry a byte-identical copy of).
-  # Template FIRST, so a template that ships its own version of a _common file
-  # wins — the overlay pass skips any relative path this run already handled.
-  # That bookkeeping ($laid) is deliberately separate from the skip-if-exists
-  # test below, which is about the USER's pre-existing files: --force must be
-  # able to overwrite those without letting _common clobber the template's copy.
-  # $laid is a bracketed string, not an associative array (bash 3.2).
-  local added=0 skipped=0 parafile_added=0 f rel dest base pass_root laid=""
-  for base in "$src" "$tdir/_common"; do
-    [ -d "$base" ] || continue
-    # Both passes honor --full the same way: plumbing-only walks .paraspace/, so
-    # an overlay file outside it can't sneak into a scaffold that asked for
-    # plumbing only. (Enforced rather than assumed — --full is the flag whose
-    # whole job is that distinction.)
-    pass_root="$base"
-    [ "$base" = "$src" ] && pass_root="$root"
-    [ "$base" = "$src" ] || [ "$full" -eq 1 ] || pass_root="$base/.paraspace"
-    [ -d "$pass_root" ] || continue
-    while IFS= read -r f; do
-      rel="${f#"$base"/}"
-      [ "$rel" = README.md ] && continue          # the template's own README, not yours
-      case "$laid" in *"[$rel]"*) continue ;; esac   # the template already provided it
-      laid="${laid}[$rel]"                           # handled, whatever the outcome below
-      dest="$PWD/$rel"
-      if [ -e "$dest" ] && [ "$force" -eq 0 ]; then
-        printf '  skip (exists): %s\n' "$rel" >&2; skipped=$((skipped + 1)); continue
-      fi
-      mkdir -p "$(dirname "$dest")"
-      cp "$f" "$dest"
-      case "$rel" in .paraspace/hooks/*|.paraspace/image-build.sh) chmod +x "$dest" ;; esac
-      [ "$rel" = .paraspace/Parafile ] && parafile_added=1
-      printf '  add: %s\n' "$rel" >&2; added=$((added + 1))
-    done < <(find "$pass_root" -type f)
-  done
+  local added=0 skipped=0 parafile_added=0 f rel dest
+  while IFS= read -r f; do
+    rel="${f#"$src"/}"
+    [ "$rel" = README.md ] && continue          # the template's own README, not yours
+    dest="$PWD/$rel"
+    if [ -e "$dest" ] && [ "$force" -eq 0 ]; then
+      printf '  skip (exists): %s\n' "$rel" >&2; skipped=$((skipped + 1)); continue
+    fi
+    mkdir -p "$(dirname "$dest")"
+    cp "$f" "$dest"
+    case "$rel" in .paraspace/hooks/*|.paraspace/image-build.sh) chmod +x "$dest" ;; esac
+    [ "$rel" = .paraspace/Parafile ] && parafile_added=1
+    printf '  add: %s\n' "$rel" >&2; added=$((added + 1))
+  done < <(find "$root" -type f)
   # Personalize the freshly-scaffolded Parafile with this dir's name: PARA_PROJECT,
   # the stable project id, so identity survives a later move or rename. That's the
   # only key that needs baking — PARA_IMAGE now DERIVES from it (see the default
@@ -1651,8 +1703,14 @@ cmd_image_build() {
   # exits, which fires the EXIT trap; that way Ctrl-C tears the builder down too
   # (see the background+wait note below). Both vars are script-scope, so they're
   # still set when the trap fires post-unwind.
+  # Temp alias for the publish/swap below. NOT "${PARA_IMAGE}-new": now that
+  # PARA_IMAGE derives from the project slug, sibling projects `app` and `app-new`
+  # would have `app`'s build publish over — and then rename away — `app-new`'s real
+  # image, and this cleanup would delete it outright. The prefix puts the temp name
+  # in a namespace no derived image occupies.
+  tmp_alias="para-imgbuild-tmp-$PARA_PROJECT"
   cleanup_builder() {
-    incus image delete "${PARA_IMAGE}-new" >/dev/null 2>&1 || true
+    incus image delete "$tmp_alias" >/dev/null 2>&1 || true
     incus delete -f "$builder" >/dev/null 2>&1 || true
   }
   trap cleanup_builder EXIT
@@ -1736,9 +1794,9 @@ cmd_image_build() {
   # destroyed the working image *before* publishing, so any publish failure left
   # the box with NO image. Now the live image is only dropped once the new one
   # is in hand. --reuse in case a prior aborted run left the temp alias behind.
-  incus $q publish "$builder/publish" --reuse --alias "${PARA_IMAGE}-new"
+  incus $q publish "$builder/publish" --reuse --alias "$tmp_alias"
   incus image delete "$PARA_IMAGE" >/dev/null 2>&1 || true
-  incus image alias rename "${PARA_IMAGE}-new" "$PARA_IMAGE"
+  incus image alias rename "$tmp_alias" "$PARA_IMAGE"
   # Stamp provenance so `para image status` can report drift: the hash of the
   # source that produced this image (image_src_sha), the contract it was built
   # under, and whether it was an incremental (-i) layer rather than a clean build.
@@ -1874,6 +1932,12 @@ usage_full() {
   [ -n "$PARA_PROJECT" ] || [ "$PARA_VOLUME" != "para-home-" ] || vol="para-home-<project>  (resolved inside a project)"
   # No default for the build base — say so rather than print an empty column.
   local base="${PARA_BASE_IMAGE:-<unset — declare it in the Parafile>}"
+  # Outside a project PARA_IMAGE falls back to the placeholder "para-dev" arm,
+  # which nothing can actually launch (every command that reads it calls
+  # require_project first). Printing the literal would advertise a default this
+  # very branch removed, so say what it really is — mirroring PARA_VOLUME above.
+  local img="$PARA_IMAGE"
+  [ -n "$PARA_PROJECT" ] || img="<derived from PARA_PROJECT, inside a project>"
   cat <<EOF
 para — parallel dev workspaces on Incus
 
@@ -1997,7 +2061,7 @@ CONFIGURATION
 
     PARA_DOMAIN       $PARA_DOMAIN
     PARA_HTTPS_PORT   $PARA_HTTPS_PORT
-    PARA_IMAGE        $PARA_IMAGE
+    PARA_IMAGE        $img
     PARA_BASE_IMAGE   $base
     PARA_POOL         $PARA_POOL
     PARA_BRIDGE       $PARA_BRIDGE

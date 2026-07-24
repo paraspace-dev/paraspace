@@ -1,8 +1,11 @@
 # The Parafile
 
 `.paraspace/Parafile` is the per-project config: the few knobs `para` itself reads.
-It is **sourced as bash**, and every key is a scalar: they use `: "${PARA_X:=…}"`
-so a real environment variable still wins.
+It is **sourced as bash**, and every key is a scalar. Most use `: "${PARA_X:=…}"`
+so a real environment variable still wins; keys where an *empty* value means
+something — `PARA_ROUTES`, `PARA_HOST_ENV`, `PARA_IMAGE_BOOTSTRAP` — use
+`PARA_X="${PARA_X-…}"` instead, so the environment can override them to empty too
+(see [Precedence](#precedence)).
 
 Any `PARA_FOO` you set here — documented or not — is forwarded into your hooks'
 environment for free, so the Parafile is also where a project declares its own
@@ -99,8 +102,9 @@ PARA_ROUTES="
 "
 ```
 
-A trailing comma is tolerated. Entries themselves are atomic — no whitespace
-inside one — which is the price of letting whitespace separate them.
+A trailing comma is tolerated, and a value that is only whitespace means the same
+as empty. Entries themselves are atomic — no whitespace inside one — which is the
+price of letting whitespace separate them.
 
 **Required — para pins no default port.** Declare it empty for a workspace that
 serves no HTTP at all (a worker, a queue consumer, a bare box):
@@ -120,13 +124,27 @@ used, so splitting it is one line — or use the `parse_routes` helper the templ
 ship:
 
 ```sh
-IFS=, read -ra routes <<<"$PARA_ROUTES"
+IFS=, read -ra routes <<<"$PARA_ROUTES"   # inline
+for r in $(parse_routes); do …; done      # with the templates' helpers
 ```
 
-para validates every entry before canonicalizing: a port is digits, an optional
-subdomain is a DNS label. An entry containing a space, or an empty one from a
-stray comma, would corrupt the workspace registry and break routing for every
+para validates every entry when you `para up`, before canonicalizing:
+
+- the port must be **1–65535** — Caddy rejects anything else outright;
+- the optional subdomain must be a DNS label (no leading or trailing hyphen);
+- no two entries may resolve to the **same hostname** — two bare ports both claim
+  the workspace apex, and Caddy refuses the whole config as an "ambiguous site
+  definition", not just that one site;
+- an entry containing a space, or an empty one from a stray comma, is refused
+  because it would corrupt the workspace registry.
+
+Those last two matter more than they look: `para` reloads Caddy with the error
+suppressed, so an invalid route would otherwise report a healthy workspace while
+silently serving nothing — and the *next* Caddy start would fail for every
 workspace on the machine.
+
+Validation runs at `up`, not when the `Parafile` is read, so a bad value can never
+cost you the commands you'd use to fix it (`para ls`, `para rm`, `para --help`).
 
 ### `PARA_DOMAIN`
 

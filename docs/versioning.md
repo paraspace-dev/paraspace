@@ -49,8 +49,10 @@ staying at 1 stays explicable:
     forwarded to hooks (so a hook could not see its own routes), could not come
     from the environment, needed `${#a[@]}` guards for bash 3.2, and needed
     `declare -p` to tell "declared empty" from "unset", because `${a+set}` tests
-    element zero. That last one shipped as a bug — `PARA_ROUTES=()` read as unset,
-    making `void-minimal` impossible to bring up.
+    element zero. A `Parafile` still using the array form is refused with a
+    migration message rather than parsed: `$PARA_ROUTES` on an array yields
+    element ZERO, so `( "3000" "api:3001" )` would otherwise publish `:3000` and
+    drop the rest silently.
 
   As a scalar it also parses liberally and stores canonically: entries may be
   separated by commas, spaces, tabs or newlines (so a multi-line list is a
@@ -59,10 +61,21 @@ staying at 1 stays explicable:
   them. The `sub:port` order is unchanged.
 
   Breaking for any Parafile declaring the key, and it **widens** the injected hook
-  environment (`PARA_ROUTES` is now forwarded). Pre-launch with no external
+  environment twice over: `PARA_ROUTES` is now forwarded at all, and `PARA_URL` —
+  an existing contract variable — gained a new possible value, the empty string,
+  for a workspace that publishes no routes. The latter is reachable only through a
+  configuration that was previously inexpressible, so no existing hook can regress
+  on it. Pre-launch with no external
   consumers, so `PARA_CONTRACT` stayed at 1. The bundled templates' `hooks/helpers`
   gained `parse_routes`/`route_ports`; para deliberately does not provide those
   itself, since a para-owned hook-side function would be new contract surface.
+- **Route validation happens at `para up`, not at config load.** It briefly ran
+  during config load and `exit 1`d, which meant one bad character in one project's
+  `Parafile` disabled `para ls`, `para rm`, `para reconcile` and `para --help` for
+  every project, from anywhere inside that tree — breaking the rule that the
+  project-agnostic commands work from anywhere. Validation now runs where routes
+  are consumed. Consequence worth knowing: an invalid `PARA_ROUTES` is reported by
+  `up`, not by the next command you happen to run.
 - **`PARA_IMAGE` now defaults to `$PARA_PROJECT`** instead of the fixed
   `para-dev`. Incus image aliases are daemon-global, so the old default put two
   projects that both left the key unset on one image — and a build in either

@@ -55,7 +55,7 @@ loop.
 | `Parafile` | `para` (host-side) | the keys `para` reads — [reference](./parafile.md) |
 | `hooks/` | the workspace | `provision`, `boot`, plus any shared code they source |
 | `skel/` | your hooks | seed files (dotfiles etc.) synced to `~/.para/skel` |
-| `image-build.sh` | `para image-build` (host-side) | builds the base image |
+| `image-build.sh` | `para image build` (host-side) | builds the base image |
 
 `.paraspace/` is set-up-once plumbing, hidden like `.github` — commit it with the
 project so every machine (and every teammate) gets the same workspaces.

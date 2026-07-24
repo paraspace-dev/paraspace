@@ -1,0 +1,59 @@
+#!/usr/bin/env bash
+set -euo pipefail
+# ============================================================================
+# prune-branches — delete local branches whose PR is already merged or closed.
+#
+# A thin wrapper around `gh poi` (seachicken/gh-poi). All it adds is an
+# actionable error when gh or the extension is missing — a newcomer running
+# `npm run prune-branches` on a fresh checkout should get install instructions,
+# not "command not found". Every flag is passed straight through to gh poi.
+#
+#   Usage: bin/prune-branches [gh-poi flags…]
+#     --dry-run           list what would be deleted, delete nothing
+#     --scan quick|deep   how hard to look for the PR behind a branch
+#     --state merged|closed
+#
+#   Via npm (note the `--`, which stops npm eating the flags):
+#     npm run prune-branches
+#     npm run prune-branches -- --dry-run
+#
+# Deleting is the default, not opt-in. gh poi only removes a local branch once
+# its PR is merged or closed on the remote, so the commits already survive
+# there — and `git reflog` still has the ref locally. A command named "prune"
+# that doesn't prune is the worse trap: you read a list, assume it acted, and
+# the branches are all still there.
+# ============================================================================
+
+# Always operate on THIS package's repo, not whatever directory you're standing
+# in, so `npm run prune-branches` means the same thing from anywhere.
+cd "$(cd "$(dirname "$0")/.." && pwd)"
+
+# Intercept -h/--help; everything else is gh poi's business.
+args=()
+for arg in "$@"; do
+  case "$arg" in
+    # Print the header between the two `# ====` rules rather than a fixed line
+    # range — a line-numbered `sed -n '3,20p'` silently misprints the moment
+    # anyone edits the header above. Same idiom as test/run.
+    -h|--help)
+      awk '/^# ={10,}$/{n++; next} n==1{sub(/^# ?/, ""); print} n>1{exit}' "$0"
+      exit 0 ;;
+    *) args+=("$arg") ;;
+  esac
+done
+
+if ! command -v gh >/dev/null 2>&1; then
+  echo "prune-branches: needs the GitHub CLI — https://cli.github.com/" >&2
+  exit 1
+fi
+
+if ! gh extension list 2>/dev/null | grep -q 'gh-poi'; then
+  echo "prune-branches: needs the gh-poi extension. Install it once with:" >&2
+  echo "                gh extension install seachicken/gh-poi" >&2
+  exit 1
+fi
+
+# ${args[@]+"${args[@]}"} expands to nothing when empty — a bare "${args[@]}"
+# on an empty array is an unbound-variable error under `set -u` on bash 3.2
+# (macOS), which is the no-arguments case, i.e. the common one.
+exec gh poi ${args[@]+"${args[@]}"}

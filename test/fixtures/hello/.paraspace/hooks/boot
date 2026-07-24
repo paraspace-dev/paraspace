@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+set -euo pipefail
+# para boot hook — runs INSIDE the workspace after provision. Per para's readiness
+# contract it must return zero only once every routed service is actually
+# listening, so `para up` (and the harness) can trust its exit code.
+#
+# The hello fixture serves a fixed sentinel from a static dir with busybox httpd
+# (baked into the Alpine image as /usr/sbin/httpd). The body of index.html carries
+# the workspace name, so the routing test can prove it reached THIS workspace and
+# not some other site on the shared Caddy.
+
+. "$(dirname "$0")/helpers"
+
+docroot="$HOME/www"
+port=8080
+
+stage "Serving sentinel on :$port (busybox httpd)"
+mkdir -p "$docroot"
+# The sentinel the e2e curl asserts on. PARA_NAME is injected by para (docs/hooks.md).
+printf 'para-e2e-ok %s\n' "$PARA_NAME" > "$docroot/index.html"
+
+# busybox httpd daemonizes (no -f), binding 0.0.0.0:$port so para's Caddy can reach
+# it at the container's bridge IP. Re-running boot (idempotent up) would fail to
+# bind the in-use port, which is fine — an httpd is already up; we only need to
+# guarantee it's listening before we return.
+#
+# Absolute path on purpose: hooks run as the uid-1000 user via `su -`, whose PATH
+# is /bin:/usr/bin — it does NOT include /usr/sbin, where busybox-extras installs
+# the httpd symlink. A bare `httpd` would be "command not found".
+/usr/sbin/httpd -p "$port" -h "$docroot" 2>/dev/null || true
+
+# Readiness gate: return 0 only once the port actually answers.
+for _ in $(seq 1 50); do
+  if wget -qO- "http://127.0.0.1:$port/" >/dev/null 2>&1; then
+    info "httpd is listening on :$port"
+    exit 0
+  fi
+  sleep 0.2
+done
+die "httpd did not come up on :$port within ~10s"

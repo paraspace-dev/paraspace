@@ -25,6 +25,25 @@ Base image alias `para up` launches. You build it with `para image-build` —
 see [The image contract](./image.md). `para init` names it after your
 directory.
 
+### `PARA_BASE_IMAGE`
+
+The Incus image `para image-build` launches its builder from — any image works
+(`images:debian/13`, `images:voidlinux`, `images:alpine/edge`, …). **Required**
+to build: para pins no default, so your image's distro is never para's choice
+and can't change under you when para updates. `image-build` refuses with a clear
+error until you declare one. Not used by `para up`, which launches the *built*
+image (`PARA_IMAGE`).
+
+### `PARA_IMAGE_BOOTSTRAP`
+
+Optional one-liner run via `sh -c` inside the builder **before** your
+`.paraspace/image-build.sh`. Its job is to leave bash in the image (para runs
+the payload with `bash -s`) and to refresh the package index if the base needs
+it — `xbps-install -Syu xbps bash` on Void (what the templates declare),
+`apk add --no-cache bash` on Alpine, `apt-get update` on Debian. Unset or empty
+means no bootstrap step; `--from-current` skips it. See
+[The image contract](./image.md).
+
 ### `PARA_ORIGIN`
 
 Git URL the clone hook clones. Project-declared — para does not guess it (a

@@ -17,6 +17,16 @@
 # (`para init` sets this to your project's directory name.)
 : "${PARA_IMAGE:=void-docker-gh}"
 
+# What `para image-build` builds FROM: the incus image its builder launches, and
+# one `sh -c` line run inside it before .paraspace/image-build.sh. para assumes
+# nothing about the distro — any incus image works (`images:debian/13`,
+# `images:alpine/edge`, …); this template targets Void. The bootstrap must leave
+# BASH in the builder (para runs image-build.sh with `bash -s`); here it also
+# refreshes Void's bundled xbps, which is a rolling-release snapshot that can be
+# too stale to install against. Set it to "" if your base needs nothing.
+: "${PARA_BASE_IMAGE:=images:voidlinux}"
+: "${PARA_IMAGE_BOOTSTRAP:=xbps-install -Syu xbps bash}"
+
 # Git URL para clones into each workspace. Change it to your project's repo.
 : "${PARA_ORIGIN:=git@github.com:jchook/docker-caddy.git}"
 

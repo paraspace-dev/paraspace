@@ -26,7 +26,13 @@
     "darwin"
   ],
   "scripts": {
-    "lint": "bin/lint"
+    "lint": "bin/lint",
+    "site": "vitepress dev",
+    "site:build": "vitepress build",
+    "site:preview": "vitepress preview"
+  },
+  "devDependencies": {
+    "vitepress": "^1.6.4"
   },
   "bin": {
     "para": "bin/para"

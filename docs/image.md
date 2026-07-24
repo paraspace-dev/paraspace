@@ -31,6 +31,6 @@ overlay(fs) rather than vfs, and publishes the result as `$PARA_IMAGE`.
 - `-q` / `-v` force or keep the Incus progress bars (auto-quiet when not a
   tty).
 
-The templates' [`image-build.sh`](../templates/void-docker-gh/.paraspace/image-build.sh)
+The templates' [`image-build.sh`](https://github.com/paraspace-dev/paraspace/blob/main/templates/void-docker-gh/.paraspace/image-build.sh)
 scripts are the reference: a package list, a user, and Docker set up for
 nesting.

@@ -30,7 +30,7 @@ para sh box                             # get a shell inside it
 ```
 
 `para up` succeeds and the workspace runs, but it publishes **no URL** — this box
-boots nothing, so its Parafile declares `PARA_ROUTES=()` and `para ls` shows no
+boots nothing, so its Parafile declares an empty `PARA_ROUTES` and `para ls` shows no
 address for it. That's expected for a bare box: list a port in `PARA_ROUTES` once
 you have something listening, and the URL appears on the next `para up`.
 
@@ -48,7 +48,7 @@ The scaffold tells you where each piece goes:
 - **`hooks/boot`** — put your app's start command here (e.g. `docker compose up
   -d --wait`) and return 0 only once the routed service is listening.
 - **`Parafile`** — set `PARA_ORIGIN`/`PARA_CLONE_DIR`, and list your service's
-  port in `PARA_ROUTES` (it ships as `PARA_ROUTES=()`, the explicit "serves no
+  port in `PARA_ROUTES` (it ships as `PARA_ROUTES=""`, the explicit "serves no
   HTTP", because this box boots nothing).
 
 For a fuller starting point, see [`void-docker-gh`](../void-docker-gh) (a runnable

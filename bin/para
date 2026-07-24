@@ -239,47 +239,41 @@ fi
 PARA_CLONE_BRANCH="${PARA_CLONE_BRANCH:-}"
 [ -z "$PARA_CLONE_BRANCH" ] || [[ "$PARA_CLONE_BRANCH" =~ ^[A-Za-z0-9][A-Za-z0-9._/-]*$ ]] \
   || { printf 'para: PARA_CLONE_BRANCH must be a plain branch name ([A-Za-z0-9._/-]); got %s\n' "$PARA_CLONE_BRANCH" >&2; exit 1; }
-# The HTTP routes para publishes through its Caddy. NO default port: a baked-in
-# 8080 is exactly the kind of project policy para doesn't hold, and it made a
-# workspace with no HTTP at all — a worker, a queue consumer, a bare box —
-# inexpressible. That case is now spelled PARA_ROUTES=() and is honored.
-# An UNSET key still means "I forgot", not "I meant none", so cmd_up refuses it
-# rather than silently building a workspace with no URL (same posture as
-# PARA_BASE_IMAGE). ROUTES_DECLARED carries unset-vs-empty past this
-# normalization, and is deliberately NOT named PARA_* so run_hook's blanket
-# forwarder doesn't ship a para internal into every hook's environment.
+# The HTTP routes para publishes through its Caddy: a comma-separated list of
+# "[sub:]port" entries — "8080", or "3000,api:3001". A bare port is the workspace
+# apex. NO default port: a baked-in 8080 is exactly the kind of project policy
+# para doesn't hold.
 #
-# Detected with `declare -p`, NOT `${PARA_ROUTES+set}`: the `+set` form tests
-# element ZERO, which an empty array does not have, so it reports PARA_ROUTES=()
-# as UNSET — the one case this whole distinction exists to catch. `declare -p`
-# tests the variable itself and is bash-3.2 safe.
-if _rdecl="$(declare -p PARA_ROUTES 2>/dev/null)"; then
-  # An array, or something else? An exported environment variable is always a
-  # SCALAR, and `${#scalar[@]}` is an "unbound variable" error under `set -u` on
-  # bash 5+ (and a misleading 1 on bash 3.2) — so a scalar here used to surface
-  # as a raw bash crash from cmd_up. Name the real problem instead. Same
-  # `declare -`[aA] test run_hook uses to spot arrays.
-  case "$_rdecl" in
-    "declare -"[aA]*) ROUTES_DECLARED=1 ;;
-    *) printf 'para: PARA_ROUTES must be a bash ARRAY — set it in .paraspace/Parafile as PARA_ROUTES=( "3000" "api:3001" ). It cannot come from the environment or the user config, which carry only scalars.\n' >&2; exit 1 ;;
-  esac
-else
-  ROUTES_DECLARED=0; PARA_ROUTES=()
-fi
-unset _rdecl
-# Validate each route token. They are spliced into Caddy site addresses AND into
-# the registry's space-separated field 3, so a token containing a space (or an
-# EMPTY one, which `${#PARA_ROUTES[@]}` can't catch — count 1, content "") would
-# shift every field the readers parse: `para ls` silently drops the workspace,
-# and gen_caddyfile emits an upstream Caddy rejects, which fails `caddy reload`
-# and takes down routing for every workspace on the box. Rejecting "-" here also
-# keeps the no-routes sentinel unambiguous.
-if [ "$ROUTES_DECLARED" -eq 1 ] && [ "${#PARA_ROUTES[@]}" -gt 0 ]; then
-  for _r in "${PARA_ROUTES[@]}"; do
+# A SCALAR, like every other Parafile key. It was briefly a bash array, which
+# cost far more than it bought: para flattens it to this very CSV a few lines
+# into cmd_up — the registry field, the container stamp and gen_caddyfile are all
+# CSV already — so the array existed only to be discarded, while costing three
+# `${#a[@]}` guards (expanding an empty array trips `set -u` on bash 3.2), a
+# type check against scalars arriving from the environment, exclusion from
+# run_hook's forwarder (so hooks could not see their own routes), and a
+# `declare -p` dance to tell "declared empty" from "unset" — because `${a+set}`
+# tests element ZERO, which an empty array hasn't got. That last one shipped as a
+# bug: PARA_ROUTES=() read as unset. As a scalar the plain idiom is simply right.
+#
+# EMPTY means "this workspace serves no HTTP" and is honored; UNSET means "I
+# forgot" and cmd_up refuses it, so a project can't lose its URL to a typo (the
+# same posture as PARA_BASE_IMAGE). ROUTES_DECLARED carries that distinction past
+# the normalization, and is deliberately NOT named PARA_* so run_hook's blanket
+# forwarder doesn't ship a para internal into every hook's environment.
+if [ "${PARA_ROUTES+set}" = set ]; then ROUTES_DECLARED=1; else ROUTES_DECLARED=0; PARA_ROUTES=""; fi
+# Validate every entry. They are spliced into Caddy site addresses AND into the
+# registry's space-separated field 3, so an entry containing a space — or an empty
+# one from a stray comma — would shift every field the readers parse: `para ls`
+# silently drops the workspace, and gen_caddyfile emits an upstream Caddy rejects,
+# failing `caddy reload` and taking routing down for every workspace on the box.
+# Rejecting "-" here also keeps the no-routes registry sentinel unambiguous.
+if [ -n "$PARA_ROUTES" ]; then
+  IFS=, read -ra _routes <<<"$PARA_ROUTES"
+  for _r in "${_routes[@]}"; do
     [[ "$_r" =~ ^([A-Za-z0-9][A-Za-z0-9-]*:)?[0-9]{1,5}$ ]] \
-      || { printf 'para: PARA_ROUTES entries must be "[sub:]port" (e.g. "3000" or "api:3001"); got %s\n' "$_r" >&2; exit 1; }
+      || { printf 'para: PARA_ROUTES must be comma-separated "[sub:]port" entries (e.g. "3000" or "3000,api:3001"); got %s\n' "$_r" >&2; exit 1; }
   done
-  unset _r
+  unset _routes _r
 fi
 
 PARA_STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/para"
@@ -699,7 +693,7 @@ EOF
       # entry is "[sub:]port": bare = the apex host, "sub:port" = a subdomain.
       # Upstreams are plain HTTP at the container IP; the project's stack makes the
       # port listen on 0.0.0.0 there.
-      # "-" is the sentinel for a workspace that declared PARA_ROUTES=() — it
+      # "-" is the sentinel for a workspace that declared an empty PARA_ROUTES — it
       # publishes no Caddy site at all (field 3 can't be empty; see cmd_up).
       [ "$routes" = "-" ] && continue
       IFS=, read -ra ws_routes <<<"$routes"
@@ -827,10 +821,10 @@ run_hook() { # run_hook <hook> <name>
   #   PARA_HOSTNAME/GIT_NAME/GIT_EMAIL — host identity (gitconfig + ssh-key label).
   local PARA_NAME="$name" PARA_SHARED="/para/shared"
   local PARA_URL PARA_HOSTNAME PARA_GIT_NAME PARA_GIT_EMAIL
-  # EMPTY for a workspace that declared no routes (PARA_ROUTES=()) — there is no
-  # Caddy site, so handing a hook a URL that resolves to nothing would be a lie.
-  # A hook that prints or curls it should test for empty.
-  if [ "${#PARA_ROUTES[@]}" -gt 0 ]; then PARA_URL="https://$name.$PARA_DOMAIN$(url_port)"; else PARA_URL=""; fi
+  # EMPTY for a workspace that declared no routes — there is no Caddy site, so
+  # handing a hook a URL that resolves to nothing would be a lie. A hook that
+  # prints or curls it should test for empty.
+  if [ -n "$PARA_ROUTES" ]; then PARA_URL="https://$name.$PARA_DOMAIN$(url_port)"; else PARA_URL=""; fi
   PARA_HOSTNAME="$(hostname -s 2>/dev/null || hostname)"
   PARA_GIT_NAME="$(git config --global user.name 2>/dev/null || true)"
   PARA_GIT_EMAIL="$(git config --global user.email 2>/dev/null || true)"
@@ -838,11 +832,12 @@ run_hook() { # run_hook <hook> <name>
   # project can pass its own knobs to hooks just by setting PARA_FOO in its Parafile
   # — no para change, no hand-maintained list that drifts out of sync. `printf %q`
   # keeps values with spaces/quotes (a user.name like O'Brien, an origin URL) intact
-  # through the guest `su -c` re-parse. Arrays (PARA_ROUTES) are skipped: %q on an
-  # array only captures element 0, so exporting it as a scalar would be misleading —
-  # a hook that needs routes reads them from the Parafile. The documented contract
-  # (docs/hooks.md) is the authoritative set; para internals also ride along as harmless
-  # guest env. `${!PARA_@}` + this loop is bash-3.2 safe.
+  # through the guest `su -c` re-parse. Arrays are skipped: %q on an array only
+  # captures element 0, so exporting it as a scalar would be misleading. No
+  # documented key is an array any more — PARA_ROUTES became a CSV scalar and is
+  # forwarded like the rest — but the guard stays for whatever a project declares.
+  # The documented contract (docs/hooks.md) is the authoritative set; para internals
+  # also ride along as harmless guest env. `${!PARA_@}` + this loop is bash-3.2 safe.
   local ctx="" _v _decl
   for _v in "${!PARA_@}"; do
     _decl="$(declare -p "$_v" 2>/dev/null)"
@@ -890,13 +885,11 @@ cmd_up() {
   # `para ls` can scope to the current project. PARA_PROJECT (field 5) is a plain
   # slug; routes are comma-joined, domain a token.
   [ "$ROUTES_DECLARED" -eq 1 ] \
-    || die "PARA_ROUTES is not set in .paraspace/Parafile — declare the ports para should publish, e.g. PARA_ROUTES=( \"3000\" \"api:3001\" ). For a workspace with no HTTP routes at all, declare it empty: PARA_ROUTES=()."
+    || die "PARA_ROUTES is not set in .paraspace/Parafile — declare the ports para should publish, e.g. PARA_ROUTES=\"3000,api:3001\". For a workspace with no HTTP routes at all, declare it empty: PARA_ROUTES=\"\"."
   # Field 3 is positional, so a route-less workspace records the "-" sentinel — an
   # empty field would shift domain and project one place left in every reader's
-  # `read -r name ip routes domain project`. Guard the [*] expansion on the count:
-  # expanding an empty array under `set -u` errors on bash < 4.4 (macOS ships 3.2).
-  local rcsv="-"
-  if [ "${#PARA_ROUTES[@]}" -gt 0 ]; then rcsv="$(IFS=,; echo "${PARA_ROUTES[*]}")"; fi
+  # `read -r name ip routes domain project`.
+  local rcsv="${PARA_ROUTES:--}"
   ensure_backend; ensure_dirs; ensure_pool; ensure_volume
   caddy_running || start_caddy
   local ct; ct="$(ct_name "$name")"
@@ -1125,7 +1118,7 @@ cmd_ls() {
     # and pick the exact row. (Piping into awk is SIGPIPE-safe — awk drains stdin.)
     local ctn; ctn="$(ct_name "$name")"
     state="$(incus list "$ctn" -c ns -f csv 2>/dev/null | awk -F, -v c="$ctn" '$1==c{print $2}')" || true
-    # A route-less workspace (the "-" sentinel, from PARA_ROUTES=()) publishes no
+    # A route-less workspace (the "-" sentinel, from an empty PARA_ROUTES) publishes no
     # Caddy site, so there is no URL to print for it.
     if [ "$routes" = "-" ]; then url="-"; else url="https://$name.$domain$(url_port)"; fi
     if [ -n "$scope" ]; then
@@ -1256,7 +1249,7 @@ cmd_web() {
   # no-routes sentinel — opening its apex would just land on a Caddy 404/refusal.
   local wroutes; wroutes="$(awk -v n="$name" '$1==n{print $3}' "$REGISTRY" 2>/dev/null || true)"
   [ "$wroutes" != "-" ] \
-    || die "workspace '$name' publishes no HTTP routes (its project declares PARA_ROUTES=()) — there is no URL to open."
+    || die "workspace '$name' publishes no HTTP routes (its project declares an empty PARA_ROUTES) — there is no URL to open."
   local url; url="https://$name.$PARA_DOMAIN$(url_port)"
   case "$(uname -s)" in
     Darwin) open "$url" ;;

@@ -37,4 +37,4 @@
 
 # One route: the workspace apex -> the busybox httpd the boot hook starts on :8080.
 #   https://<name>.paraspace.dev  ->  <container-ip>:8080
-PARA_ROUTES=( "8080" )
+PARA_ROUTES="8080"

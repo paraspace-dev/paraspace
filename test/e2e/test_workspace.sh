@@ -12,6 +12,16 @@ test_http_route_serves_the_sentinel() {
   assert_contains "$body" "para-e2e-ok $PARA_WS" "sentinel body carries the workspace name"
 }
 
+test_routes_reach_the_provision_hook() {
+  # PARA_ROUTES is a comma-separated scalar, so para's blanket PARA_* forwarder
+  # carries it into hooks like any other key. That's new: as a bash array it was
+  # skipped by the forwarder (%q on an array captures only element 0), and a hook
+  # needing its own routes had to re-source the Parafile. The fixture's provision
+  # hook writes what it received to ~/routes-seen; the fixture declares "8080".
+  local got; got="$("$PARA" sh "$PARA_WS" -c 'cat ~/routes-seen' 2>/dev/null)"
+  assert_eq "8080" "$got" "the provision hook received PARA_ROUTES"
+}
+
 test_workspace_is_listed_and_running() {
   local names; names="$("$PARA" ls --names 2>/dev/null)"
   assert_contains "$names" "$PARA_WS" "ls --names includes the workspace" || return 1

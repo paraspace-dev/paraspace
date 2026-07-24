@@ -31,11 +31,13 @@
 # Git URL para clones into each workspace. Change it to your project's repo.
 : "${PARA_ORIGIN:=git@github.com:jchook/docker-caddy.git}"
 
-# HTTP routes para publishes through its Caddy — one TLS site per "[sub:]port".
-# A bare port is the workspace apex: 8080 -> https://<name>.$PARA_DOMAIN
+# HTTP routes para publishes through its Caddy — one TLS site per "[sub:]port",
+# comma-separated. A bare port is the workspace apex:
+#   8080            -> https://<name>.$PARA_DOMAIN
+#   3000,api:3001   -> apex :3000 plus https://api.<name>.$PARA_DOMAIN -> :3001
 # Required — para pins no default port. For a workspace with no HTTP at all
-# (a worker, a queue consumer), declare it empty: PARA_ROUTES=()
-PARA_ROUTES=( "8080" )
+# (a worker, a queue consumer), declare it empty: PARA_ROUTES=""
+PARA_ROUTES="8080"
 
 # ---- optional -----------------------------------------------------------------
 # para's own defaults, spelled out so you don't have to go look them up. Uncomment

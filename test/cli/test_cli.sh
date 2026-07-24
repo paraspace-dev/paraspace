@@ -104,15 +104,16 @@ test_up_refuses_undeclared_routes() {
   assert_contains "$out" "PARA_ROUTES" "refusal names the missing key" || return 1
   # The refusal must also teach the empty spelling, which is the whole point of
   # distinguishing unset from empty.
-  assert_contains "$out" "PARA_ROUTES=()" "refusal shows how to declare no routes"
+  assert_contains "$out" 'PARA_ROUTES=""' "refusal shows how to declare no routes"
 }
 
 test_up_accepts_an_explicitly_empty_route_list() {
-  # The regression that shipped in the first cut of this feature: `${arr+set}`
-  # tests element ZERO, which an empty array doesn't have, so PARA_ROUTES=() read
-  # as UNSET and `para up` refused it — telling the user to declare exactly what
-  # they had declared. void-minimal ships PARA_ROUTES=(), so this made that
-  # template impossible to bring up at all.
+  # An empty value is a DECLARATION ("serves no HTTP"), not an omission — the
+  # distinction cmd_up refuses an unset key over. void-minimal ships an empty
+  # PARA_ROUTES, so this is also the guard on that template being usable at all.
+  # (It regressed once already: while PARA_ROUTES was a bash array, `${a+set}`
+  # tested element zero, which an empty array hasn't got, so `PARA_ROUTES=()`
+  # read as unset and the template could not be brought up.)
   #
   # Asserted by checking that whatever stops the run afterwards is no longer the
   # routes refusal. `up` must NOT be allowed to run past that point: on a machine
@@ -131,41 +132,46 @@ test_up_accepts_an_explicitly_empty_route_list() {
   printf '#!/bin/sh\nexit 1\n' > "$stub/caddy";  chmod +x "$stub/caddy"
   printf '#!/bin/sh\nexit 1\n' > "$stub/colima"; chmod +x "$stub/colima"
   mkdir -p "$d/.paraspace"
-  printf 'PARA_VERSION=1\nPARA_PROJECT=emptyroutes\nPARA_ROUTES=()\n' > "$d/.paraspace/Parafile"
+  printf 'PARA_VERSION=1\nPARA_PROJECT=emptyroutes\nPARA_ROUTES=""\n' > "$d/.paraspace/Parafile"
   local out; out="$(env PATH="$stub:$PATH" PARA_PROJECT_DIR="$d" "$PARA" up somews 2>&1)" || true
   rm -rf "$d" "$stub"
   # Whatever stopped the run, it must not have been about routes — that covers
   # both the unset refusal and any route-validation error, and says nothing about
   # which backend command happens to be missing on this machine.
-  assert_not_contains "$out" "PARA_ROUTES" "an empty array is a declaration, not an omission"
+  assert_not_contains "$out" "PARA_ROUTES" "an empty value is a declaration, not an omission"
 }
 
-test_routes_reject_a_scalar_and_malformed_entries() {
-  # PARA_ROUTES is spliced into Caddy site addresses and into the registry's
-  # space-separated field 3. A scalar (all the environment can carry) used to
-  # surface as a raw `unbound variable` crash; an empty or space-bearing entry
-  # silently wrote a short row that shifts every reader's parse.
+test_routes_reject_malformed_entries() {
+  # PARA_ROUTES entries are spliced into Caddy site addresses AND into the
+  # registry's space-separated field 3, so an entry with a space — or an empty one
+  # from a stray comma — would shift every reader's parse: `para ls` drops the
+  # workspace, and gen_caddyfile emits an upstream Caddy rejects, which fails
+  # `caddy reload` and kills routing for every workspace on the machine.
   local d; d="$(mktemp -d "${TMPDIR:-/tmp}/para-badroutes.XXXXXX")"
   mkdir -p "$d/.paraspace"
-  # A scalar from the environment. The Parafile deliberately does NOT declare
-  # PARA_ROUTES here: array keys are assigned plainly, so a Parafile that declares
-  # one simply overwrites the imported scalar (the documented semantics). The
-  # scalar only survives to be judged when the project leaves the key alone.
-  printf 'PARA_VERSION=1\nPARA_PROJECT=badroutes\n' > "$d/.paraspace/Parafile"
-  local out rc=0
-  out="$(env PARA_PROJECT_DIR="$d" PARA_ROUTES=8080 "$PARA" ls 2>&1)" || rc=$?
-  [ "$rc" -ne 0 ] || { rm -rf "$d"; echo "  a scalar PARA_ROUTES was accepted" >&2; return 1; }
-  assert_contains "$out" "must be a bash ARRAY" "scalar refusal explains the type" || { rm -rf "$d"; return 1; }
-  # An empty entry: count 1, content "" — the case a count check cannot catch.
-  printf 'PARA_VERSION=1\nPARA_PROJECT=badroutes\nPARA_ROUTES=( "" )\n' > "$d/.paraspace/Parafile"
-  rc=0; out="$(env PARA_PROJECT_DIR="$d" "$PARA" ls 2>&1)" || rc=$?
-  [ "$rc" -ne 0 ] || { rm -rf "$d"; echo "  an empty route entry was accepted" >&2; return 1; }
-  # An entry containing a space would shift the registry's positional fields.
-  printf 'PARA_VERSION=1\nPARA_PROJECT=badroutes\nPARA_ROUTES=( "80 90" )\n' > "$d/.paraspace/Parafile"
-  rc=0; out="$(env PARA_PROJECT_DIR="$d" "$PARA" ls 2>&1)" || rc=$?
+  local out rc bad
+  for bad in '3000,,api:3001' '80 90' 'no-port' '-'; do
+    printf 'PARA_VERSION=1\nPARA_PROJECT=badroutes\nPARA_ROUTES="%s"\n' "$bad" > "$d/.paraspace/Parafile"
+    rc=0; out="$(env PARA_PROJECT_DIR="$d" "$PARA" ls 2>&1)" || rc=$?
+    [ "$rc" -ne 0 ] || { rm -rf "$d"; echo "  PARA_ROUTES=\"$bad\" was accepted" >&2; return 1; }
+  done
   rm -rf "$d"
-  [ "$rc" -ne 0 ] || { echo "  a route entry with a space was accepted" >&2; return 1; }
   assert_contains "$out" "[sub:]port" "refusal shows the expected shape"
+}
+
+test_routes_can_come_from_the_environment() {
+  # As a plain scalar, PARA_ROUTES follows the same precedence as every other key
+  # — so a one-off `PARA_ROUTES=… para up` works. That was impossible while it was
+  # a bash array (the environment carries only scalars), and is the visible half of
+  # why it stopped being one. A Parafile-declared value is still overridden by the
+  # environment, like any other scalar key.
+  local d; d="$(mktemp -d "${TMPDIR:-/tmp}/para-envroutes.XXXXXX")"
+  mkdir -p "$d/.paraspace"
+  printf 'PARA_VERSION=1\nPARA_PROJECT=envroutes\nPARA_ROUTES="8080"\n' > "$d/.paraspace/Parafile"
+  local rc=0
+  env PARA_PROJECT_DIR="$d" PARA_ROUTES="3000,api:3001" "$PARA" ls >/dev/null 2>&1 || rc=$?
+  rm -rf "$d"
+  [ "$rc" -eq 0 ] || { echo "  a valid PARA_ROUTES from the environment was rejected" >&2; return 1; }
 }
 
 test_image_defaults_to_the_project_slug() {

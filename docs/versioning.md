@@ -35,14 +35,28 @@ staying at 1 stays explicable:
   above that is breaking — an existing Parafile without the key stops building —
   but it landed pre-launch, at zero external consumers, so `PARA_CONTRACT` stayed
   at 1 rather than burning a version on a migration nobody had to perform.
-- **`PARA_ROUTES` lost its `8080` default and gained an empty spelling.** An
-  unset `PARA_ROUTES` used to fall back to port 8080 — baked-in project policy —
-  and an explicitly empty one was refused, which made a workspace with no HTTP
-  routes inexpressible. Now `PARA_ROUTES=()` is legal and publishes no site,
-  while an *unset* key is refused (empty is a decision, unset is an oversight).
-  Breaking for a Parafile that relied on the 8080 fallback; landed pre-launch, so
-  `PARA_CONTRACT` stayed at 1. The registry's routes field records `-` for a
-  route-less workspace, since it's positional and can't be empty.
+- **`PARA_ROUTES` became a comma-separated scalar, lost its `8080` default, and
+  gained an empty spelling.** It used to be a bash array, `PARA_ROUTES=( "8080" )`.
+  Three changes in one, all pre-launch:
+  - *No default.* An unset key fell back to port 8080 — baked-in project policy.
+    Now it's required; an unset key is refused.
+  - *Empty is legal.* `PARA_ROUTES=""` publishes no site, so a workspace with no
+    HTTP (a worker, a bare box) is expressible. Empty is a decision, unset is an
+    oversight. The registry records `-` for one, its routes field being positional.
+  - *Scalar, not array.* para flattened the array to this same CSV a few lines
+    into `up` — the registry, the container stamp and the Caddyfile generator were
+    always CSV — so the array bought nothing and cost plenty: it could not be
+    forwarded to hooks (so a hook could not see its own routes), could not come
+    from the environment, needed `${#a[@]}` guards for bash 3.2, and needed
+    `declare -p` to tell "declared empty" from "unset", because `${a+set}` tests
+    element zero. That last one shipped as a bug — `PARA_ROUTES=()` read as unset,
+    making `void-minimal` impossible to bring up.
+
+  Breaking for any Parafile declaring the key, and it **widens** the injected hook
+  environment (`PARA_ROUTES` is now forwarded). Pre-launch with no external
+  consumers, so `PARA_CONTRACT` stayed at 1. The bundled templates' `hooks/helpers`
+  gained `parse_routes`/`route_ports`; para deliberately does not provide those
+  itself, since a para-owned hook-side function would be new contract surface.
 - **`PARA_IMAGE` now defaults to `$PARA_PROJECT`** instead of the fixed
   `para-dev`. Incus image aliases are daemon-global, so the old default put two
   projects that both left the key unset on one image — and a build in either

@@ -1,8 +1,8 @@
 # The Parafile
 
 `.paraspace/Parafile` is the per-project config: the few knobs `para` itself reads.
-It is **sourced as bash**. Scalars use `: "${PARA_X:=…}"` so a real environment
-variable still wins; arrays are set plainly.
+It is **sourced as bash**, and every key is a scalar: they use `: "${PARA_X:=…}"`
+so a real environment variable still wins.
 
 Any `PARA_FOO` you set here — documented or not — is forwarded into your hooks'
 environment for free, so the Parafile is also where a project declares its own
@@ -73,11 +73,11 @@ means no bootstrap step; `--from-current` skips it. See
 
 ### `PARA_ROUTES`
 
-A bash array of `"[sub:]port"` entries — one TLS Caddy site each. A bare port
-is the workspace apex:
+A **comma-separated** list of `"[sub:]port"` entries — one TLS Caddy site each.
+A bare port is the workspace apex:
 
 ```sh
-PARA_ROUTES=( "3000" "api:3001" )
+PARA_ROUTES="3000,api:3001"
 # https://<name>.$PARA_DOMAIN      -> :3000
 # https://api.<name>.$PARA_DOMAIN  -> :3001
 ```
@@ -86,23 +86,25 @@ PARA_ROUTES=( "3000" "api:3001" )
 serves no HTTP at all (a worker, a queue consumer, a bare box):
 
 ```sh
-PARA_ROUTES=()   # no Caddy site; `para ls` shows no URL
+PARA_ROUTES=""   # no Caddy site; `para ls` shows no URL
 ```
 
 `para up` refuses an *unset* `PARA_ROUTES` rather than guessing, so a project
 can't silently lose its URL to a typo: empty is a decision, unset is an oversight.
 
-It must be a bash **array**, and unlike the scalar keys it is assigned plainly —
-so a Parafile that declares it always wins over the environment. The environment
-and the user config carry only scalars anyway; if one reaches para (because the
-Parafile left the key alone), para rejects it with an error rather than treating
-the string as a single route. Being an array, it is also **not** forwarded to
-hooks; a hook that needs routes reads them from the Parafile.
+It's a plain scalar like every other key, so it follows the ordinary precedence —
+a one-off `PARA_ROUTES="3000" para up ws` works — and it reaches your hooks
+through the [usual forwarding](./hooks.md#the-environment-para-injects). Split it
+with the `parse_routes` helper the templates ship, or inline:
 
-Each entry must be `[sub:]port` — a port is digits, an optional subdomain is a
-DNS label. para validates them, because a route with a space (or an empty one)
-would corrupt its workspace registry and break routing for every workspace on
-the machine.
+```sh
+IFS=, read -ra routes <<<"$PARA_ROUTES"
+```
+
+Each entry must be `[sub:]port` — a port is digits, an optional subdomain a DNS
+label. para validates them, because an entry containing a space (or an empty one
+from a stray comma) would corrupt its workspace registry and break routing for
+every workspace on the machine.
 
 ### `PARA_DOMAIN`
 

@@ -20,3 +20,16 @@ interactive() { [ -z "${PARA_NONINTERACTIVE:-}" ] && [ -t 0 ]; }
 
 # Print a prompt and wait for Enter — only when someone can answer.
 pause() { if interactive; then printf '%s ' "$*" >&2; read -r _ || true; fi; }
+
+# The project's HTTP routes, one "[sub:]port" per line — para injects them as the
+# comma-separated $PARA_ROUTES. Prints nothing when the project publishes none,
+# so a `for` over it is simply a no-op.
+#   for r in $(parse_routes); do …; done
+parse_routes() {
+  [ -n "${PARA_ROUTES:-}" ] || return 0
+  printf '%s\n' "$PARA_ROUTES" | tr ',' '\n'
+}
+
+# Just the port numbers, one per line — a boot hook waiting on its own routed
+# services wants these, not the subdomains.
+route_ports() { parse_routes | sed 's/.*://'; }

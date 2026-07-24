@@ -38,7 +38,8 @@
 # you a full box and `para sh <name>`; it just publishes no site, and `para ls`
 # shows no URL. Once you run something, list its port here — a bare port is the
 # workspace apex:
-#   PARA_ROUTES="8080"   # -> https://<name>.$PARA_DOMAIN
+#   PARA_ROUTES="8080"              # -> https://<name>.$PARA_DOMAIN
+#   PARA_ROUTES="3000,api:3001"     # several: commas, spaces or newlines
 PARA_ROUTES=""
 
 # ---- optional -----------------------------------------------------------------

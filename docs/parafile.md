@@ -73,14 +73,34 @@ means no bootstrap step; `--from-current` skips it. See
 
 ### `PARA_ROUTES`
 
-A **comma-separated** list of `"[sub:]port"` entries — one TLS Caddy site each.
-A bare port is the workspace apex:
+A list of `"[sub:]port"` entries — one TLS Caddy site each. A bare port is the
+workspace apex:
 
 ```sh
 PARA_ROUTES="3000,api:3001"
 # https://<name>.$PARA_DOMAIN      -> :3000
 # https://api.<name>.$PARA_DOMAIN  -> :3001
 ```
+
+The order is **`sub:port`** — left is where you arrive, right is where it goes,
+the same direction as `docker -p 8080:80` and `ssh -L`. The reverse is refused
+rather than guessed at (an all-digit DNS label is legal, so `8080:9000` could not
+be disambiguated).
+
+Separate entries with **commas, spaces, tabs or newlines**, whichever reads best.
+para normalizes all of them to one comma-separated form, so a multi-line list is
+a first-class way to write a project with several routes:
+
+```sh
+PARA_ROUTES="
+  3000
+  api:3001
+  db:8081
+"
+```
+
+A trailing comma is tolerated. Entries themselves are atomic — no whitespace
+inside one — which is the price of letting whitespace separate them.
 
 **Required — para pins no default port.** Declare it empty for a workspace that
 serves no HTTP at all (a worker, a queue consumer, a bare box):
@@ -94,17 +114,19 @@ can't silently lose its URL to a typo: empty is a decision, unset is an oversigh
 
 It's a plain scalar like every other key, so it follows the ordinary precedence —
 a one-off `PARA_ROUTES="3000" para up ws` works — and it reaches your hooks
-through the [usual forwarding](./hooks.md#the-environment-para-injects). Split it
-with the `parse_routes` helper the templates ship, or inline:
+through the [usual forwarding](./hooks.md#the-environment-para-injects). Hooks
+always see the **canonical** comma-separated form, never the spelling the Parafile
+used, so splitting it is one line — or use the `parse_routes` helper the templates
+ship:
 
 ```sh
 IFS=, read -ra routes <<<"$PARA_ROUTES"
 ```
 
-Each entry must be `[sub:]port` — a port is digits, an optional subdomain a DNS
-label. para validates them, because an entry containing a space (or an empty one
-from a stray comma) would corrupt its workspace registry and break routing for
-every workspace on the machine.
+para validates every entry before canonicalizing: a port is digits, an optional
+subdomain is a DNS label. An entry containing a space, or an empty one from a
+stray comma, would corrupt the workspace registry and break routing for every
+workspace on the machine.
 
 ### `PARA_DOMAIN`
 

@@ -52,6 +52,12 @@ staying at 1 stays explicable:
     element zero. That last one shipped as a bug — `PARA_ROUTES=()` read as unset,
     making `void-minimal` impossible to bring up.
 
+  As a scalar it also parses liberally and stores canonically: entries may be
+  separated by commas, spaces, tabs or newlines (so a multi-line list is a
+  first-class spelling), and para normalizes them to one comma-separated form
+  before anything downstream — the registry, the stamp, Caddy, the hooks — sees
+  them. The `sub:port` order is unchanged.
+
   Breaking for any Parafile declaring the key, and it **widens** the injected hook
   environment (`PARA_ROUTES` is now forwarded). Pre-launch with no external
   consumers, so `PARA_CONTRACT` stayed at 1. The bundled templates' `hooks/helpers`

@@ -150,13 +150,41 @@ test_routes_reject_malformed_entries() {
   local d; d="$(mktemp -d "${TMPDIR:-/tmp}/para-badroutes.XXXXXX")"
   mkdir -p "$d/.paraspace"
   local out rc bad
-  for bad in '3000,,api:3001' '80 90' 'no-port' '-'; do
+  # '3000:app' is the sub:port order reversed — para publishes https://<sub>… so
+  # left is where you arrive and right is where it goes, as in `docker -p`. The
+  # reverse must be refused rather than silently misrouted; an all-digit DNS label
+  # is legal, so accepting both orders could not be disambiguated.
+  for bad in '3000,,api:3001' '80 90x' 'no-port' '-' '3000:app'; do
     printf 'PARA_VERSION=1\nPARA_PROJECT=badroutes\nPARA_ROUTES="%s"\n' "$bad" > "$d/.paraspace/Parafile"
     rc=0; out="$(env PARA_PROJECT_DIR="$d" "$PARA" ls 2>&1)" || rc=$?
     [ "$rc" -ne 0 ] || { rm -rf "$d"; echo "  PARA_ROUTES=\"$bad\" was accepted" >&2; return 1; }
   done
   rm -rf "$d"
   assert_contains "$out" "[sub:]port" "refusal shows the expected shape"
+}
+
+test_routes_accept_flexible_separators() {
+  # Entries may be separated by commas, spaces, tabs or newlines, so a project
+  # with several routes can lay them out readably; para canonicalizes whatever it
+  # gets to one comma-separated form. Every spelling below must load cleanly —
+  # `para ls` exercises the whole parse/validate/canonicalize path with no incus.
+  local d; d="$(mktemp -d "${TMPDIR:-/tmp}/para-sep.XXXXXX")"
+  mkdir -p "$d/.paraspace"
+  local spelling rc
+  # shellcheck disable=SC1004  # the embedded newlines are the point of the case
+  for spelling in \
+      '"3000,api:3001"' \
+      '"3000, api:3001, db:8081"' \
+      '"3000 api:3001"' \
+      '"
+  3000
+  api:3001
+"'; do
+    printf 'PARA_VERSION=1\nPARA_PROJECT=sep\nPARA_ROUTES=%s\n' "$spelling" > "$d/.paraspace/Parafile"
+    rc=0; env PARA_PROJECT_DIR="$d" "$PARA" ls >/dev/null 2>&1 || rc=$?
+    [ "$rc" -eq 0 ] || { rm -rf "$d"; echo "  rejected a valid spelling: $spelling" >&2; return 1; }
+  done
+  rm -rf "$d"
 }
 
 test_routes_can_come_from_the_environment() {

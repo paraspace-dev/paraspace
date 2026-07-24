@@ -261,20 +261,41 @@ PARA_CLONE_BRANCH="${PARA_CLONE_BRANCH:-}"
 # the normalization, and is deliberately NOT named PARA_* so run_hook's blanket
 # forwarder doesn't ship a para internal into every hook's environment.
 if [ "${PARA_ROUTES+set}" = set ]; then ROUTES_DECLARED=1; else ROUTES_DECLARED=0; PARA_ROUTES=""; fi
-# Validate every entry. They are spliced into Caddy site addresses AND into the
-# registry's space-separated field 3, so an entry containing a space — or an empty
-# one from a stray comma — would shift every field the readers parse: `para ls`
-# silently drops the workspace, and gen_caddyfile emits an upstream Caddy rejects,
-# failing `caddy reload` and taking routing down for every workspace on the box.
-# Rejecting "-" here also keeps the no-routes registry sentinel unambiguous.
-if [ -n "$PARA_ROUTES" ]; then
-  IFS=, read -ra _routes <<<"$PARA_ROUTES"
+# Parse LIBERALLY, store CANONICALLY. Entries may be separated by commas, spaces,
+# tabs or newlines, so a project with several routes can lay them out to be read:
+#
+#   PARA_ROUTES="3000"                 PARA_ROUTES="
+#   PARA_ROUTES="3000,api:3001"          3000
+#   PARA_ROUTES="3000 api:3001"          api:3001
+#                                        db:8081
+#                                      "
+#
+# Whichever spelling a Parafile uses, para normalizes it to the comma-separated
+# form, so everything downstream sees exactly ONE format: the registry's field 3
+# (space-separated and positional — a raw multi-line value would corrupt every
+# reader), the container stamp, gen_caddyfile, and the hook environment. Entries
+# are therefore ATOMIC: "[sub:]port" with no whitespace inside one, which is the
+# price of letting whitespace separate them. Order is sub:port — left is where you
+# arrive, right is where it goes, as in `docker -p` and `ssh -L`.
+_oifs="$IFS"; IFS=$', \t\n'
+# shellcheck disable=SC2206  # splitting $PARA_ROUTES on IFS is the entire point
+_routes=( $PARA_ROUTES )
+if [ "${#_routes[@]}" -gt 0 ]; then
+  # Validate BEFORE canonicalizing. Entries are spliced into Caddy site addresses
+  # and into the registry, where an empty entry (a stray comma) or one bearing a
+  # space would shift every field the readers parse: `para ls` silently drops the
+  # workspace, and gen_caddyfile emits an upstream Caddy rejects, failing
+  # `caddy reload` and taking routing down for every workspace on the box.
+  # Rejecting "-" here also keeps the no-routes registry sentinel unambiguous.
   for _r in "${_routes[@]}"; do
     [[ "$_r" =~ ^([A-Za-z0-9][A-Za-z0-9-]*:)?[0-9]{1,5}$ ]] \
-      || { printf 'para: PARA_ROUTES must be comma-separated "[sub:]port" entries (e.g. "3000" or "3000,api:3001"); got %s\n' "$_r" >&2; exit 1; }
+      || { printf 'para: PARA_ROUTES entries must be "[sub:]port" — a port, optionally prefixed by a subdomain (e.g. "3000" or "3000,api:3001"); got %s\n' "$_r" >&2; exit 1; }
   done
-  unset _routes _r
+  IFS=,; PARA_ROUTES="${_routes[*]}"
+else
+  PARA_ROUTES=""   # unset, empty, or whitespace-only: this workspace serves no HTTP
 fi
+IFS="$_oifs"; unset _oifs _routes _r
 
 PARA_STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/para"
 REGISTRY="$PARA_STATE_DIR/workspaces"    # "name ip routes domain project" per line

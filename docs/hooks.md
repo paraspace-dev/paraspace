@@ -55,7 +55,7 @@ The documented context is:
 | Variable | Meaning |
 |---|---|
 | `PARA_NAME`, `PARA_URL`, `PARA_DOMAIN` | this workspace + its host/domain. `PARA_URL` is **empty** when the project declares an empty `PARA_ROUTES` — there's no site to point at |
-| `PARA_ROUTES` | the routes para publishes, comma-separated `[sub:]port` (empty if none) |
+| `PARA_ROUTES` | the routes para publishes, always canonical comma-separated `[sub:]port` whatever spelling the `Parafile` used (empty if none) |
 | `PARA_PROJECT` | the project identity slug (also the shared-volume suffix) |
 | `PARA_CLONE_DIR`, `PARA_CLONE_BRANCH`, `PARA_ORIGIN` | what/where to clone |
 | `PARA_SHARED=/para/shared` | the shared-volume mount |

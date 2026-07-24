@@ -37,4 +37,12 @@
 
 # One route: the workspace apex -> the busybox httpd the boot hook starts on :8080.
 #   https://<name>.paraspace.dev  ->  <container-ip>:8080
-PARA_ROUTES="8080"
+#
+# Deliberately written in the MULTI-LINE spelling even though it's a single route:
+# para accepts comma-, space-, tab- or newline-separated entries and canonicalizes
+# them to one comma-separated form, and test_routes_reach_the_provision_hook reads
+# back what the hook actually received ("8080") — so this spelling is what proves
+# the normalization end to end, through the hook forwarder.
+PARA_ROUTES="
+  8080
+"

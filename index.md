@@ -42,6 +42,7 @@ npm i -g paraspace
 
 ```sh
 cd your-project   # a repo set up for para
+para image-build  # once per machine — build the project's base image
 para up ws1       # launch an isolated workspace
 para sh ws1       # shell into the clone
 ```

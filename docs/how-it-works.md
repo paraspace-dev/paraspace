@@ -17,8 +17,8 @@ The usual escapes:
 - **A VM per workspace** isolates cleanly but reserves fixed RAM and CPU for
   each — a laptop affords two or three.
 - **Hosted dev environments** do the isolation in the cloud, and the interface
-  is the price: web terminals, browser IDEs, routing that fights you — metered
-  by the hour while your own machine idles.
+  is the price: web terminals, browser IDEs, counter-intuitive routing —
+  metered by the hour while your own machine idles.
 
 `para` runs each workspace as an Incus **system** container: isolated like a
 VM, no fixed reservation, and containers still run *inside* it — a Docker

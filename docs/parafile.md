@@ -64,18 +64,16 @@ hooks themselves.
 The workspace user para runs hooks, `para sh`, and `para run` as, and chowns
 every pushed file to. Defaults: `app`, `1000`, `1000`.
 
-These belong to the *project*, not to you: your `.paraspace/image-build.sh`
-creates this user inside `$PARA_IMAGE` (para passes all three into it), and
-para's runtime chowns target the same ids. Change them only if `1000` is
-already taken in your base image — and rebuild the image afterwards, or the
-chowns will land on a uid with no passwd entry and the shared volume becomes
+It's your `.paraspace/image-build.sh` that makes use of these — it bakes the
+user into `$PARA_IMAGE`, and para's runtime chowns target the same ids. Change
+them only if `1000` is already taken in your base image, and rebuild afterwards,
+or the chowns land on a uid with no passwd entry and the shared volume becomes
 unwritable.
 
-They deliberately do **not** default to your host `id -u`. Nothing host-side is
-bind-mounted into a workspace: the shared volume is `security.shifted`, so the
-guest's uid maps through the unprivileged idmap to a subuid rather than to
-yours. On macOS, Incus runs inside colima's Linux VM, where your host uid has
-no meaning at all.
+They default to a stable `1000` rather than your host `id -u`: para bind-mounts
+nothing host-side, so there's nothing to line up with. A project that adds
+host-guest file sharing can have its `image-build.sh` honor an override (env or
+user config, which both win over the Parafile) to align the ids.
 
 ### `PARA_DOMAIN`
 

@@ -125,17 +125,14 @@ PARAFILE="${PARAFILE:-${PROJECT_ROOT:+$PROJECT_ROOT/.paraspace/Parafile}}"
 # Parafile normally sets these; the defaults just keep para working if it doesn't.
 : "${PARA_IMAGE:=para-dev}"
 : "${PARA_CLONE_DIR:=app}"
-# The workspace user para runs hooks, `para sh`, and `para run` as, and that every
-# push/chown below targets. It belongs to the PROJECT because the project's
-# image-build.sh is what creates it in $PARA_IMAGE — these values must match the
-# ones baked there or the chowns land on a uid with no passwd entry. Deliberately
-# a stable default rather than the host's `id -u`: nothing host-side is
-# bind-mounted (the shared volume is security.shifted, so the guest's uid maps
-# through the unprivileged idmap to a subuid, never to yours), and on macOS incus
-# runs inside colima's VM where the host uid means nothing at all.
+
+# The workspace user/group. It's up to the image builder to honor these and
+# ensure the user exists on the base image. Optionally the builder can honor
+# user-config overrides for aligning host and guest UIDs.
 : "${PARA_USER:=app}"
 : "${PARA_UID:=1000}"
 : "${PARA_GID:=1000}"
+
 # The incus image `para image-build` launches its builder from, and an optional
 # `sh -c` line run in that builder BEFORE the project's image-build.sh payload.
 # Both are the project's call: para builds whatever base you name and knows

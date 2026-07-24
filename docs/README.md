@@ -9,8 +9,9 @@ para is a **generic mechanism** — the Incus/Caddy/volume/lifecycle engine, the
 way `docker compose` is generic. It bakes in nothing project-specific: each
 project keeps its own setup in a `.paraspace/` dir at its repo root.
 
-New here? Start with the [README](../README.md) — install and quick start live
-there.
+New here? Start with the
+[README](https://github.com/paraspace-dev/paraspace#readme) — install and quick
+start live there.
 
 ## Guides
 
@@ -36,13 +37,17 @@ there.
 
 ## Templates
 
-Three runnable templates under [`templates/`](../templates) share one shape and
-vary in weight:
+Three runnable templates under
+[`templates/`](https://github.com/paraspace-dev/paraspace/tree/main/templates)
+share one shape and vary in weight:
 
-- [`void-docker-gh`](../templates/void-docker-gh) — the `para init` default: a
+- [`void-docker-gh`](https://github.com/paraspace-dev/paraspace/tree/main/templates/void-docker-gh)
+  — the `para init` default: a
   small, complete Docker demo exercising the whole mechanism.
-- [`void-minimal`](../templates/void-minimal) — the barest box: installs and
+- [`void-minimal`](https://github.com/paraspace-dev/paraspace/tree/main/templates/void-minimal)
+  — the barest box: installs and
   runs nothing, with comments marking where your stack goes.
-- [`void-jchook`](../templates/void-jchook) — a full personal dev environment
+- [`void-jchook`](https://github.com/paraspace-dev/paraspace/tree/main/templates/void-jchook)
+  — a full personal dev environment
   (zsh, tmux, Neovim, Claude Code) on top of the same demo.
 

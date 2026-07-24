@@ -18,7 +18,8 @@ set -euo pipefail
 #
 # This is yours — para owns no image. Add language runtimes / your own tools; keep
 # the image contract (docker→overlayfs, a $PARA_USER/$PARA_UID user in the docker
-# group, bash + git). Not meant to be run on a host — it mutates system packages and services.
+# group, bash + git). Not meant to be run on a host — it mutates system packages
+# and services.
 
 # Workspace user to bake in. Passed by `para image-build`; defaults keep a
 # standalone run working. $HOME_DIR is where useradd -m lands the home.

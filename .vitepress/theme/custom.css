@@ -32,6 +32,16 @@
 }
 
 /*
+ * The terminal demo's decorations (orbit, stars, glow) intentionally spill
+ * outside their box. Clip them at the hero section's edge so they can't widen
+ * the page and open a phantom right gutter on small screens. `clip` (not
+ * `hidden`) keeps the vertical glow and creates no scroll container.
+ */
+.VPHome .VPHero {
+  overflow-x: clip;
+}
+
+/*
  * The hero image slot holds the terminal demo, which sizes itself; undo the
  * default theme's fixed-size circular image treatment.
  */

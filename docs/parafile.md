@@ -1,6 +1,6 @@
 # The Parafile
 
-`.paraspace/Parafile` is the per-project config: the few knobs para itself reads.
+`.paraspace/Parafile` is the per-project config: the few knobs `para` itself reads.
 It is **sourced as bash**. Scalars use `: "${PARA_X:=…}"` so a real environment
 variable still wins; arrays are set plainly.
 
@@ -13,7 +13,7 @@ knobs (the default template's `PARA_GH_AUTH` is one). See
 
 ### `PARA_PROJECT`
 
-Project **identity** — the single key para uses for workspace ownership,
+Project **identity** — the single key `para` uses for workspace ownership,
 `para ls` scoping, and the shared-volume name. A plain slug (`[a-z0-9-]`),
 independent of where the checkout lives, so moving or renaming the dir keeps
 its workspaces bound to it. `para init` bakes it to the dir name; unset falls
@@ -29,15 +29,15 @@ directory.
 
 The Incus image `para image-build` launches its builder from — any image works
 (`images:debian/13`, `images:voidlinux`, `images:alpine/edge`, …). **Required**
-to build: para pins no default, so your image's distro is never para's choice
-and can't change under you when para updates. `image-build` refuses with a clear
+to build: `para` pins no default, so your image's distro is never `para`'s choice
+and can't change under you when `para` updates. `image-build` refuses with a clear
 error until you declare one. Not used by `para up`, which launches the *built*
 image (`PARA_IMAGE`).
 
 ### `PARA_IMAGE_BOOTSTRAP`
 
 Optional one-liner run via `sh -c` inside the builder **before** your
-`.paraspace/image-build.sh`. Its job is to leave bash in the image (para runs
+`.paraspace/image-build.sh`. Its job is to leave bash in the image (`para` runs
 the payload with `bash -s`) and to refresh the package index if the base needs
 it — `xbps-install -Syu xbps bash` on Void (what the templates declare),
 `apk add --no-cache bash` on Alpine, `apt-get update` on Debian. Unset or empty
@@ -46,7 +46,7 @@ means no bootstrap step; `--from-current` skips it. See
 
 ### `PARA_ORIGIN`
 
-Git URL the clone hook clones. Project-declared — para does not guess it (a
+Git URL the clone hook clones. Project-declared — `para` does not guess it (a
 toplevel Parafile can derive it from its own `origin`).
 
 ### `PARA_CLONE_DIR`
@@ -114,7 +114,7 @@ is set (the port your host stack listens on); `PARA_WORKCOPY_HOST` defaults to
 
 ### `PARA_VERSION`
 
-Optional but recommended: the para contract version your hooks target. para
+Optional but recommended: the `para` contract version your hooks target. `para`
 refuses with a clear error on a mismatch — see
 [Contract versioning](./versioning.md).
 
@@ -124,9 +124,9 @@ Some knobs describe *your box*, not the project, so they live in the per-user
 config file — `$XDG_CONFIG_HOME/para/config`, i.e. `~/.config/para/config` by
 default. Persist them with `para config-set KEY VALUE`. Notable ones:
 
-- `PARA_HTTPS_PORT` — the port para Caddy binds (default `8443`; set `443` for
+- `PARA_HTTPS_PORT` — the port `para` Caddy binds (default `8443`; set `443` for
   port-less URLs — see [Workspace URLs](./urls.md)).
-- `PARA_POOL` — the Incus storage pool; para writes this itself when it has to
+- `PARA_POOL` — the Incus storage pool; `para` writes this itself when it has to
   create a `dir` pool for nested Docker.
 - `PARA_BRIDGE` — the Incus bridge workspaces attach to (default `incusbr0`).
 

@@ -1,9 +1,9 @@
 # Hooks
 
-para runs a project's hooks **inside the workspace, in `$HOME`**, as the
+`para` runs a project's hooks **inside the workspace, in `$HOME`**, as the
 workspace user (`$PARA_USER`, uid `$PARA_UID` — `app`/`1000` by default).
 Everything domain-specific — git, gh, dotfiles, `.env`, booting the stack —
-lives here, never in para.
+lives here, never in `para`.
 
 ## The two hooks
 
@@ -13,35 +13,35 @@ Owns everything before boot: seed and symlink the shared volume (decide *what's
 shared*), clone the repo (and authenticate — see
 [Git authentication](./git-auth.md)), render `.env`, and whatever else your
 stack needs. **Idempotent** — `para up` re-runs it on every converge. May
-prompt: para gives it a tty when interactive, which is where the ssh-key/gh
+prompt: `para` gives it a tty when interactive, which is where the ssh-key/gh
 flow lives.
 
 ### `boot`
 
 Brings the stack up. **Readiness contract:** return zero only once every
 routed service is up *and actually listening* — compose: `up -d --wait`; bare
-processes: start detached under a supervisor and wait until listening. para
+processes: start detached under a supervisor and wait until listening. `para`
 gates on agent + DNS before hooks, then trusts the boot hook's exit code.
 
 An absent hook is a visible no-op; a project only writes the ones it needs.
-para runs only the named hooks, so a project can drop shared code beside them —
+`para` runs only the named hooks, so a project can drop shared code beside them —
 the default template factors colored output into a `helpers` file its hooks
 source. Anything else under `.paraspace/hooks/` is just synced along, never run.
 
 ## How hooks reach the workspace
 
 Hook files come from your **host checkout**, not the clone, so edits take
-effect on the next `up`. Before the hooks run, para syncs the project's
+effect on the next `up`. Before the hooks run, `para` syncs the project's
 `.paraspace/hooks/` and `.paraspace/skel/` to `~/.para/` in the workspace (the
-`Parafile` and `image-build.sh` stay host-side — para reads those itself), so
+`Parafile` and `image-build.sh` stay host-side — `para` reads those itself), so
 a hook can seed from `~/.para/skel` before the clone even exists.
 
-## The environment para injects
+## The environment `para` injects
 
-para forwards **every `PARA_*` variable in scope** — the user config,
-everything your `Parafile` sets, and the per-workspace values para computes —
+`para` forwards **every `PARA_*` variable in scope** — the user config,
+everything your `Parafile` sets, and the per-workspace values `para` computes —
 into the hook's environment. So beyond the documented set below, **any
-`PARA_FOO` you put in your `Parafile` reaches your hooks for free**, no para
+`PARA_FOO` you put in your `Parafile` reaches your hooks for free**, no `para`
 change needed.
 
 The documented context is:
@@ -55,11 +55,11 @@ The documented context is:
 | `PARA_USER`/`UID`/`GID` | the workspace user's identity |
 | `PARA_HOSTNAME` | the ssh-key label |
 | `PARA_GIT_NAME`/`EMAIL` | the seeded gitconfig |
-| `PARA_CONTRACT` | the contract version para provides |
+| `PARA_CONTRACT` | the contract version `para` provides |
 
 Two caveats:
 
 - `PARA_ROUTES` is an array and is **not** forwarded — read routes from the
   `Parafile`.
-- para's own internals may also appear in the env; only the variables above are
+- `para`'s own internals may also appear in the env; only the variables above are
   the [versioned contract](./versioning.md).

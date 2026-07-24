@@ -8,7 +8,7 @@ hero:
   actions:
     - theme: brand
       text: Get started
-      link: /docs/
+      link: /docs/getting-started
     - theme: alt
       text: View on GitHub
       link: https://github.com/paraspace-dev/paraspace
@@ -22,7 +22,7 @@ features:
     details: One host Caddy routes https://name.paraspace.dev to each workspace. Open two branches in two tabs and compare.
   - icon: 🔌
     title: Bring your own stack
-    details: para is a generic mechanism, like docker compose. Your project's .paraspace/ dir — a Parafile and hooks — holds everything project-specific.
+    details: ParaSpace is a generic mechanism, like docker compose. Your project's .paraspace/ dir — a Parafile and hooks — holds everything project-specific.
   - icon: 🤖
     title: Made for agents
     details: Run several coding agents in parallel, each in its own workspace, without collisions on ports, databases, or checkouts.
@@ -34,7 +34,7 @@ features:
 npm i -g paraspace
 ```
 
-para uses [Incus](https://linuxcontainers.org/incus/) and Caddy on the host —
+`para` uses [Incus](https://linuxcontainers.org/incus/) and Caddy on the host —
 `brew install caddy colima incus` on macOS; see the
 [README](https://github.com/paraspace-dev/paraspace#install) for Linux.
 
@@ -42,6 +42,7 @@ para uses [Incus](https://linuxcontainers.org/incus/) and Caddy on the host —
 
 ```sh
 cd your-project   # a repo set up for para
+para image-build  # once per machine — build the project's base image
 para up ws1       # launch an isolated workspace
 para sh ws1       # shell into the clone
 ```

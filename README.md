@@ -1,7 +1,7 @@
 # ParaSpace
 
-`para` is an LLM-era coding tool that enables you to parallelize tasks across
-isolated environments on your local machine.
+`para` runs any number of full, isolated copies of your project side by side
+on your local machine.
 
 Each workspace is a full, isolated copy of your project — its own clone, its
 own stack, its own `https://<name>.<domain>` URL — so several agents
@@ -33,6 +33,7 @@ brew install caddy colima incus
 
 ```sh
 cd <your project> # a repo set up for para — see below
+para image-build  # once per machine — build the project's base image
 para up ws1       # launch an isolated workspace
 para sh ws1       # shell into the clone
 ```

@@ -19,8 +19,8 @@ The rules:
 
 ## Decisions
 
-Seam changes that were made *without* a bump, and why — so the constant staying
-at 1 stays explicable:
+Interface changes that were made *without* a bump, and why — so the constant
+staying at 1 stays explicable:
 
 - **`PARA_BASE_IMAGE` became required for `para image-build`.** `image-build`
   used to hardcode a Void base; it now refuses unless the

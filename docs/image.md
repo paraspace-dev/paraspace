@@ -1,29 +1,29 @@
 # The image contract
 
-para owns **no** base image — you build your own. `para up` launches whatever
+`para` owns **no** base image — you build your own. `para up` launches whatever
 `PARA_IMAGE` names, so the image is where your toolchain, package installs, and
 pre-pulled Docker images get baked in once instead of on every `up`.
 
 ## What the image must have
 
-para's own mechanism needs very little of the image:
+`para`'s own mechanism needs very little of the image:
 
-- a **uid-1000 user** (`$PARA_USER`, `app` by default) — para runs hooks,
+- a **uid-1000 user** (`$PARA_USER`, `app` by default) — `para` runs hooks,
   `para sh`, and `para run` as it, and every file it pushes is chowned to it;
-- **bash** — para invokes hooks and shells via `su -s /bin/bash`;
-- **git**, if your hooks clone (the bundled templates' do; para itself never
+- **bash** — `para` invokes hooks and shells via `su -s /bin/bash`;
+- **git**, if your hooks clone (the bundled templates' do; `para` itself never
   runs git).
 
 Everything else is your project's choice. If your stack is Docker Compose —
 as the bundled templates' is — then the image also needs **docker** with
 nesting resolving to **overlayfs** (a `dir`/ext4 Incus pool; btrfs/zfs<2.2
 silently falls back to the slow vfs driver) and that uid-1000 user in the
-`docker` group. para doesn't know or check that; the templates'
+`docker` group. `para` doesn't know or check that; the templates'
 `image-build.sh` verifies it for you, because the payload that installs Docker
 is what should refuse to publish a half-broken image.
 
 For full ergonomics also include `tmux` (`para run`), a login shell like `zsh`
-(`para sh`), and `claude`/`nvim`/`gh` — para degrades rather than breaks
+(`para sh`), and `claude`/`nvim`/`gh` — `para` degrades rather than breaks
 without them.
 
 ## Building with `para image-build`
@@ -47,8 +47,8 @@ refresh the package index — `xbps-install -Syu xbps bash` on Void,
 already ships what your payload needs doesn't need it at all; leave it unset.
 
 Both keys live in the [Parafile](./parafile.md). `PARA_BASE_IMAGE` has **no
-default** — the distro is entirely the project's call, so para asks rather than
-picks, and a para update can never swap the ground your image is built on.
+default** — the distro is entirely the project's call, so `para` asks rather than
+picks, and a `para` update can never swap the ground your image is built on.
 
 - Images are **per-arch** — build on the machine that runs them (arm64 on
   Apple Silicon).

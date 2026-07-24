@@ -42,7 +42,7 @@ The full command surface (`down`, `rm`, `run`, `web`, …) is in
 
 ## Set up your project
 
-para needs one thing from a project: a `.paraspace/` dir at the repo root — a
+`para` needs one thing from a project: a `.paraspace/` dir at the repo root — a
 `Parafile` (config) and `hooks/` (provision + boot). Scaffold it from a
 working template:
 
@@ -58,13 +58,13 @@ defaults; the walkthrough is [Project setup](./docs/project-setup.md).
 
 Full documentation lives in [`docs/`](./docs/README.md):
 
-- [How it works](./docs/how-it-works.md) — the host Caddy, the shared home
-  volume, self-describing workspaces, where state lives.
-- [Project setup](./docs/project-setup.md) — adapting para to your project.
+- [How it works](./docs/how-it-works.md) — the architecture at a glance, and
+  how macOS differs.
+- [Project setup](./docs/project-setup.md) — adapting `para` to your project.
 - [Commands](./docs/commands.md) — the full CLI surface + shell completion.
 - [The Parafile](./docs/parafile.md) · [Hooks](./docs/hooks.md) ·
   [The image contract](./docs/image.md) ·
-  [Contract versioning](./docs/versioning.md) — the para↔project contract.
+  [Contract versioning](./docs/versioning.md) — the `para`↔project contract.
 
 Workspace URLs default to `https://<name>.paraspace.dev:8443` — dropping the
 `:8443`, using your own domain, and browser certificate trust are all covered

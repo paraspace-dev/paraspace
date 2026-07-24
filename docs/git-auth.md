@@ -1,7 +1,7 @@
 # Git authentication
 
 Workspaces clone and push over SSH, so the git host must trust this machine's
-key. para uses **one para key per machine** (`para-<hostname>`), individually
+key. `para` uses **one `para` key per machine** (`para-<hostname>`), individually
 revocable — never your host keys.
 
 ## First run
@@ -23,6 +23,7 @@ Set `PARA_GH_AUTH=1` in the default template's `Parafile` and its hook takes a
 `gh auth login` path instead, uploading the key for you — handy for private
 repos.
 
-Because the key lives on the [shared volume](./how-it-works.md), every
+Because the key lives on the
+[shared volume](./internals.md#the-shared-home-volume), every
 workspace of the project inherits it — you authorize once per machine, not per
 workspace.

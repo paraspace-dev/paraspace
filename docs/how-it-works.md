@@ -1,24 +1,38 @@
 # How it works
 
-The whole mechanism is four pieces:
+## The problem
+
+You want several full copies of a project running at once — one per branch, one
+per agent. The usual routes:
+
+- **Hosted dev environments** do the isolation in the cloud, and the interface
+  is the price: web terminals, browser IDEs, routing that fights you — metered
+  by the hour while your own machine idles.
+- **DIY on your machine** — worktrees, port offsets, devcontainers — shares one
+  network and one Docker daemon, so ports, `.env`s, and auth collide across
+  branches. That fiddliness is most of what the hosted platforms are selling
+  relief from.
+
+`para` does the isolation locally, with system containers:
 
 ```
-       browser
-       │  https://ws1.<domain>:8443
-       ▼
-┌──────────────────────────────┐
-│          host Caddy          │   terminates TLS for *.<domain>
-└──────┬───────────────┬───────┘   proxies each route → container IP
-       │               │
-┌──────▼──────┐ ┌──────▼──────┐
-│  para-ws1   │ │  para-ws2   │   one Incus system container per
-│   clone     │ │   clone     │   workspace — the project's stack
-│   stack     │ │   stack     │   (containers and all) runs inside
+       browser                     terminal
+       │  https://ws1.<domain>:8443   │
+       ▼                              │  para sh ws2
+┌──────────────────────────────┐      │
+│          host Caddy          │      │
+│  TLS + routes for *.<domain> │      │
+└──────┬───────────────┬───────┘      │
+       │               │              │
+┌──────▼──────┐ ┌──────▼──────┐       │
+│  para-ws1   │ │  para-ws2   ◀───────┘
+│   clone     │ │   clone     │
+│   stack     │ │   stack     │
 └──────┬──────┘ └──────┬──────┘
        │               │
 ┌──────▼───────────────▼───────┐
-│      para-home-<project>     │   one shared home volume per project
-│   mounted at /para/shared    │   (auth, dotfiles — seeded once)
+│      para-home-<project>     │
+│   mounted at /para/shared    │
 └──────────────────────────────┘
 ```
 
@@ -27,6 +41,11 @@ runs — bare processes, or containers nested inside the container (Docker boots
 fine) — binds its usual ports on the workspace's own network, so workspaces
 never collide with each other or with the host. Caddy proxies each workspace's
 URL to its IP; nothing gets remapped.
+
+The URL is only one door. `para sh` drops a real shell in a workspace's clone —
+your dotfiles, a real pty, no web terminal — and `para run` opens a tmux
+session there with `claude` already running. Agents work the workspaces the
+same way you do.
 
 - **One host Caddy** terminates TLS for the `*.<domain>` wildcard and
   reverse-proxies each workspace's routes to its container IP. It binds `:8443`

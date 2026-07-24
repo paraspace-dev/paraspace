@@ -28,8 +28,9 @@ export default defineConfig({
         {
           text: 'Guides',
           items: [
-            { text: 'How it works', link: '/docs/how-it-works' },
+            { text: 'Getting started', link: '/docs/getting-started' },
             { text: 'Project setup', link: '/docs/project-setup' },
+            { text: 'How it works', link: '/docs/how-it-works' },
             { text: 'Workspace URLs', link: '/docs/urls' },
             { text: 'Git authentication', link: '/docs/git-auth' },
           ],

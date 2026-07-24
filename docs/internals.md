@@ -28,7 +28,7 @@ projects at one `PARA_VOLUME` to share auth across them.
 `para` launches the container, attaches the volume, waits for it to be ready,
 syncs the project's `.paraspace/` dir into it, and runs the project's hooks.
 Everything domain-specific (git, gh, dotfiles, `.env`, boot) lives in
-`.paraspace/hooks/`, never in `para`. The [hook contract](./hooks.md) is the seam.
+`.paraspace/hooks/`, never in `para` — see the [hook contract](./hooks.md).
 
 ## Workspaces are self-describing
 

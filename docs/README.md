@@ -9,17 +9,18 @@ own `https://<name>.<domain>` URL, reachable from your workstation.
 way `docker compose` is generic. It bakes in nothing project-specific: each
 project keeps its own setup in a `.paraspace/` dir at its repo root.
 
-New here? Start with the
-[README](https://github.com/paraspace-dev/paraspace#readme) — install and quick
-start live there.
+New here? [Get started](./getting-started.md) — install, prerequisites, and
+your first workspace.
 
 ## Guides
 
-- [How it works](./how-it-works.md) — the architecture at a glance: one host
-  Caddy, one container per workspace, one shared volume per project (and the
-  one extra macOS layer).
+- [Getting started](./getting-started.md) — install `para`, launch a
+  workspace, scaffold your project.
 - [Project setup](./project-setup.md) — adapt `para` to your own project with
   `para init` and a `.paraspace/` dir.
+- [How it works](./how-it-works.md) — the problem this solves and the
+  architecture that solves it: one host Caddy, one container per workspace,
+  one shared volume per project.
 - [Workspace URLs](./urls.md) — removing the `:8443` from URLs, using your own
   domain, and trusting the local CA in your browser.
 - [Git authentication](./git-auth.md) — authorizing a machine's SSH key so

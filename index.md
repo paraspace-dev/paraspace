@@ -8,7 +8,7 @@ hero:
   actions:
     - theme: brand
       text: Get started
-      link: /docs/
+      link: /docs/getting-started
     - theme: alt
       text: View on GitHub
       link: https://github.com/paraspace-dev/paraspace

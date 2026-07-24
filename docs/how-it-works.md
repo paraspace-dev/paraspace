@@ -61,8 +61,7 @@ session there with `claude` already running. Agents work the workspaces the
 same way you do.
 
 - **One host Caddy** terminates TLS for the `*.<domain>` wildcard and
-  reverse-proxies each workspace's routes to its container IP. It binds `:8443`
-  by default; clean `:443` URLs are an opt-in — see
+  reverse-proxies each workspace's routes to its container IP — see
   [Workspace URLs](./urls.md).
 - **One Incus container per workspace** (`para-<name>`) holds the clone and
   runs the project's whole stack inside — nested containers included.
@@ -70,8 +69,8 @@ same way you do.
   `/para/shared` — authenticate once (git, `gh`, dotfiles) and every workspace
   inherits it.
 - **The project's hooks** do all provisioning. Everything project-specific
-  lives in the project's `.paraspace/` dir, never in `para` — the
-  [hook contract](./hooks.md) is the seam.
+  lives in the project's `.paraspace/` dir, never in `para` — see the
+  [hook contract](./hooks.md).
 
 Nothing else runs on the host.
 

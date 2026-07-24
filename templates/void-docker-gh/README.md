@@ -16,7 +16,7 @@ same demo carrying a full personal dev environment — zsh, tmux, Neovim, Claude
 ```
 void-docker-gh/
   .paraspace/                # all the para plumbing — hidden, set-up-once
-    Parafile               # the few knobs para reads (version, image, origin, routes)
+    Parafile               # the few knobs para reads (version, identity, base image, origin, routes)
     hooks/provision        # seed+link the shared volume, clone, copy .env
     hooks/boot             # docker compose up -d --wait
     hooks/helpers          # colored output + small guards, sourced by the hooks

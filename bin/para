@@ -33,10 +33,36 @@ set -euo pipefail
 # btrfs).
 PARA_CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/para"
 PARA_CONFIG="$PARA_CONFIG_DIR/config"
+# Keys refused FROM THE USER CONFIG: per-project identity and build inputs, where
+# a box-wide value is incoherent. One global PARA_PROJECT collapses every
+# project's ownership, `para ls` scoping, and shared volume onto a single name; a
+# global PARA_BASE_IMAGE rebuilds every project's image on a distro its
+# image-build.sh doesn't target — the exact failure "no default base" exists to
+# prevent. A DENYlist, not an allowlist: every other PARA_* stays settable here on
+# purpose, because run_hook forwards them all into the hooks, which is how a
+# project (or a person) exposes knobs para has never heard of.
+# The ENVIRONMENT stays unrestricted — it's per-invocation, so it can't silently
+# apply to the wrong project, and test/run sandboxes e2e with PARA_PROJECT/
+# PARA_VOLUME set that way.
+parafile_only_key() {
+  case "$1" in
+    PARA_PROJECT|PARA_IMAGE|PARA_BASE_IMAGE|PARA_IMAGE_BOOTSTRAP) return 0 ;;
+    PARA_VERSION|PARA_ORIGIN|PARA_CLONE_DIR|PARA_VOLUME|PARA_ROUTES) return 0 ;;
+    *) return 1 ;;
+  esac
+}
 if [ -f "$PARA_CONFIG" ]; then
   while IFS='=' read -r _k _v; do
     case "$_k" in
-      PARA_[A-Z_]*) [ -n "${!_k:-}" ] || printf -v "$_k" '%s' "$_v" ;;
+      PARA_[A-Z_]*)
+        # Warn rather than die: a stale config line shouldn't brick every para
+        # command, but it must never take effect silently. (die/warn aren't
+        # defined yet — config load runs before the helpers.)
+        if parafile_only_key "$_k"; then
+          printf 'para: ignoring %s from %s — it is per-project; set it in .paraspace/Parafile\n' "$_k" "$PARA_CONFIG" >&2
+        else
+          [ -n "${!_k:-}" ] || printf -v "$_k" '%s' "$_v"
+        fi ;;
     esac
   done < "$PARA_CONFIG"
   unset _k _v
@@ -123,7 +149,8 @@ PARAFILE="${PARAFILE:-${PROJECT_ROOT:+$PROJECT_ROOT/.paraspace/Parafile}}"
 [ -n "${PARAFILE:-}" ] && [ -f "$PARAFILE" ] && . "$PARAFILE"
 # Fallbacks: applied only when neither env nor the Parafile set them. A project's
 # Parafile normally sets these; the defaults just keep para working if it doesn't.
-: "${PARA_IMAGE:=para-dev}"
+# (PARA_IMAGE is defaulted further down, once PARA_PROJECT — which it derives
+# from — has been resolved.)
 : "${PARA_CLONE_DIR:=app}"
 
 # The workspace user/group. It's up to the image builder to honor these and
@@ -168,6 +195,17 @@ if [ -n "$PROJECT_ROOT" ]; then
   [[ "$PARA_PROJECT" =~ ^[a-z0-9][a-z0-9-]*$ ]] \
     || { printf 'para: PARA_PROJECT must be a plain slug ([a-z0-9-], no leading hyphen); got %s\n' "$PARA_PROJECT" >&2; exit 1; }
 fi
+# The image `para up` launches and `para image build` publishes. DERIVED from the
+# project slug, because incus image aliases are daemon-global: a fixed default
+# would put two projects that both leave it unset on ONE image — and a build in
+# either would delete and republish the other's out from under it (see the
+# publish/swap in cmd_image_build). Deriving it also means a scaffolded project
+# never has to set this key at all. Declare it explicitly only to point several
+# projects at a shared image, or to name an image built elsewhere.
+# PARA_PROJECT is already validated [a-z0-9-], which is a legal incus alias. The
+# para-dev arm is unreachable in practice (outside a project every command that
+# reads this calls require_project first) — it just keeps set -u satisfied.
+: "${PARA_IMAGE:=${PARA_PROJECT:-para-dev}}"
 # Wildcard domain the workspaces live under: https://<name>.$PARA_DOMAIN, so
 # `*.$PARA_DOMAIN` must resolve to 127.0.0.1. Recorded per-workspace at `up` time
 # (registry field 4) so a global para stays correct across projects on different
@@ -201,7 +239,16 @@ fi
 PARA_CLONE_BRANCH="${PARA_CLONE_BRANCH:-}"
 [ -z "$PARA_CLONE_BRANCH" ] || [[ "$PARA_CLONE_BRANCH" =~ ^[A-Za-z0-9][A-Za-z0-9._/-]*$ ]] \
   || { printf 'para: PARA_CLONE_BRANCH must be a plain branch name ([A-Za-z0-9._/-]); got %s\n' "$PARA_CLONE_BRANCH" >&2; exit 1; }
-[ "${PARA_ROUTES+set}" = set ] || PARA_ROUTES=( "8080" )
+# The HTTP routes para publishes through its Caddy. NO default port: a baked-in
+# 8080 is exactly the kind of project policy para doesn't hold, and it made a
+# workspace with no HTTP at all — a worker, a queue consumer, a bare box —
+# inexpressible. That case is now spelled PARA_ROUTES=() and is honored.
+# An UNSET key still means "I forgot", not "I meant none", so cmd_up refuses it
+# rather than silently building a workspace with no URL (same posture as
+# PARA_BASE_IMAGE). ROUTES_DECLARED carries unset-vs-empty past this
+# normalization, and is deliberately NOT named PARA_* so run_hook's blanket
+# forwarder doesn't ship a para internal into every hook's environment.
+if [ "${PARA_ROUTES+set}" = set ]; then ROUTES_DECLARED=1; else ROUTES_DECLARED=0; PARA_ROUTES=(); fi
 
 PARA_STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/para"
 REGISTRY="$PARA_STATE_DIR/workspaces"    # "name ip routes domain project" per line
@@ -335,7 +382,13 @@ require_project() {
   # Contract handshake (opt-in): a Parafile that declares which para contract its
   # hooks target (PARA_VERSION) gets a clear error on a mismatch instead of a
   # silent break when a global para is updated. Not set => no check.
-  if [ -n "${PARA_VERSION:-}" ] && [ "$PARA_VERSION" != "$PARA_CONTRACT" ]; then
+  if [ -z "${PARA_VERSION:-}" ]; then
+    # An undeclared version is the case the handshake can't protect: a future
+    # contract 2 would run these hooks silently. `para init` always writes the
+    # key, so this only reaches hand-rolled Parafiles — exactly the ones most
+    # likely to break. Warn, don't die: it's the pre-existing default.
+    warn "this project's .paraspace/Parafile declares no PARA_VERSION — add ': \"\${PARA_VERSION:=$PARA_CONTRACT}\"' so a breaking para change fails loudly instead of silently (docs/versioning.md)."
+  elif [ "$PARA_VERSION" != "$PARA_CONTRACT" ]; then
     die "this project targets para contract $PARA_VERSION, but this para provides contract $PARA_CONTRACT. The para<->project interface changed in a breaking way — update para, or update the project's .paraspace/hooks/ + .paraspace/Parafile PARA_VERSION."
   fi
 }
@@ -614,6 +667,9 @@ EOF
       # entry is "[sub:]port": bare = the apex host, "sub:port" = a subdomain.
       # Upstreams are plain HTTP at the container IP; the project's stack makes the
       # port listen on 0.0.0.0 there.
+      # "-" is the sentinel for a workspace that declared PARA_ROUTES=() — it
+      # publishes no Caddy site at all (field 3 can't be empty; see cmd_up).
+      [ "$routes" = "-" ] && continue
       IFS=, read -ra ws_routes <<<"$routes"
       dom="$domain"
       printf '\n# Workspace %s:\n' "$name"
@@ -798,9 +854,14 @@ cmd_up() {
   # when another project's `para` regenerates the machine-wide Caddyfile, and so
   # `para ls` can scope to the current project. PARA_PROJECT (field 5) is a plain
   # slug; routes are comma-joined, domain a token.
-  # Reject empty routes: an empty field 3 would shift every field the readers parse.
-  [ "${#PARA_ROUTES[@]}" -gt 0 ] || die "PARA_ROUTES is empty — set at least one route (\"[sub:]port\") in .paraspace/Parafile."
-  local rcsv; rcsv="$(IFS=,; echo "${PARA_ROUTES[*]}")"
+  [ "$ROUTES_DECLARED" -eq 1 ] \
+    || die "PARA_ROUTES is not set in .paraspace/Parafile — declare the ports para should publish, e.g. PARA_ROUTES=( \"3000\" \"api:3001\" ). For a workspace with no HTTP routes at all, declare it empty: PARA_ROUTES=()."
+  # Field 3 is positional, so a route-less workspace records the "-" sentinel — an
+  # empty field would shift domain and project one place left in every reader's
+  # `read -r name ip routes domain project`. Guard the [*] expansion on the count:
+  # expanding an empty array under `set -u` errors on bash < 4.4 (macOS ships 3.2).
+  local rcsv="-"
+  if [ "${#PARA_ROUTES[@]}" -gt 0 ]; then rcsv="$(IFS=,; echo "${PARA_ROUTES[*]}")"; fi
   ensure_backend; ensure_dirs; ensure_pool; ensure_volume
   caddy_running || start_caddy
   local ct; ct="$(ct_name "$name")"
@@ -841,6 +902,16 @@ cmd_up() {
   else
     incus image info "$PARA_IMAGE" >/dev/null 2>&1 \
       || die "base image '$PARA_IMAGE' not found — run 'para image build' first"
+    # PARA_USER/UID/GID are overridable (env or user config) so a project can align
+    # host and guest ids — but the user is BAKED INTO the image by image-build.sh,
+    # and para's runtime chowns target the configured ids. Override them without a
+    # rebuild and every chown lands on a uid with no passwd entry, leaving the
+    # shared volume unwritable — a failure that surfaces far from its cause. The
+    # image records what it baked; compare and refuse up front. An unstamped image
+    # (built before this existed) is not second-guessed.
+    local baked; baked="$(incus image get-property "$PARA_IMAGE" user.para.uid 2>/dev/null || true)"
+    [ -z "$baked" ] || [ "$baked" = "$PARA_UID:$PARA_GID" ] \
+      || die "image '$PARA_IMAGE' bakes its workspace user at uid:gid $baked, but PARA_UID:PARA_GID is $PARA_UID:$PARA_GID — para's chowns would target a uid the image has no passwd entry for. Rebuild with 'para image build', or drop the override."
     ip="$(alloc_ip)"
     log "Launching $ct at $ip (nesting on)…"
     # --storage: keep the container root on $PARA_POOL. Without it the root lands
@@ -945,6 +1016,10 @@ cmd_reconcile() {
       skipped=$((skipped + 1)); continue
     fi
     routes="$(ct_meta "$ct" user.para.routes)"
+    # Same positional-field guard as $ip below. An empty routes stamp — a
+    # route-less workspace, or one stamped by a para predating the sentinel —
+    # would collapse the row to four fields and shift every reader's parse.
+    [ -n "$routes" ] || routes="-"
     domain="$(ct_meta "$ct" user.para.domain)"
     ip="$(incus config device get "$ct" eth0 ipv4.address 2>/dev/null || true)"
     if [ -z "$ip" ]; then
@@ -1002,7 +1077,9 @@ cmd_ls() {
     # and pick the exact row. (Piping into awk is SIGPIPE-safe — awk drains stdin.)
     local ctn; ctn="$(ct_name "$name")"
     state="$(incus list "$ctn" -c ns -f csv 2>/dev/null | awk -F, -v c="$ctn" '$1==c{print $2}')" || true
-    url="https://$name.$domain$(url_port)"
+    # A route-less workspace (the "-" sentinel, from PARA_ROUTES=()) publishes no
+    # Caddy site, so there is no URL to print for it.
+    if [ "$routes" = "-" ]; then url="-"; else url="https://$name.$domain$(url_port)"; fi
     if [ -n "$scope" ]; then
       printf '%-22s %-16s %-9s %s\n' "$name" "$ip" "${state:-MISSING}" "$url"
     else
@@ -1142,6 +1219,12 @@ cmd_config_set() {
     PARA_[A-Z_]*) ;;
     *) die "config keys must be PARA_* (the config loader ignores others) — got '$1'" ;;
   esac
+  # Refuse the per-project keys the loader would ignore anyway, so the mistake
+  # surfaces here (where the user is looking) rather than as a warning on every
+  # later command.
+  if parafile_only_key "$1"; then
+    die "'$1' is per-project — set it in the project's .paraspace/Parafile, not the user config: a box-wide value would apply it to every project on this machine. See docs/parafile.md."
+  fi
   persist_config "$1" "$2"   # ensure_dirs (mkdir -p) + atomic replace, no hand-editing
 }
 
@@ -1250,13 +1333,22 @@ cmd_init() {
     || die "no templates found — install via 'npm i -g paraspace', or 'para install' from a checkout."
   # --names: bare template names, one per line — the machine-readable twin of
   # --list (which prints a titled, indented view). Feeds `para init` completion.
+  # An underscore prefix marks a non-template directory — `_common` is the shared
+  # overlay every scaffold gets, not something you can `para init`. Skipped in both
+  # listings so it never shows up as a choice.
   if [ "$names" -eq 1 ]; then
-    local t; for t in "$tdir"/*/; do [ -d "$t" ] && printf '%s\n' "$(basename "$t")"; done
+    local t; for t in "$tdir"/*/; do
+      case "$(basename "$t")" in _*) continue ;; esac
+      [ -d "$t" ] && printf '%s\n' "$(basename "$t")"
+    done
     return 0
   fi
   if [ "$list" -eq 1 ]; then
     log "Available templates (in $tdir):"
-    local t; for t in "$tdir"/*/; do [ -d "$t" ] && printf '  %s\n' "$(basename "$t")"; done
+    local t; for t in "$tdir"/*/; do
+      case "$(basename "$t")" in _*) continue ;; esac
+      [ -d "$t" ] && printf '  %s\n' "$(basename "$t")"
+    done
     return 0
   fi
   tmpl="${tmpl:-void-docker-gh}"
@@ -1269,30 +1361,49 @@ cmd_init() {
   [ "$full" -eq 1 ] && { root="$src"; note="full tree"; }
   [ -d "$root" ] || die "template '$tmpl' has nothing to scaffold at $root."
   log "Scaffolding '$tmpl' into $PWD ($note)…"
-  local added=0 skipped=0 parafile_added=0 f rel dest
-  while IFS= read -r f; do
-    rel="${f#"$src"/}"
-    [ "$rel" = README.md ] && continue          # the template's own README, not yours
-    dest="$PWD/$rel"
-    if [ -e "$dest" ] && [ "$force" -eq 0 ]; then
-      printf '  skip (exists): %s\n' "$rel" >&2; skipped=$((skipped + 1)); continue
-    fi
-    mkdir -p "$(dirname "$dest")"
-    cp "$f" "$dest"
-    case "$rel" in .paraspace/hooks/*|.paraspace/image-build.sh) chmod +x "$dest" ;; esac
-    [ "$rel" = .paraspace/Parafile ] && parafile_added=1
-    printf '  add: %s\n' "$rel" >&2; added=$((added + 1))
-  done < <(find "$root" -type f)
-  # Personalize the freshly-scaffolded Parafile with this dir's name: PARA_IMAGE
-  # (names the base image) and PARA_PROJECT (the stable project id, so identity
-  # survives a later move/rename). Only when WE added the Parafile (never rewrite
-  # one the user already had).
+  # TWO passes: the chosen template, then the shared templates/_common overlay
+  # (plumbing every template would otherwise carry a byte-identical copy of).
+  # Template FIRST, so a template that ships its own version of a _common file
+  # wins — the overlay pass skips any relative path this run already handled.
+  # That bookkeeping ($laid) is deliberately separate from the skip-if-exists
+  # test below, which is about the USER's pre-existing files: --force must be
+  # able to overwrite those without letting _common clobber the template's copy.
+  # $laid is a bracketed string, not an associative array (bash 3.2).
+  local added=0 skipped=0 parafile_added=0 f rel dest base pass_root laid=""
+  for base in "$src" "$tdir/_common"; do
+    [ -d "$base" ] || continue
+    # The template pass honors --full (whole tree vs .paraspace/ only); _common
+    # only ever holds .paraspace/ plumbing, so it's walked whole either way.
+    pass_root="$base"
+    [ "$base" = "$src" ] && pass_root="$root"
+    while IFS= read -r f; do
+      rel="${f#"$base"/}"
+      [ "$rel" = README.md ] && continue          # the template's own README, not yours
+      case "$laid" in *"[$rel]"*) continue ;; esac   # the template already provided it
+      laid="${laid}[$rel]"                           # handled, whatever the outcome below
+      dest="$PWD/$rel"
+      if [ -e "$dest" ] && [ "$force" -eq 0 ]; then
+        printf '  skip (exists): %s\n' "$rel" >&2; skipped=$((skipped + 1)); continue
+      fi
+      mkdir -p "$(dirname "$dest")"
+      cp "$f" "$dest"
+      case "$rel" in .paraspace/hooks/*|.paraspace/image-build.sh) chmod +x "$dest" ;; esac
+      [ "$rel" = .paraspace/Parafile ] && parafile_added=1
+      printf '  add: %s\n' "$rel" >&2; added=$((added + 1))
+    done < <(find "$pass_root" -type f)
+  done
+  # Personalize the freshly-scaffolded Parafile with this dir's name: PARA_PROJECT,
+  # the stable project id, so identity survives a later move or rename. That's the
+  # only key that needs baking — PARA_IMAGE now DERIVES from it (see the default
+  # up top), so there's nothing to rewrite and no way for the two to diverge (the
+  # old PARA_IMAGE sed used the raw basename, leaving a dir like `My.App` with
+  # image `My.App` but project `my-app`). Only when WE added the Parafile — never
+  # rewrite one the user already had.
   if [ "$parafile_added" -eq 1 ]; then
     local img slug; img="$(basename "$PWD")"
     if [[ "$img" =~ ^[A-Za-z0-9._-]+$ ]]; then
       slug="$(printf '%s' "$img" | tr '[:upper:]' '[:lower:]' | tr -c 'a-z0-9-' '-')"
       slug="${slug#-}"; slug="${slug%-}"
-      sed -i.bak -E "s|^(: \"\\\$\{PARA_IMAGE:=)[^}]*(\}\")|\1$img\2|" "$PWD/.paraspace/Parafile"
       [ -n "$slug" ] && sed -i.bak -E "s|^(: \"\\\$\{PARA_PROJECT:=)[^}]*(\}\")|\1$slug\2|" "$PWD/.paraspace/Parafile"
       rm -f "$PWD/.paraspace/Parafile.bak"
     fi
@@ -1560,6 +1671,11 @@ cmd_image_build() {
   incus image set-property "$PARA_IMAGE" user.para.src_sha "$(image_src_sha)" >/dev/null 2>&1 || true
   incus image set-property "$PARA_IMAGE" user.para.contract "$PARA_CONTRACT" >/dev/null 2>&1 || true
   incus image set-property "$PARA_IMAGE" user.para.incremental "$from_current" >/dev/null 2>&1 || true
+  # The workspace user this build BAKED IN (image-build.sh creates it from the
+  # PARA_USER/UID/GID passed above). Recorded so cmd_up can refuse a config that
+  # has drifted from the image instead of chowning onto a uid with no passwd entry.
+  incus image set-property "$PARA_IMAGE" user.para.user "$PARA_USER" >/dev/null 2>&1 || true
+  incus image set-property "$PARA_IMAGE" user.para.uid "$PARA_UID:$PARA_GID" >/dev/null 2>&1 || true
   incus delete -f "$builder"
   trap - EXIT INT TERM
   log "Base image '$PARA_IMAGE' ready. Now: para up <name>"
@@ -1583,10 +1699,12 @@ cmd_image_status() {
   # Provenance stamped at publish time. get-property errors (nonzero, no output)
   # on an image built before this existed — guard so set -e doesn't abort, and
   # report it as "unknown" rather than pretending the source is in sync.
-  local src contract incremental
+  local src contract incremental baked_user baked_uid
   src="$(incus image get-property "$PARA_IMAGE" user.para.src_sha 2>/dev/null || true)"
   contract="$(incus image get-property "$PARA_IMAGE" user.para.contract 2>/dev/null || true)"
   incremental="$(incus image get-property "$PARA_IMAGE" user.para.incremental 2>/dev/null || true)"
+  baked_user="$(incus image get-property "$PARA_IMAGE" user.para.user 2>/dev/null || true)"
+  baked_uid="$(incus image get-property "$PARA_IMAGE" user.para.uid 2>/dev/null || true)"
   local source_line
   if [ -z "$src" ]; then
     source_line="unknown — image predates provenance tracking; rebuild to record"
@@ -1600,6 +1718,16 @@ cmd_image_status() {
   printf '  source     %s\n' "$source_line"
   printf '  base       %s\n' "${PARA_BASE_IMAGE:-<unset>}"
   [ -n "$contract" ] && printf '  contract   %s\n' "$contract"
+  # The baked workspace user, flagged when the running config has drifted from it
+  # (cmd_up refuses that combination — surface it here too, where you'd look).
+  if [ -n "$baked_uid" ]; then
+    if [ "$baked_uid" = "$PARA_UID:$PARA_GID" ]; then
+      printf '  user       %s (%s)\n' "${baked_user:-?}" "$baked_uid"
+    else
+      printf '  user       %s (%s) — DRIFTED, config is %s:%s; rebuild\n' \
+        "${baked_user:-?}" "$baked_uid" "$PARA_UID" "$PARA_GID"
+    fi
+  fi
   if [ "${incremental:-0}" = "1" ]; then
     printf '  build      incremental (-i)\n'
     warn "last build was incremental (-i) — do one clean 'para image build' before relying on it (see docs/image.md)"

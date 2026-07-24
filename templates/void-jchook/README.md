@@ -24,7 +24,7 @@ your own repo.
 ```
 void-jchook/
   .paraspace/
-    Parafile               # identity, the demo origin, one route (:8080)
+    Parafile               # identity, the base image, the demo origin, one route (:8080)
     image-build.sh         # docker + git + zsh/tmux/Neovim toolchain + Claude Code
     hooks/provision        # seed + link the shared dev env, clone, copy .env
     hooks/boot             # docker compose up -d --wait

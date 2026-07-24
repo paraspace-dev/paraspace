@@ -7,11 +7,14 @@
 # every test and summarize, then exit non-zero if any failed. Set
 # PARA_TEST_FAILFAST=1 to stop at the first failure instead.
 
-# Colors only on a tty.
+# Colors — and the carriage return that rewrites the in-progress line — only on a
+# tty. Piped output (CI, logs) has no working \r, so _t_cr is empty there and the
+# result line is printed plainly instead of with a stray control character.
 if [ -t 1 ]; then
   _t_grn=$'\033[32m'; _t_red=$'\033[31m'; _t_gray=$'\033[90m'; _t_off=$'\033[0m'
+  _t_cr=$'\r'
 else
-  _t_grn='' _t_red='' _t_gray='' _t_off=''
+  _t_grn='' _t_red='' _t_gray='' _t_off='' _t_cr=''
 fi
 
 _t_pass=0
@@ -25,7 +28,7 @@ declare -a _t_failed=()
 run_test() {
   local fn="$1" desc start rc
   desc="${fn#test_}"; desc="${desc//_/ }"
-  # Progress line only on a tty, where the \r below overwrites it in place; piped
+  # Progress line only on a tty, where _t_cr below overwrites it in place; piped
   # output (CI, logs) has no working \r, so skip it and print just the result.
   [ -t 1 ] && printf '%s+ %s%s ' "$_t_gray" "$desc" "$_t_off"
   start="$SECONDS"
@@ -35,10 +38,10 @@ run_test() {
   ( "$fn" ) || rc=$?
   local took=$((SECONDS - start))
   if [ "$rc" -eq 0 ]; then
-    printf '\r%s✓%s %s %s(%ds)%s\n' "$_t_grn" "$_t_off" "$desc" "$_t_gray" "$took" "$_t_off"
+    printf '%s%s✓%s %s %s(%ds)%s\n' "$_t_cr" "$_t_grn" "$_t_off" "$desc" "$_t_gray" "$took" "$_t_off"
     _t_pass=$((_t_pass + 1))
   else
-    printf '\r%s✗%s %s %s(%ds)%s\n' "$_t_red" "$_t_off" "$desc" "$_t_gray" "$took" "$_t_off"
+    printf '%s%s✗%s %s %s(%ds)%s\n' "$_t_cr" "$_t_red" "$_t_off" "$desc" "$_t_gray" "$took" "$_t_off"
     _t_fail=$((_t_fail + 1))
     _t_failed+=("$desc")
     [ "${PARA_TEST_FAILFAST:-0}" = 1 ] && return 1

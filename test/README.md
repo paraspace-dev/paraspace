@@ -74,15 +74,24 @@ Every run is sandboxed so it never touches your real para state:
 - throwaway `XDG_STATE_HOME`/`XDG_CONFIG_HOME`/… under a temp dir — its own
   registry, Caddyfile, pidfile and machine config;
 - a non-default Caddy port (`9443`), so its Caddy can't collide with a real one;
-- an IP band carved from the addresses **actually free** on the incus bridge (the
-  registry is sandboxed and empty, but bridge IPs are machine-global — this is
-  what stops a run from allocating straight into a live workspace);
+- an IP band carved from the addresses **actually free** on the incus bridge —
+  across every incus project, since the bridge is machine-global while the
+  sandboxed registry is empty. This is what stops a run from allocating straight
+  into a live workspace;
 - a throwaway `PARA_PROJECT`/volume, and fixed pre-tracked workspace names so
-  teardown reclaims everything even if a test aborts.
+  teardown reclaims everything even if a test aborts;
+- **the para identity and image keys inherited from your shell are unset**
+  (`PARA_VOLUME`, `PARA_PROJECT`, `PARA_PROJECT_DIR`, `PARA_IMAGE`,
+  `PARA_BASE_IMAGE`, `PARA_IMAGE_BOOTSTRAP`). Both halves matter: teardown
+  deletes `PARA_VOLUME`, and an inherited `PARA_IMAGE` would make a
+  `PARA_TEST_REBUILD=1` run publish the fixture payload over *your* image alias.
 
-Teardown removes the run's workspaces, its shared volume, its Caddy, and the temp
-tree. The `alpine-minimal` image is left cached. Flags: `--keep` (leave it all
-for inspection), `--failfast` (stop at the first failure).
+Teardown removes the run's workspaces (via `para rm`, backstopped by a direct
+`incus delete` in case the run died before registering), its shared volume (swept
+across every storage pool, guarded to the run-unique `para-home-paratest-*`
+name), its Caddy, and the temp tree. The `alpine-minimal` image is left cached.
+Ctrl-C is trapped so an interrupted run still tears down. Flags: `--keep` (leave
+it all for inspection), `--failfast` (stop at the first failure).
 
 ## Known limitations of the e2e sandbox
 

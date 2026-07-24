@@ -28,11 +28,19 @@ sandbox_base() {
   export XDG_CACHE_HOME="$SANDBOX_ROOT/cache"
   mkdir -p "$XDG_STATE_HOME" "$XDG_CONFIG_HOME" "$XDG_DATA_HOME" "$XDG_CACHE_HOME"
   # Neutralize any inherited para identity from the caller's environment. This is
-  # SAFETY-CRITICAL: teardown deletes $PARA_VOLUME, so a developer who exports
-  # PARA_VOLUME (e.g. the docs-recommended shared name para-home) must not have it
-  # leak in and get their real volume deleted by a `--cli` run. sandbox_e2e sets
-  # its own run-unique values after this.
+  # SAFETY-CRITICAL, and for two distinct reasons:
+  #   - teardown deletes $PARA_VOLUME, so a developer who exports PARA_VOLUME
+  #     (e.g. the docs-recommended shared name para-home) must not have it leak in
+  #     and get their real volume deleted by a `--cli` run;
+  #   - the image keys are just as destructive one step over. The fixture's
+  #     Parafile declares them with `: "${X:=…}"`, which yields to the
+  #     environment — so an exported PARA_IMAGE (say, a real `void-jchook` alias)
+  #     means a PARA_TEST_REBUILD=1 run PUBLISHES the Alpine fixture payload over
+  #     that real alias. Without the rebuild it's merely confusing: workspaces
+  #     launch from the wrong image and fail with no /usr/sbin/httpd.
+  # sandbox_e2e sets its own run-unique values after this.
   unset PARA_VOLUME PARA_PROJECT PARA_PROJECT_DIR
+  unset PARA_IMAGE PARA_BASE_IMAGE PARA_IMAGE_BOOTSTRAP
   # A non-default port so the run's Caddy can't collide with a real para Caddy on
   # :8443, and its own pidfile (under the temp XDG_STATE_HOME) governs only it.
   export PARA_HTTPS_PORT="${PARA_TEST_PORT:-9443}"
@@ -56,14 +64,33 @@ sandbox_prefix() {
 #      `-d eth0,ipv4.address=`, a device override that persists while stopped.
 # Without (2) the picker would happily allocate over a stopped real workspace and
 # collide the moment it starts.
+#
+# Both sources are read with --all-projects: `incus list` defaults to the current
+# incus project, but the BRIDGE is machine-global, so an instance in another
+# project holding an address on it collides just as hard. Older incus lacks the
+# flag, and a picker that silently saw nothing would fail OPEN — allocating
+# straight over live workspaces — so probe once and degrade to the current
+# project rather than to an empty set.
 sandbox_used_octets() {
-  local prefix="$1" n
-  {
-    incus list -f csv -c 4 2>/dev/null
-    while IFS= read -r n; do
-      [ -n "$n" ] && incus config device get "$n" eth0 ipv4.address 2>/dev/null
-    done < <(incus list -f csv -c n 2>/dev/null)
-  } | grep -oE "${prefix//./\\.}\.[0-9]+" \
+  local prefix="$1" n proj
+  if incus list --all-projects -f csv -c n >/dev/null 2>&1; then
+    # `-c en` pairs each instance with its project, so the per-instance device
+    # lookup can be aimed at the project that actually holds it.
+    {
+      incus list --all-projects -f csv -c 4 2>/dev/null
+      while IFS=, read -r proj n; do
+        [ -n "$n" ] || continue
+        incus config device get "$n" eth0 ipv4.address --project "$proj" 2>/dev/null
+      done < <(incus list --all-projects -f csv -c en 2>/dev/null)
+    }
+  else
+    {
+      incus list -f csv -c 4 2>/dev/null
+      while IFS= read -r n; do
+        [ -n "$n" ] && incus config device get "$n" eth0 ipv4.address 2>/dev/null
+      done < <(incus list -f csv -c n 2>/dev/null)
+    }
+  fi | grep -oE "${prefix//./\\.}\.[0-9]+" \
     | sed "s/^${prefix//./\\.}\.//" \
     | sort -un
 }
@@ -79,11 +106,20 @@ sandbox_used_octets() {
 # Prefer `ss` (a definitive listener check on Linux, where the e2e tier runs); fall
 # back to bash /dev/tcp. /dev/tcp fails OPEN (reports "free" if the connect can't be
 # made), so `ss` is the safer primary when present.
+#
+# Matches :2019 on ANY address, not just 127.0.0.1. Caddy's default admin address
+# is `localhost:2019`, which resolves per-host — it can bind ::1 instead of (or as
+# well as) 127.0.0.1, and a 127.0.0.1-only match would then report "free" and let
+# the run proceed into exactly the shared-admin-port collision this check exists
+# to prevent. The trade is asymmetric: a false positive costs a spurious refusal
+# the developer clears in seconds, a false negative can reload or kill their real
+# Caddy. The trailing space keeps `:2019 ` from also matching `:20190`.
 sandbox_caddy_admin_free() {
   if command -v ss >/dev/null 2>&1; then
-    ! ss -ltn 2>/dev/null | grep -q '127\.0\.0\.1:2019 '
+    ! ss -ltn 2>/dev/null | grep -q ':2019 '
   else
-    ! (exec 3<>/dev/tcp/127.0.0.1/2019) 2>/dev/null
+    ! (exec 3<>/dev/tcp/127.0.0.1/2019) 2>/dev/null \
+      && ! (exec 3<>/dev/tcp/::1/2019) 2>/dev/null
   fi
 }
 
@@ -135,7 +171,11 @@ sandbox_e2e() {
   # if you touched image-build.sh, the Parafile's base/bootstrap, or
   # cmd_image_build itself, rebuild explicitly with PARA_TEST_REBUILD=1.
   # --no-build skips even the existence check.
-  local img="${PARA_IMAGE:-alpine-minimal}"
+  # Hardcoded, not "${PARA_IMAGE:-…}": sandbox_base unset PARA_IMAGE precisely so
+  # the caller's environment can't redirect the build, which leaves the fixture
+  # Parafile's own `: "${PARA_IMAGE:=alpine-minimal}"` as the single source of the
+  # alias. Keep this string in step with that line.
+  local img=alpine-minimal
   if [ "${PARA_TEST_NO_BUILD:-0}" != 1 ]; then
     if [ "${PARA_TEST_REBUILD:-0}" = 1 ] || ! incus image info "$img" >/dev/null 2>&1; then
       "$PARA" image-build || return 1
@@ -165,17 +205,22 @@ sandbox_teardown() {
     # something this run launched.
     incus delete -f "para-$ws" >/dev/null 2>&1 || true
   done
-  # The shared volume para lazily created for this project. It lands on whichever
-  # pool para settled on — para-dir (the nested-Docker default) or, if that switch
-  # didn't fire, default — so try both. GUARDED to our run-unique name pattern
+  # The shared volume para lazily created for this project. Which pool it landed
+  # on is not knowable from here: para picks between para-dir (the nested-Docker
+  # default) and default at runtime, PARA_POOL can override that, and para records
+  # its choice in the sandboxed config file rather than back into our environment.
+  # So sweep EVERY pool instead of guessing a list — a hardcoded para-dir/default
+  # pair leaked the volume on every run for anyone using a custom pool.
+  # The sweep is safe only because it stays GUARDED to our run-unique name pattern
   # (sandbox_e2e sets para-home-paratest-$$): teardown must NEVER delete a volume
   # it didn't create, even if PARA_VOLUME somehow carried in from the environment.
   case "${PARA_VOLUME:-}" in
     para-home-paratest-*)
       local p
-      for p in para-dir default; do
+      while IFS= read -r p; do
+        [ -n "$p" ] || continue
         incus storage volume delete "$p" "$PARA_VOLUME" >/dev/null 2>&1 || true
-      done
+      done < <(incus storage list -f csv -c n 2>/dev/null)
       ;;
   esac
   # Kill the run's own Caddy directly by its sandboxed pidfile — NOT via `para

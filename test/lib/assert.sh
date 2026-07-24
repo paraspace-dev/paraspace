@@ -15,10 +15,12 @@ assert() {
 # mutating calls whose stdout you don't need; capture stdout directly (not via
 # this) when a test asserts on it.
 para_do() {
-  local out
+  local out line
   if ! out="$("$PARA" "$@" 2>&1)"; then
     printf '    para %s failed:\n' "$1" >&2
-    printf '    | %s\n' "$out" >&2
+    # Gutter every line. A single `printf '    | %s\n' "$out"` prefixes only the
+    # first one and dumps the rest flush left — i.e. most of a multi-line failure.
+    while IFS= read -r line; do printf '    | %s\n' "$line" >&2; done <<<"$out"
     return 1
   fi
 }

@@ -2,8 +2,10 @@
 
 ## The problem
 
-You want several full copies of a project running at once — one per branch, one
-per agent. The usual routes:
+An agent working a task needs more than a worktree — it needs the whole app
+running: services up, database seeded, something to open in a browser. Three
+agents on three tasks means three running stacks, and they can't share yours.
+The usual routes:
 
 - **Hosted dev environments** do the isolation in the cloud, and the interface
   is the price: web terminals, browser IDEs, routing that fights you — metered

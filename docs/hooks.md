@@ -42,13 +42,20 @@ a hook can seed from `~/.para/skel` before the clone even exists.
 everything your `Parafile` sets, and the per-workspace values `para` computes —
 into the hook's environment. So beyond the documented set below, **any
 `PARA_FOO` you put in your `Parafile` reaches your hooks for free**, no `para`
-change needed.
+change needed. The same is true of your own keys in the user config, which is
+how you pass a machine-wide knob to your hooks.
+
+Two caveats on where a value may come from: the [per-project
+keys](./parafile.md#1-per-project-keys-are-refused-from-the-user-config) —
+`PARA_PROJECT`, `PARA_CLONE_DIR` and `PARA_ORIGIN` among them — are **not** read
+from the user config, so set those in the `Parafile`. And `PARA_ROUTES` is an
+array, so it isn't forwarded at all (see below).
 
 The documented context is:
 
 | Variable | Meaning |
 |---|---|
-| `PARA_NAME`, `PARA_URL`, `PARA_DOMAIN` | this workspace + its host/domain |
+| `PARA_NAME`, `PARA_URL`, `PARA_DOMAIN` | this workspace + its host/domain. `PARA_URL` is **empty** when the project declares `PARA_ROUTES=()` — there's no site to point at |
 | `PARA_PROJECT` | the project identity slug (also the shared-volume suffix) |
 | `PARA_CLONE_DIR`, `PARA_CLONE_BRANCH`, `PARA_ORIGIN` | what/where to clone |
 | `PARA_SHARED=/para/shared` | the shared-volume mount |

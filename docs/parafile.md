@@ -15,13 +15,17 @@ a Parafile that restates a default is a copy that goes stale.
 
 ## What has to be there
 
-Only three things a project genuinely has to decide:
+Two keys para itself requires, plus one your hooks will:
 
 | Key | Needed by | Why there's no default |
 |---|---|---|
 | `PARA_BASE_IMAGE` | `para image build` | para never picks your distro |
 | `PARA_ROUTES` | `para up` | which port your app listens on is project policy |
-| `PARA_ORIGIN` | the clone hook | para doesn't guess your repo |
+| `PARA_ORIGIN` | the clone hook, not para | para doesn't guess your repo |
+
+`PARA_ORIGIN` is listed because the bundled templates' `provision` hook needs it
+— para itself never reads it (see [below](#keys-para-only-forwards-to-hooks)). A
+project whose hooks don't clone, like `void-minimal`, omits it entirely.
 
 Everything else either defaults or is genuinely optional. `PARA_VERSION` has no
 default either, but it's a version pin rather than a setting — see
@@ -88,9 +92,17 @@ PARA_ROUTES=()   # no Caddy site; `para ls` shows no URL
 `para up` refuses an *unset* `PARA_ROUTES` rather than guessing, so a project
 can't silently lose its URL to a typo: empty is a decision, unset is an oversight.
 
-As an array it is **not** forwarded to hooks — and unlike every scalar key, it
-can't be set from the environment or the user config either. A hook that needs
-routes reads them from the Parafile.
+It must be a bash **array**, and unlike the scalar keys it is assigned plainly —
+so a Parafile that declares it always wins over the environment. The environment
+and the user config carry only scalars anyway; if one reaches para (because the
+Parafile left the key alone), para rejects it with an error rather than treating
+the string as a single route. Being an array, it is also **not** forwarded to
+hooks; a hook that needs routes reads them from the Parafile.
+
+Each entry must be `[sub:]port` — a port is digits, an optional subdomain is a
+DNS label. para validates them, because a route with a space (or an empty one)
+would corrupt its workspace registry and break routing for every workspace on
+the machine.
 
 ### `PARA_DOMAIN`
 
@@ -119,13 +131,20 @@ one (else nothing); empty = always nothing; a set path must exist.
 The workspace user para runs hooks, `para sh`, and `para run` as, and chowns
 every pushed file to. Defaults: `app`, `1000`, `1000`.
 
-It's your `.paraspace/image-build.sh` that makes use of these — it bakes the
-user into `$PARA_IMAGE`, and para's runtime chowns target the same ids. Change
+It's your `.paraspace/image-build.sh` that makes use of these — it creates the
+user in `$PARA_IMAGE`, and para's runtime chowns target the same ids. Change
 them only if `1000` is already taken in your base image, **and rebuild
-afterwards**: `para image build` records the ids it baked, and `para up` refuses
-to launch an image whose baked user no longer matches your config — otherwise the
-chowns land on a uid with no passwd entry and the shared volume becomes
-unwritable. `para image status` shows the baked user and flags the drift.
+afterwards**, or the chowns land on a uid with no passwd entry and the shared
+volume becomes unwritable.
+
+para helps with exactly one part of that: `para image build` records the
+`PARA_UID`/`PARA_GID` **it was configured with** onto the image, and `para up`
+refuses to launch when they no longer match the ids configured now.
+`para image status` shows them and flags the mismatch. That's the whole
+guarantee — para compares its own build-time config against its current config.
+It is *not* a check on what your payload actually created, because para assumes
+nothing about `image-build.sh`; a payload that ignores the ids it's handed is
+still on its own.
 
 They default to a stable `1000` rather than your host `id -u`: para bind-mounts
 nothing host-side, so there's nothing to line up with. A project that adds
@@ -194,6 +213,12 @@ and refused by `para config-set`:
 Set them in the Parafile, or in the environment for a one-off run. Every *other*
 `PARA_*` is fair game in the user config — including keys para has never heard
 of, which is how you pass your own knobs to your hooks machine-wide.
+
+`PARA_DOMAIN` is deliberately **not** on that list, even though it's project
+config. A personal wildcard domain (`*.dev.mybox.lan`) is a reasonable thing to
+want box-wide, and it can't collide: workspace names are unique per machine, and
+each workspace records its own domain at `up` time, so projects on different
+domains coexist.
 
 ### 2. The environment can't override a `:=` key to empty
 

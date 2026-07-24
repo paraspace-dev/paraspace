@@ -107,6 +107,61 @@ test_up_refuses_undeclared_routes() {
   assert_contains "$out" "PARA_ROUTES=()" "refusal shows how to declare no routes"
 }
 
+test_up_accepts_an_explicitly_empty_route_list() {
+  # The regression that shipped in the first cut of this feature: `${arr+set}`
+  # tests element ZERO, which an empty array doesn't have, so PARA_ROUTES=() read
+  # as UNSET and `para up` refused it — telling the user to declare exactly what
+  # they had declared. void-minimal ships PARA_ROUTES=(), so this made that
+  # template impossible to bring up at all.
+  #
+  # Asserted by checking that whatever stops the run afterwards is no longer the
+  # routes refusal. `up` must NOT be allowed to run past that point: on a machine
+  # that has incus, the very next steps (ensure_pool/ensure_volume) create real
+  # storage. So the run is stopped deterministically with an `incus` stub that
+  # always fails — ensure_backend is the first thing after the routes check, and
+  # nothing has touched disk by then.
+  local d stub
+  d="$(mktemp -d "${TMPDIR:-/tmp}/para-emptyroutes.XXXXXX")"
+  stub="$(mktemp -d "${TMPDIR:-/tmp}/para-stub.XXXXXX")"
+  printf '#!/bin/sh\nexit 1\n' > "$stub/incus";  chmod +x "$stub/incus"
+  printf '#!/bin/sh\nexit 1\n' > "$stub/colima"; chmod +x "$stub/colima"
+  mkdir -p "$d/.paraspace"
+  printf 'PARA_VERSION=1\nPARA_PROJECT=emptyroutes\nPARA_ROUTES=()\n' > "$d/.paraspace/Parafile"
+  local out; out="$(env PATH="$stub:$PATH" PARA_PROJECT_DIR="$d" "$PARA" up somews 2>&1)" || true
+  rm -rf "$d" "$stub"
+  assert_not_contains "$out" "PARA_ROUTES is not set" "an empty array is a declaration, not an omission" || return 1
+  # And confirm it really did get past the routes gate rather than dying earlier.
+  assert_contains "$out" "incus" "the run proceeded to the backend check"
+}
+
+test_routes_reject_a_scalar_and_malformed_entries() {
+  # PARA_ROUTES is spliced into Caddy site addresses and into the registry's
+  # space-separated field 3. A scalar (all the environment can carry) used to
+  # surface as a raw `unbound variable` crash; an empty or space-bearing entry
+  # silently wrote a short row that shifts every reader's parse.
+  local d; d="$(mktemp -d "${TMPDIR:-/tmp}/para-badroutes.XXXXXX")"
+  mkdir -p "$d/.paraspace"
+  # A scalar from the environment. The Parafile deliberately does NOT declare
+  # PARA_ROUTES here: array keys are assigned plainly, so a Parafile that declares
+  # one simply overwrites the imported scalar (the documented semantics). The
+  # scalar only survives to be judged when the project leaves the key alone.
+  printf 'PARA_VERSION=1\nPARA_PROJECT=badroutes\n' > "$d/.paraspace/Parafile"
+  local out rc=0
+  out="$(env PARA_PROJECT_DIR="$d" PARA_ROUTES=8080 "$PARA" ls 2>&1)" || rc=$?
+  [ "$rc" -ne 0 ] || { rm -rf "$d"; echo "  a scalar PARA_ROUTES was accepted" >&2; return 1; }
+  assert_contains "$out" "must be a bash ARRAY" "scalar refusal explains the type" || { rm -rf "$d"; return 1; }
+  # An empty entry: count 1, content "" — the case a count check cannot catch.
+  printf 'PARA_VERSION=1\nPARA_PROJECT=badroutes\nPARA_ROUTES=( "" )\n' > "$d/.paraspace/Parafile"
+  rc=0; out="$(env PARA_PROJECT_DIR="$d" "$PARA" ls 2>&1)" || rc=$?
+  [ "$rc" -ne 0 ] || { rm -rf "$d"; echo "  an empty route entry was accepted" >&2; return 1; }
+  # An entry containing a space would shift the registry's positional fields.
+  printf 'PARA_VERSION=1\nPARA_PROJECT=badroutes\nPARA_ROUTES=( "80 90" )\n' > "$d/.paraspace/Parafile"
+  rc=0; out="$(env PARA_PROJECT_DIR="$d" "$PARA" ls 2>&1)" || rc=$?
+  rm -rf "$d"
+  [ "$rc" -ne 0 ] || { echo "  a route entry with a space was accepted" >&2; return 1; }
+  assert_contains "$out" "[sub:]port" "refusal shows the expected shape"
+}
+
 test_image_defaults_to_the_project_slug() {
   # PARA_IMAGE DERIVES from PARA_PROJECT rather than a fixed literal: incus image
   # aliases are daemon-global, so a shared default would put two projects that both
@@ -137,7 +192,21 @@ test_config_set_refuses_a_per_project_key() {
   assert_contains "$out" "Parafile" "refusal points at the Parafile" || return 1
   # It's a DENYlist, not an allowlist: any other PARA_* must still persist, because
   # that namespace is how a project passes its own knobs through to its hooks.
-  assert "$PARA" config-set PARA_DEMO_KNOB yes
+  # Cleaned up unconditionally — the sandbox config file is shared with every other
+  # test in the run, so a leftover line here would leak into them (test/README.md
+  # requires order-independence).
+  rc=0; "$PARA" config-set PARA_DEMO_KNOB yes >/dev/null 2>&1 || rc=$?
+  _cli_strip_config PARA_DEMO_KNOB
+  [ "$rc" -eq 0 ] || { echo "  config-set refused a non-project PARA_* key" >&2; return 1; }
+}
+
+# Drop KEY's line from the sandboxed user config. Used by the tests that have to
+# write one, so they restore shared state on the FAILURE path too, not just on
+# success. Never touches a real config: XDG_CONFIG_HOME is sandboxed by test/run.
+_cli_strip_config() {
+  local cfg="$XDG_CONFIG_HOME/para/config" tmp
+  [ -f "$cfg" ] || return 0
+  tmp="$(mktemp)"; grep -v "^$1=" "$cfg" > "$tmp" 2>/dev/null || true; mv "$tmp" "$cfg"
 }
 
 test_user_config_ignores_per_project_keys() {
@@ -152,8 +221,8 @@ test_user_config_ignores_per_project_keys() {
   printf 'PARA_VERSION=1\nPARA_PROJECT=cfgdeny\n' > "$d/.paraspace/Parafile"
   local out; out="$(env PARA_PROJECT_DIR="$d" "$PARA" --help 2>&1)"
   rm -rf "$d"
-  # Drop the seeded line again — the config file is shared with the rest of the run.
-  local tmp; tmp="$(mktemp)"; grep -v '^PARA_IMAGE=' "$cfg" > "$tmp" 2>/dev/null || true; mv "$tmp" "$cfg"
+  # Restore shared state BEFORE any assertion can return early.
+  _cli_strip_config PARA_IMAGE
   assert_not_contains "$out" "hijacked-image" "user-config PARA_IMAGE does not take effect" || return 1
   assert_contains "$out" "ignoring PARA_IMAGE" "para says out loud that it ignored the key"
 }

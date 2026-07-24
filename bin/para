@@ -248,7 +248,39 @@ PARA_CLONE_BRANCH="${PARA_CLONE_BRANCH:-}"
 # PARA_BASE_IMAGE). ROUTES_DECLARED carries unset-vs-empty past this
 # normalization, and is deliberately NOT named PARA_* so run_hook's blanket
 # forwarder doesn't ship a para internal into every hook's environment.
-if [ "${PARA_ROUTES+set}" = set ]; then ROUTES_DECLARED=1; else ROUTES_DECLARED=0; PARA_ROUTES=(); fi
+#
+# Detected with `declare -p`, NOT `${PARA_ROUTES+set}`: the `+set` form tests
+# element ZERO, which an empty array does not have, so it reports PARA_ROUTES=()
+# as UNSET — the one case this whole distinction exists to catch. `declare -p`
+# tests the variable itself and is bash-3.2 safe.
+if _rdecl="$(declare -p PARA_ROUTES 2>/dev/null)"; then
+  # An array, or something else? An exported environment variable is always a
+  # SCALAR, and `${#scalar[@]}` is an "unbound variable" error under `set -u` on
+  # bash 5+ (and a misleading 1 on bash 3.2) — so a scalar here used to surface
+  # as a raw bash crash from cmd_up. Name the real problem instead. Same
+  # `declare -`[aA] test run_hook uses to spot arrays.
+  case "$_rdecl" in
+    "declare -"[aA]*) ROUTES_DECLARED=1 ;;
+    *) printf 'para: PARA_ROUTES must be a bash ARRAY — set it in .paraspace/Parafile as PARA_ROUTES=( "3000" "api:3001" ). It cannot come from the environment or the user config, which carry only scalars.\n' >&2; exit 1 ;;
+  esac
+else
+  ROUTES_DECLARED=0; PARA_ROUTES=()
+fi
+unset _rdecl
+# Validate each route token. They are spliced into Caddy site addresses AND into
+# the registry's space-separated field 3, so a token containing a space (or an
+# EMPTY one, which `${#PARA_ROUTES[@]}` can't catch — count 1, content "") would
+# shift every field the readers parse: `para ls` silently drops the workspace,
+# and gen_caddyfile emits an upstream Caddy rejects, which fails `caddy reload`
+# and takes down routing for every workspace on the box. Rejecting "-" here also
+# keeps the no-routes sentinel unambiguous.
+if [ "$ROUTES_DECLARED" -eq 1 ] && [ "${#PARA_ROUTES[@]}" -gt 0 ]; then
+  for _r in "${PARA_ROUTES[@]}"; do
+    [[ "$_r" =~ ^([A-Za-z0-9][A-Za-z0-9-]*:)?[0-9]{1,5}$ ]] \
+      || { printf 'para: PARA_ROUTES entries must be "[sub:]port" (e.g. "3000" or "api:3001"); got %s\n' "$_r" >&2; exit 1; }
+  done
+  unset _r
+fi
 
 PARA_STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/para"
 REGISTRY="$PARA_STATE_DIR/workspaces"    # "name ip routes domain project" per line
@@ -795,7 +827,10 @@ run_hook() { # run_hook <hook> <name>
   #   PARA_HOSTNAME/GIT_NAME/GIT_EMAIL — host identity (gitconfig + ssh-key label).
   local PARA_NAME="$name" PARA_SHARED="/para/shared"
   local PARA_URL PARA_HOSTNAME PARA_GIT_NAME PARA_GIT_EMAIL
-  PARA_URL="https://$name.$PARA_DOMAIN$(url_port)"
+  # EMPTY for a workspace that declared no routes (PARA_ROUTES=()) — there is no
+  # Caddy site, so handing a hook a URL that resolves to nothing would be a lie.
+  # A hook that prints or curls it should test for empty.
+  if [ "${#PARA_ROUTES[@]}" -gt 0 ]; then PARA_URL="https://$name.$PARA_DOMAIN$(url_port)"; else PARA_URL=""; fi
   PARA_HOSTNAME="$(hostname -s 2>/dev/null || hostname)"
   PARA_GIT_NAME="$(git config --global user.name 2>/dev/null || true)"
   PARA_GIT_EMAIL="$(git config --global user.email 2>/dev/null || true)"
@@ -902,16 +937,6 @@ cmd_up() {
   else
     incus image info "$PARA_IMAGE" >/dev/null 2>&1 \
       || die "base image '$PARA_IMAGE' not found — run 'para image build' first"
-    # PARA_USER/UID/GID are overridable (env or user config) so a project can align
-    # host and guest ids — but the user is BAKED INTO the image by image-build.sh,
-    # and para's runtime chowns target the configured ids. Override them without a
-    # rebuild and every chown lands on a uid with no passwd entry, leaving the
-    # shared volume unwritable — a failure that surfaces far from its cause. The
-    # image records what it baked; compare and refuse up front. An unstamped image
-    # (built before this existed) is not second-guessed.
-    local baked; baked="$(incus image get-property "$PARA_IMAGE" user.para.uid 2>/dev/null || true)"
-    [ -z "$baked" ] || [ "$baked" = "$PARA_UID:$PARA_GID" ] \
-      || die "image '$PARA_IMAGE' bakes its workspace user at uid:gid $baked, but PARA_UID:PARA_GID is $PARA_UID:$PARA_GID — para's chowns would target a uid the image has no passwd entry for. Rebuild with 'para image build', or drop the override."
     ip="$(alloc_ip)"
     log "Launching $ct at $ip (nesting on)…"
     # --storage: keep the container root on $PARA_POOL. Without it the root lands
@@ -928,6 +953,25 @@ cmd_up() {
     echo "$name $ip $rcsv $PARA_DOMAIN $PARA_PROJECT" >> "$REGISTRY"   # "name ip routes domain project" — register early so rm/ls see partial state
     incus storage volume attach "$PARA_POOL" "$PARA_VOLUME" "$ct" parahome /para/shared
   fi
+  # PARA_UID/GID are overridable (env or user config) so a project can align host
+  # and guest ids, but every chown below targets them — and if they've moved since
+  # the image was built, those chowns land on a uid with no passwd entry and the
+  # shared volume becomes unwritable, far from the cause.
+  #
+  # The guarantee here is narrow and worth stating exactly: `para image build`
+  # records the PARA_UID:PARA_GID *para was configured with* at build time, and
+  # this compares it against the PARA_UID:PARA_GID configured now. It is NOT a
+  # claim about what the payload actually created — para assumes nothing about
+  # image-build.sh, which is free to ignore the ids it's handed. It catches the
+  # case that actually bites (config moved, image didn't), and nothing more.
+  #
+  # Checked on BOTH branches: the chowns run for an existing workspace too, so
+  # gating this on container creation would miss the everyday re-`up` path. An
+  # unstamped image (built before this existed, or since deleted) is not
+  # second-guessed.
+  local baked; baked="$(incus image get-property "$PARA_IMAGE" user.para.uid 2>/dev/null || true)"
+  [ -z "$baked" ] || [ "$baked" = "$PARA_UID:$PARA_GID" ] \
+    || die "image '$PARA_IMAGE' was built with PARA_UID:PARA_GID $baked, but it is $PARA_UID:$PARA_GID now — para's chowns would target a uid the image likely has no passwd entry for. Rebuild with 'para image build', or drop the override."
   # Stamp this workspace's identity onto the container (refreshed each up, mirroring
   # the registry row just written) so it stays self-describing for `para reconcile`
   # and the ownership check above.
@@ -947,7 +991,11 @@ cmd_up() {
   log "Booting the stack via the project's boot hook — first run pulls images, be patient…"
   run_hook boot "$name"
   gen_caddyfile; caddy_reload
-  log "Workspace '$name' ready → https://$name.$PARA_DOMAIN$(url_port)"
+  if [ "$rcsv" = "-" ]; then
+    log "Workspace '$name' ready (no HTTP routes declared — 'para sh $name' for a shell)."
+  else
+    log "Workspace '$name' ready → https://$name.$PARA_DOMAIN$(url_port)"
+  fi
 }
 
 cmd_down() {
@@ -1203,6 +1251,12 @@ cmd_key() {
 
 cmd_web() {
   local name="${1:-}"; [ -n "$name" ] || die "usage: para web <name>"
+  # Routes come from the REGISTRY (field 3), not the current Parafile: `web` is
+  # project-agnostic and the workspace may belong to another project. "-" is the
+  # no-routes sentinel — opening its apex would just land on a Caddy 404/refusal.
+  local wroutes; wroutes="$(awk -v n="$name" '$1==n{print $3}' "$REGISTRY" 2>/dev/null || true)"
+  [ "$wroutes" != "-" ] \
+    || die "workspace '$name' publishes no HTTP routes (its project declares PARA_ROUTES=()) — there is no URL to open."
   local url; url="https://$name.$PARA_DOMAIN$(url_port)"
   case "$(uname -s)" in
     Darwin) open "$url" ;;
@@ -1352,6 +1406,9 @@ cmd_init() {
     return 0
   fi
   tmpl="${tmpl:-void-docker-gh}"
+  # `_`-prefixed dirs are overlays, not templates (they're hidden from --list /
+  # --names above) — refuse them by name too, rather than scaffolding one.
+  case "$tmpl" in _*) die "'$tmpl' is a shared overlay, not a template (see: para init --list)." ;; esac
   local src="$tdir/$tmpl"
   [ -d "$src" ] || die "no such template '$tmpl' (see: para init --list)."
   # Plumbing-only (default) walks the template's .paraspace/; --full walks the whole
@@ -1372,10 +1429,14 @@ cmd_init() {
   local added=0 skipped=0 parafile_added=0 f rel dest base pass_root laid=""
   for base in "$src" "$tdir/_common"; do
     [ -d "$base" ] || continue
-    # The template pass honors --full (whole tree vs .paraspace/ only); _common
-    # only ever holds .paraspace/ plumbing, so it's walked whole either way.
+    # Both passes honor --full the same way: plumbing-only walks .paraspace/, so
+    # an overlay file outside it can't sneak into a scaffold that asked for
+    # plumbing only. (Enforced rather than assumed — --full is the flag whose
+    # whole job is that distinction.)
     pass_root="$base"
     [ "$base" = "$src" ] && pass_root="$root"
+    [ "$base" = "$src" ] || [ "$full" -eq 1 ] || pass_root="$base/.paraspace"
+    [ -d "$pass_root" ] || continue
     while IFS= read -r f; do
       rel="${f#"$base"/}"
       [ "$rel" = README.md ] && continue          # the template's own README, not yours
@@ -1885,7 +1946,8 @@ CONFIG & AUTH
                            your git host once per machine to push from a
                            workspace
   config-set KEY VALUE     persist a PARA_* override to \$PARA_CONFIG
-                           (real environment variables still win)
+                           (real environment variables still win). Per-project
+                           keys are refused — see CONFIGURATION below
   config-import <name> <path>…
                            copy host dotfiles into workspace <name>'s shared
                            volume
@@ -1904,7 +1966,20 @@ Only 'up', 'image' (build/status/rm), and 'config-sync' must run inside a projec
 
 CONFIGURATION
   Precedence is: environment > user config > Parafile > default. The user
-  config is a KEY=VALUE file; write it with 'para config-set'. Resolved here:
+  config is a KEY=VALUE file; write it with 'para config-set'.
+
+  Two exceptions, both documented in docs/parafile.md:
+    * The user config describes your BOX, so it can't set per-project keys —
+      PARA_PROJECT, PARA_IMAGE, PARA_BASE_IMAGE, PARA_IMAGE_BOOTSTRAP,
+      PARA_VERSION, PARA_ORIGIN, PARA_CLONE_DIR, PARA_VOLUME, PARA_ROUTES are
+      ignored there (with a warning) and refused by 'config-set'. Set them in
+      the Parafile, or in the environment for one run. Every other PARA_* is
+      fair game there, including your own, and reaches your hooks.
+    * A Parafile key written as : "\${X:=default}" can't be overridden to EMPTY
+      from the environment (:= fires on empty too). Matters only where empty
+      means something: PARA_HOST_ENV, PARA_IMAGE_BOOTSTRAP.
+
+  Resolved here:
 
     PARA_DOMAIN       $PARA_DOMAIN
     PARA_HTTPS_PORT   $PARA_HTTPS_PORT

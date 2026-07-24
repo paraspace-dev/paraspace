@@ -46,22 +46,36 @@ staying at 1 stays explicable:
 - **`PARA_IMAGE` now defaults to `$PARA_PROJECT`** instead of the fixed
   `para-dev`. Incus image aliases are daemon-global, so the old default put two
   projects that both left the key unset on one image — and a build in either
-  republished the other's. Additive in practice: every scaffolded Parafile
-  declared the key explicitly, and `para init` no longer has to rewrite it.
+  republished the other's. Breaking on the same terms as `PARA_BASE_IMAGE`
+  above: a `Parafile` that omitted the key and relied on the `para-dev` alias
+  now resolves to a different image (`para up` says the image isn't built; the
+  old `para-dev` image is left on disk). Pre-launch, zero external consumers, so
+  `PARA_CONTRACT` stayed at 1 rather than burning a version. `para init` no
+  longer rewrites the key, and the bundled templates no longer declare it.
 - **Per-project keys are refused from the user config.** `PARA_PROJECT`,
   `PARA_IMAGE`, `PARA_BASE_IMAGE`, `PARA_IMAGE_BOOTSTRAP`, `PARA_VERSION`,
-  `PARA_ORIGIN`, `PARA_CLONE_DIR` and `PARA_VOLUME` are now ignored in
-  `~/.config/para/config` (with a warning) and rejected by `para config-set`: a
-  box-wide value applied them to every project, and one global `PARA_PROJECT`
-  collapsed every project's ownership and shared volume onto a single name. The
-  environment is unaffected, and the config namespace stays open to every other
-  `PARA_*`. Not a `Parafile`-key change — the keys and their meanings are
-  identical — so no bump.
-- **The image records the workspace user it baked** (`user.para.user`,
-  `user.para.uid`), and `para up` refuses an image whose baked ids don't match
-  `PARA_UID`/`PARA_GID`. Additive provenance, degrading to "not stamped" on older
-  images; it turns a documented footgun (override without rebuild → chowns onto a
-  uid with no passwd entry) into an up-front error.
+  `PARA_ORIGIN`, `PARA_CLONE_DIR`, `PARA_VOLUME` and `PARA_ROUTES` are now
+  ignored in `~/.config/para/config` (with a warning) and rejected by
+  `para config-set`: a box-wide value applied them to every project, and one
+  global `PARA_PROJECT` collapsed every project's ownership and shared volume
+  onto a single name. The environment is unaffected, and the config namespace
+  stays open to every other `PARA_*`.
+
+  This **narrows the injected hook environment**, which the contract covers: a
+  hook that read one of these from a machine-wide user config now sees nothing.
+  Breaking under the rules, and excused the same way as the two entries above —
+  pre-launch, no external consumers — not because the keys themselves are
+  unchanged. `PARA_DOMAIN` is deliberately **not** on the list despite being
+  project config: a personal wildcard domain is a reasonable box-wide setting,
+  and workspace names are unique per machine, so a shared domain can't collide.
+- **The image records the `PARA_UID`/`PARA_GID` it was built with**
+  (`user.para.uid`, plus `user.para.user` for display), and `para up` refuses to
+  launch when they no longer match the configured ids. The guarantee is
+  deliberately narrow — it compares para's build-time config against para's
+  current config, and is **not** a claim about what `image-build.sh` actually
+  created, since para assumes nothing about the payload. It catches the case
+  that bites (config moved, image didn't). Additive provenance, degrading to
+  "not stamped" on older images.
 - **`PARA_USER`/`PARA_UID`/`PARA_GID` became `Parafile` keys.** They were
   defaulted before the `Parafile` was sourced, so a `Parafile` declaring them
   with the usual `: "${PARA_UID:=…}"` idiom was silently ignored — the value was

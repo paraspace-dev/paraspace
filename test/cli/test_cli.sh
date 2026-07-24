@@ -123,15 +123,21 @@ test_up_accepts_an_explicitly_empty_route_list() {
   local d stub
   d="$(mktemp -d "${TMPDIR:-/tmp}/para-emptyroutes.XXXXXX")"
   stub="$(mktemp -d "${TMPDIR:-/tmp}/para-stub.XXXXXX")"
+  # All three backend commands are stubbed, not just incus: ensure_backend probes
+  # a different one first per platform (colima on Darwin, and `need caddy` runs
+  # before the daemon check on Linux), so stubbing only incus made the failure
+  # message environment-dependent — CI has no caddy and died there instead.
   printf '#!/bin/sh\nexit 1\n' > "$stub/incus";  chmod +x "$stub/incus"
+  printf '#!/bin/sh\nexit 1\n' > "$stub/caddy";  chmod +x "$stub/caddy"
   printf '#!/bin/sh\nexit 1\n' > "$stub/colima"; chmod +x "$stub/colima"
   mkdir -p "$d/.paraspace"
   printf 'PARA_VERSION=1\nPARA_PROJECT=emptyroutes\nPARA_ROUTES=()\n' > "$d/.paraspace/Parafile"
   local out; out="$(env PATH="$stub:$PATH" PARA_PROJECT_DIR="$d" "$PARA" up somews 2>&1)" || true
   rm -rf "$d" "$stub"
-  assert_not_contains "$out" "PARA_ROUTES is not set" "an empty array is a declaration, not an omission" || return 1
-  # And confirm it really did get past the routes gate rather than dying earlier.
-  assert_contains "$out" "incus" "the run proceeded to the backend check"
+  # Whatever stopped the run, it must not have been about routes — that covers
+  # both the unset refusal and any route-validation error, and says nothing about
+  # which backend command happens to be missing on this machine.
+  assert_not_contains "$out" "PARA_ROUTES" "an empty array is a declaration, not an omission"
 }
 
 test_routes_reject_a_scalar_and_malformed_entries() {

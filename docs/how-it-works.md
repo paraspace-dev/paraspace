@@ -1,14 +1,6 @@
 # How it works
 
-`para` composes four pieces: one host Caddy, one Incus container per workspace, a
-shared home volume per project, and the project's own hooks. Nothing else runs
-on the host.
-
-Incus containers are **system** containers, so Docker runs inside each
-workspace: the compose stack boots unchanged — same compose file, same ports —
-on the workspace's own network. Every workspace can bind `:3000` without
-colliding, and Caddy proxies each workspace's URL to its container IP, so all
-of them stay reachable with no remapped ports and no per-branch overrides.
+The whole mechanism is four pieces:
 
 ```
        browser
@@ -21,7 +13,7 @@ of them stay reachable with no remapped ports and no per-branch overrides.
 ┌──────▼──────┐ ┌──────▼──────┐
 │  para-ws1   │ │  para-ws2   │   one Incus system container per
 │   clone     │ │   clone     │   workspace — the project's stack
-│   stack     │ │   stack     │   (Docker and all) runs inside
+│   stack     │ │   stack     │   (containers and all) runs inside
 └──────┬──────┘ └──────┬──────┘
        │               │
 ┌──────▼───────────────▼───────┐
@@ -30,18 +22,26 @@ of them stay reachable with no remapped ports and no per-branch overrides.
 └──────────────────────────────┘
 ```
 
+Each workspace is a **system** container with its own IP. Whatever the project
+runs — bare processes, or containers nested inside the container (Docker boots
+fine) — binds its usual ports on the workspace's own network, so workspaces
+never collide with each other or with the host. Caddy proxies each workspace's
+URL to its IP; nothing gets remapped.
+
 - **One host Caddy** terminates TLS for the `*.<domain>` wildcard and
   reverse-proxies each workspace's routes to its container IP. It binds `:8443`
   by default; clean `:443` URLs are an opt-in — see
   [Workspace URLs](./urls.md).
 - **One Incus container per workspace** (`para-<name>`) holds the clone and
-  runs the project's whole stack inside, Docker included.
+  runs the project's whole stack inside — nested containers included.
 - **One shared home volume per project**, attached to every workspace at
   `/para/shared` — authenticate once (git, `gh`, dotfiles) and every workspace
   inherits it.
 - **The project's hooks** do all provisioning. Everything project-specific
   lives in the project's `.paraspace/` dir, never in `para` — the
   [hook contract](./hooks.md) is the seam.
+
+Nothing else runs on the host.
 
 ## macOS: one extra layer
 

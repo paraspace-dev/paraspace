@@ -19,13 +19,13 @@ If the repo already has a `.paraspace/` dir (a maintainer committed one),
 you're four commands from a running workspace:
 
 ```sh
-para image-build  # build the project's base image — once per machine
+para image build  # build the project's base image — once per machine
 para up ws1       # launch an isolated workspace
 para sh ws1       # shell into the clone
 para web ws1      # open its https URL
 ```
 
-Two things to expect on a fresh machine: `image-build` takes several minutes
+Two things to expect on a fresh machine: `para image build` takes several minutes
 (on macOS, `para` also boots its Colima VM first), and with the default
 template's hooks the first `up` **pauses at a printed SSH key** so you can
 authorize it with your git host — see

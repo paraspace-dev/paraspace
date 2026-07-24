@@ -51,8 +51,9 @@ container — pick a distinct name.
 ## Project discovery
 
 `para` finds your project by walking up from `$PWD` for a `.paraspace/` dir, the
-way git and compose find theirs. Only `up`, `image-build`, and `config-sync`
-must run inside a project; everything else (`ls`, `sh`, `down`, `rm`, `web`,
+way git and compose find theirs. Only `up`, `image` (build/status/rm), and
+`config-sync` must run inside a project; everything else (`ls`, `sh`, `down`,
+`rm`, `web`,
 `key` — and `init`, which creates the `.paraspace/` dir) works from anywhere.
 `para ls` scopes to the current project (`--all` for every project's).
 

@@ -174,13 +174,13 @@ sandbox_e2e() {
     return 1
   }
   sandbox_ip_band 4 || return 1
-  # The fixture's base image, built through para itself — `para image-build`
+  # The fixture's base image, built through para itself — `para image build`
   # reads the fixture's Parafile (PARA_PROJECT_DIR above) for the Alpine base,
   # the bash bootstrap, and the payload. Doing it this way means an e2e run also
-  # exercises image-build against a non-Void, Docker-free consumer — but only on
+  # exercises image build against a non-Void, Docker-free consumer — but only on
   # the run that actually builds. An existing alias is REUSED, because the
   # rebuild is by far the slow part, so in steady state most runs skip
-  # image-build entirely. Nothing detects that you edited the fixture's payload:
+  # image build entirely. Nothing detects that you edited the fixture's payload:
   # if you touched image-build.sh, the Parafile's base/bootstrap, or
   # cmd_image_build itself, rebuild explicitly with PARA_TEST_REBUILD=1.
   # --no-build skips even the existence check.
@@ -191,7 +191,7 @@ sandbox_e2e() {
   local img=alpine-minimal
   if [ "${PARA_TEST_NO_BUILD:-0}" != 1 ]; then
     if [ "${PARA_TEST_REBUILD:-0}" = 1 ] || ! incus image info "$img" >/dev/null 2>&1; then
-      "$PARA" image-build || return 1
+      "$PARA" image build || return 1
     else
       echo "sandbox: reusing cached image '$img' (PARA_TEST_REBUILD=1 rebuilds)" >&2
     fi

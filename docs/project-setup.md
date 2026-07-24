@@ -38,7 +38,7 @@ place. The usual adaptation is:
 Then build and launch:
 
 ```sh
-para image-build       # build the project's base image (per arch, several min)
+para image build       # build the project's base image (per arch, several min)
 para up my-feature     # clone, provision, boot
 ```
 

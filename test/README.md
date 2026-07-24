@@ -50,19 +50,19 @@ serves a fixed sentinel over HTTP with busybox `httpd`. It is **not** a template
 (it never ships in the npm package) and it does **not** use Docker — that keeps
 the published image ~5.5 MB and the whole path Docker-free.
 
-The image is built by **`para image-build`**, from the fixture's own
+The image is built by **`para image build`**, from the fixture's own
 [`.paraspace/image-build.sh`](fixtures/hello/.paraspace/image-build.sh)
 (`apk add bash busybox-extras sudo`, plus a `$PARA_USER` user) on the
 `PARA_BASE_IMAGE`/`PARA_IMAGE_BOOTSTRAP` its Parafile declares
 (`images:alpine/edge` + `apk add --no-cache bash`), published as the
 `alpine-minimal` alias. That's deliberate: the fixture is the non-Void,
 Docker-free second consumer, so building it is also the only coverage
-`image-build` has — it's what proves the command carries no distro or Docker
+`para image build` has — it's what proves the command carries no distro or Docker
 assumptions of its own.
 
 But the build is **cached**, and nothing invalidates that cache: an existing
 `alpine-minimal` alias is reused as-is. So in steady state most runs skip
-`image-build` entirely and prove nothing about it. **Rebuild explicitly with
+`para image build` entirely and prove nothing about it. **Rebuild explicitly with
 `PARA_TEST_REBUILD=1 test/run --e2e` whenever you touch the fixture's
 `image-build.sh`, its Parafile's base/bootstrap, or `cmd_image_build` itself** —
 otherwise you're testing the image you built last time. `--no-build` skips even
@@ -119,7 +119,7 @@ throwaway XDG tree can fence off:
   switch, the `pool_backing_fs` see-through for a dir pool whose *source* sits on
   btrfs/zfs, and the ZFS<2.2 idmapped-mount preflight — and the e2e tier is the
   only place it runs. Pinning a pool would walk past all of it, the same way a
-  cached image walks past `image-build`. Sharing is safe because isolation here
+  cached image walks past `para image build`. Sharing is safe because isolation here
   is by *name*, not by pool: containers are `para-<run-unique>` and the volume is
   `para-home-paratest-$$`, teardown is guarded to those, and para has no
   pool-level destructive operation (it never runs `incus storage delete`).

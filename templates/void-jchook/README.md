@@ -41,7 +41,7 @@ void-jchook/
 
 ```sh
 bin/para install                        # -> ~/.local/bin/para (once, from a checkout)
-para image-build                        # build the base image (pulls the toolchain)
+para image build                        # build the base image (pulls the toolchain)
 para up demo                            # clone + provision + boot a workspace
 para web demo                           # open https://demo.<your PARA_DOMAIN>
 para sh demo                            # drop into the configured shell

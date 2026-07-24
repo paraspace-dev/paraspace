@@ -31,9 +31,9 @@ For full ergonomics also include `tmux` (`para run`), a login shell like `zsh`
 (`para sh`), and `claude`/`nvim`/`gh` — `para` degrades rather than breaks
 without them.
 
-## Building with `para image-build`
+## Building with `para image build`
 
-`para image-build` is base-agnostic plumbing. It:
+`para image build` is base-agnostic plumbing. It:
 
 1. launches a builder from **`$PARA_BASE_IMAGE`** (any Incus image —
    `images:debian/13`, `images:voidlinux`, `images:alpine/edge`, …) with
@@ -43,7 +43,10 @@ without them.
    root, with `$PARA_USER`/`$PARA_UID`/`$PARA_GID` and `$PARA_PREPULL_IMAGES`
    (the stack's external image tags, scraped from your `docker-compose.yml` /
    `Dockerfile`) in the environment;
-4. publishes the result as **`$PARA_IMAGE`**.
+4. publishes the result as **`$PARA_IMAGE`**, stamping provenance onto it as
+   Incus image properties (`user.para.src_sha`, `user.para.contract`,
+   `user.para.incremental`) so the image is self-describing — that's what
+   `para image status` reads back.
 
 The bootstrap step exists because step 3 needs bash and step 2 is the only one
 guaranteed to run (`sh` is in every base image). Use it to install bash and/or
@@ -66,3 +69,31 @@ picks, and a `para` update can never swap the ground your image is built on.
 The templates' [`image-build.sh`](https://github.com/paraspace-dev/paraspace/blob/main/templates/void-docker-gh/.paraspace/image-build.sh)
 scripts are the reference: a package list, a user, and Docker set up for
 nesting.
+
+## Checking the image — `para image status`
+
+An image outlasts the source that built it, so `para image status` reports
+whether they're still in sync:
+
+```
+$ para image status
+  image      para-dev
+  built      2026/07/21 14:02 UTC
+  source     drifted — .paraspace/ image inputs changed since this build
+  base       images:debian/13
+  contract   1
+
+  rebuild with: para image build
+```
+
+"source" compares a hash stamped at build time against the current
+**reproducibility surface** — the `image-build.sh` payload, `$PARA_IMAGE_BOOTSTRAP`,
+`$PARA_BASE_IMAGE`, and the sorted set of pre-pulled stack images. If any of
+those changed, a rebuild would differ and status says `drifted`. An image built
+before provenance tracking (or by a plain `incus` action) reports the source as
+`unknown`. A build made with `-i` is flagged: an incremental layer doesn't
+correspond to a clean source hash, so do one pristine `para image build` before
+you rely on it.
+
+`para image rm` deletes `$PARA_IMAGE` — to reclaim space or force a fully clean
+next build. Workspaces already `up` are clones and keep running.

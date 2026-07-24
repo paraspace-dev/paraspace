@@ -22,7 +22,14 @@ The rules:
 Interface changes that were made *without* a bump, and why — so the constant
 staying at 1 stays explicable:
 
-- **`PARA_BASE_IMAGE` became required for `para image-build`.** `image-build`
+- **`para image-build` became `para image build`, plus `status`/`rm`.** The base
+  image is a distinct, shared, occasional artifact, so its verbs moved under a
+  `para image <sub>` namespace, and `para image status`/`para image rm` were
+  added. Additive, not breaking: `para image-build` stays as a deprecated alias,
+  the injected env / hook names / `Parafile` keys are untouched, and the new
+  provenance properties (`user.para.*`) degrade to "unknown" on older images. So
+  `PARA_CONTRACT` stayed at 1.
+- **`PARA_BASE_IMAGE` became required for `para image build`.** `image build`
   used to hardcode a Void base; it now refuses unless the
   [`Parafile`](./parafile.md#para_base_image) names a base image. Under the rules
   above that is breaking — an existing Parafile without the key stops building —

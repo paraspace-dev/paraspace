@@ -33,7 +33,7 @@ your first workspace.
 - [Hooks](./hooks.md) — the `provision`/`boot` contract and the environment
   `para` injects.
 - [The image contract](./image.md) — what a base image must provide, and how
-  `para image-build` builds one.
+  `para image build` builds one.
 - [Contract versioning](./versioning.md) — how the `para`↔project interface is
   versioned, and what counts as a breaking change.
 - [Internals](./internals.md) — the finer mechanics: self-describing

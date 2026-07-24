@@ -21,16 +21,16 @@ back to the dir's basename.
 
 ### `PARA_IMAGE`
 
-Base image alias `para up` launches. You build it with `para image-build` —
+Base image alias `para up` launches. You build it with `para image build` —
 see [The image contract](./image.md). `para init` names it after your
 directory.
 
 ### `PARA_BASE_IMAGE`
 
-The Incus image `para image-build` launches its builder from — any image works
+The Incus image `para image build` launches its builder from — any image works
 (`images:debian/13`, `images:voidlinux`, `images:alpine/edge`, …). **Required**
 to build: `para` pins no default, so your image's distro is never `para`'s choice
-and can't change under you when `para` updates. `image-build` refuses with a clear
+and can't change under you when `para` updates. `image build` refuses with a clear
 error until you declare one. Not used by `para up`, which launches the *built*
 image (`PARA_IMAGE`).
 

@@ -133,14 +133,14 @@ PARAFILE="${PARAFILE:-${PROJECT_ROOT:+$PROJECT_ROOT/.paraspace/Parafile}}"
 : "${PARA_UID:=1000}"
 : "${PARA_GID:=1000}"
 
-# The incus image `para image-build` launches its builder from, and an optional
+# The incus image `para image build` launches its builder from, and an optional
 # `sh -c` line run in that builder BEFORE the project's image-build.sh payload.
 # Both are the project's call: para builds whatever base you name and knows
 # nothing about its distro or package manager.
 #
 # NEITHER HAS A DEFAULT, deliberately. A default base would mean para picks your
 # distro — and worse, that a para update could silently rebuild your image on a
-# different one. So image-build refuses until the Parafile names a base. The
+# different one. So image build refuses until the Parafile names a base. The
 # bootstrap is genuinely optional: it exists because the payload runs under
 # `bash -s` and a minimal base may not ship bash (or may need its package index
 # refreshed first) — `sh` is the one interpreter every base image has.
@@ -213,6 +213,39 @@ log()  { printf '\033[36m==>\033[0m %s\n' "$*" >&2; }
 warn() { printf '\033[33mwarn:\033[0m %s\n' "$*" >&2; }
 die()  { printf '\033[31merror:\033[0m %s\n' "$*" >&2; exit 1; }
 need() { command -v "$1" >/dev/null 2>&1 || die "missing required command: $1"; }
+
+# SHA-256 of stdin as bare lowercase hex. Linux ships sha256sum; macOS ships
+# shasum (perl). Pipe the whole if/else into awk to strip the trailing filename.
+sha256_of() {
+  if command -v sha256sum >/dev/null 2>&1; then sha256sum
+  elif command -v shasum >/dev/null 2>&1; then shasum -a 256
+  else die "need 'sha256sum' or 'shasum' to hash the image source"; fi | awk '{print $1}'
+}
+
+# The reproducibility surface of `para image build`, hashed: the provisioning
+# payload, the pre-payload bootstrap line, the base image it layers on, and the
+# (sorted) stack images pre-pulled into it — exactly what cmd_image_build consumes.
+# `para image status` compares this against the sha stamped on the built image to
+# tell whether a rebuild would produce something different. \037/\036 (unit/record
+# separators) delimit the fields so payload bytes can't forge a boundary. Requires
+# a project (PROJECT_ROOT + the Parafile's PARA_* already loaded).
+image_src_sha() {
+  {
+    printf 'base\037%s\036' "$PARA_BASE_IMAGE"
+    printf 'bootstrap\037%s\036' "$PARA_IMAGE_BOOTSTRAP"
+    printf 'payload\037'; cat "$PROJECT_ROOT/.paraspace/image-build.sh" 2>/dev/null; printf '\036'
+    printf 'stack\037'; stack_images; printf '\036'
+  } | sha256_of
+}
+
+# Lightweight incus reachability for the read-only image commands (status/rm).
+# Unlike ensure_backend it never starts colima or inspects caddy — those belong to
+# the workspace/route path, not to reading an image's metadata.
+require_incus() {
+  need incus
+  incus info >/dev/null 2>&1 \
+    || die "incus not reachable — is the daemon running? (macOS: 'para start')"
+}
 
 # May we prompt / run interactive subcommands (a `read`, `gh auth login`)? Needs
 # a TTY on stdin, unless PARA_NONINTERACTIVE is set to a non-empty value — cron/CI
@@ -807,7 +840,7 @@ cmd_up() {
       || incus storage volume attach "$PARA_POOL" "$PARA_VOLUME" "$ct" parahome /para/shared
   else
     incus image info "$PARA_IMAGE" >/dev/null 2>&1 \
-      || die "base image '$PARA_IMAGE' not found — run 'para image-build' first"
+      || die "base image '$PARA_IMAGE' not found — run 'para image build' first"
     ip="$(alloc_ip)"
     log "Launching $ct at $ip (nesting on)…"
     # --storage: keep the container root on $PARA_POOL. Without it the root lands
@@ -1266,7 +1299,7 @@ cmd_init() {
   fi
   log "Done — $added added, $skipped skipped."
   if [ "$added" -gt 0 ]; then
-    log "Next: edit .paraspace/Parafile (PARA_ORIGIN, PARA_ROUTES), then 'para image-build' + 'para up <name>'."
+    log "Next: edit .paraspace/Parafile (PARA_ORIGIN, PARA_ROUTES), then 'para image build' + 'para up <name>'."
   fi
 }
 
@@ -1318,7 +1351,7 @@ _para() {
   cmd="${COMP_WORDS[1]:-}"
 
   local subcommands="start stop up down rm reconcile ls sh claude run key web \
-config-set config-import config-sync init install image-build completions help"
+config-set config-import config-sync init install image completions help"
 
   # Position 1 is the subcommand itself.
   if [ "$COMP_CWORD" -eq 1 ]; then
@@ -1334,7 +1367,8 @@ config-set config-import config-sync init install image-build completions help"
       reconcile)   flags="--prune" ;;
       sh)          flags="-c" ;;
       init)        flags="--list --names -f --force --full" ;;
-      image-build) flags="-q --quiet -v --verbose -i --from-current --incremental" ;;
+      # Flags belong to `image build` (position 2); status/rm take none.
+      image)       [ "${COMP_WORDS[2]:-}" = "build" ] && flags="-q --quiet -v --verbose -i --from-current --incremental" ;;
     esac
     COMPREPLY=( $(compgen -W "$flags" -- "$cur") )
     return
@@ -1353,6 +1387,9 @@ config-set config-import config-sync init install image-build completions help"
       ;;
     completions)
       [ "$COMP_CWORD" -eq 2 ] && COMPREPLY=( $(compgen -W "bash zsh" -- "$cur") )
+      ;;
+    image)
+      [ "$COMP_CWORD" -eq 2 ] && COMPREPLY=( $(compgen -W "build status rm" -- "$cur") )
       ;;
   esac
 }
@@ -1404,7 +1441,7 @@ cmd_image_build() {
       -q|--quiet)   q="-q"; shift ;;
       -v|--verbose) q="";   shift ;;
       -i|--from-current|--incremental) from_current=1; shift ;;
-      *) die "usage: para image-build [-q|--quiet|-v|--verbose] [-i|--from-current|--incremental]" ;;
+      *) die "usage: para image build [-q|--quiet|-v|--verbose] [-i|--from-current|--incremental]" ;;
     esac
   done
   # Checked before anything is launched (and skipped for --from-current, which
@@ -1437,7 +1474,7 @@ cmd_image_build() {
   local base="$PARA_BASE_IMAGE"
   if [ "$from_current" -eq 1 ]; then
     incus image info "$PARA_IMAGE" >/dev/null 2>&1 \
-      || die "no existing '$PARA_IMAGE' image to build from — run a plain 'para image-build' first"
+      || die "no existing '$PARA_IMAGE' image to build from — run a plain 'para image build' first"
     base="$PARA_IMAGE"
     log "Incremental build: layering onto existing '$PARA_IMAGE' (nesting on)…"
   else
@@ -1516,9 +1553,96 @@ cmd_image_build() {
   incus $q publish "$builder/publish" --reuse --alias "${PARA_IMAGE}-new"
   incus image delete "$PARA_IMAGE" >/dev/null 2>&1 || true
   incus image alias rename "${PARA_IMAGE}-new" "$PARA_IMAGE"
+  # Stamp provenance so `para image status` can report drift: the hash of the
+  # source that produced this image (image_src_sha), the contract it was built
+  # under, and whether it was an incremental (-i) layer rather than a clean build.
+  # Best-effort — a set-property hiccup must not fail an image that already built.
+  incus image set-property "$PARA_IMAGE" user.para.src_sha "$(image_src_sha)" >/dev/null 2>&1 || true
+  incus image set-property "$PARA_IMAGE" user.para.contract "$PARA_CONTRACT" >/dev/null 2>&1 || true
+  incus image set-property "$PARA_IMAGE" user.para.incremental "$from_current" >/dev/null 2>&1 || true
   incus delete -f "$builder"
   trap - EXIT INT TERM
   log "Base image '$PARA_IMAGE' ready. Now: para up <name>"
+}
+
+# `para image status`: when the base image was last built, and whether the source
+# that produced it has drifted since. Read-only — no builder, no colima autostart.
+cmd_image_status() {
+  require_project
+  require_incus
+  local info
+  info="$(incus image info "$PARA_IMAGE" 2>/dev/null)" \
+    || die "no '$PARA_IMAGE' image yet — build it with: para image build"
+  # Prefer the Uploaded timestamp (when this build was published); fall back to
+  # Created. Parsed from `incus image info` text — the one call we already need to
+  # confirm the image exists — rather than a second, format-fragile list query.
+  local built
+  built="$(printf '%s\n' "$info" | awk -F'Uploaded: *' '/Uploaded:/{print $2; exit}')"
+  [ -n "$built" ] || built="$(printf '%s\n' "$info" | awk -F'Created: *' '/Created:/{print $2; exit}')"
+  [ -n "$built" ] || built="unknown"
+  # Provenance stamped at publish time. get-property errors (nonzero, no output)
+  # on an image built before this existed — guard so set -e doesn't abort, and
+  # report it as "unknown" rather than pretending the source is in sync.
+  local src contract incremental
+  src="$(incus image get-property "$PARA_IMAGE" user.para.src_sha 2>/dev/null || true)"
+  contract="$(incus image get-property "$PARA_IMAGE" user.para.contract 2>/dev/null || true)"
+  incremental="$(incus image get-property "$PARA_IMAGE" user.para.incremental 2>/dev/null || true)"
+  local source_line
+  if [ -z "$src" ]; then
+    source_line="unknown — image predates provenance tracking; rebuild to record"
+  elif [ "$src" = "$(image_src_sha)" ]; then
+    source_line="up to date"
+  else
+    source_line="drifted — .paraspace/ image inputs changed since this build"
+  fi
+  printf '  image      %s\n' "$PARA_IMAGE"
+  printf '  built      %s\n' "$built"
+  printf '  source     %s\n' "$source_line"
+  printf '  base       %s\n' "${PARA_BASE_IMAGE:-<unset>}"
+  [ -n "$contract" ] && printf '  contract   %s\n' "$contract"
+  if [ "${incremental:-0}" = "1" ]; then
+    printf '  build      incremental (-i)\n'
+    warn "last build was incremental (-i) — do one clean 'para image build' before relying on it (see docs/image.md)"
+  fi
+  case "$source_line" in
+    "up to date") ;;
+    *) printf '\n  rebuild with: para image build\n' ;;
+  esac
+}
+
+# `para image rm`: drop the base image. Cheap way to reclaim space or force a
+# fully clean next build. Workspaces already up are unaffected (they're clones).
+cmd_image_rm() {
+  require_project
+  require_incus
+  incus image info "$PARA_IMAGE" >/dev/null 2>&1 \
+    || die "no '$PARA_IMAGE' image to remove"
+  incus image delete "$PARA_IMAGE"
+  log "Removed image '$PARA_IMAGE'. Rebuild with: para image build"
+}
+
+# Dispatch `para image <build|status|rm>`. The base image is a distinct, shared,
+# occasional artifact (vs. per-workspace `up`), so its verbs live under their own
+# namespace. `para image-build` stays as a deprecated alias (see main()).
+cmd_image() {
+  local sub="${1:-}"; shift || true
+  case "$sub" in
+    build)  cmd_image_build "$@" ;;
+    status) cmd_image_status "$@" ;;
+    rm)     cmd_image_rm "$@" ;;
+    ""|-h|--help)
+      cat >&2 <<'EOF'
+usage: para image <command>
+
+  build [-q|-v] [-i]   build + publish the base image ($PARA_IMAGE)
+  status               when it was last built, and whether its source has drifted
+  rm                   delete the base image
+
+See docs/image.md and docs/commands.md.
+EOF
+      if [ -z "$sub" ]; then exit 1; else exit 0; fi ;;
+    *) die "unknown 'para image' command '$sub' (try: build, status, rm)" ;;
+  esac
 }
 
 # Bare `para`: the handful of commands that carry day-to-day use. Anything
@@ -1613,7 +1737,7 @@ PROJECT & IMAGE
                            files that already exist. --list/--names show the
                            available templates, -f/--force overwrites, --full
                            copies the whole template tree
-  image-build [-q|-v] [-i] build + publish the base image: launch
+  image build [-q|-v] [-i] build + publish the base image: launch
                            \$PARA_BASE_IMAGE, run \$PARA_IMAGE_BOOTSTRAP then the
                            project's .paraspace/image-build.sh in it, pre-pull
                            the stack's external images, publish as \$PARA_IMAGE.
@@ -1622,6 +1746,11 @@ PROJECT & IMAGE
                            -i/--from-current (alias --incremental) layers onto
                            the existing image for fast iteration instead of
                            starting from a pristine base
+  image status             when \$PARA_IMAGE was last built, and whether its
+                           source (payload + bootstrap + base + pre-pull set) has
+                           drifted since — i.e. whether a rebuild would differ
+  image rm                 delete \$PARA_IMAGE (reclaim space / force a fully
+                           clean next build; running workspaces are unaffected)
 
 CONFIG & AUTH
   key                      print this machine's para pubkey — authorize it on
@@ -1642,8 +1771,8 @@ CONFIG & AUTH
   completions <bash|zsh>   print a shell completion script to stdout; load it
                            with: source <(para completions bash)
 
-Only 'up', 'image-build', and 'config-sync' must run inside a project (a
-.paraspace/ dir, found from \$PWD upward); everything else works anywhere.
+Only 'up', 'image' (build/status/rm), and 'config-sync' must run inside a project
+(a .paraspace/ dir, found from \$PWD upward); everything else works anywhere.
 
 CONFIGURATION
   Precedence is: environment > user config > Parafile > default. The user
@@ -1672,7 +1801,7 @@ PREREQUISITES (one-time per machine)
       macOS  brew install colima incus caddy; 'para start' runs colima for you
              (needs colima >= 0.10 — budget several GB of RAM per workspace)
   * Trust para Caddy's local CA once:  caddy trust
-  * Build the base image:  para image-build
+  * Build the base image:  para image build
 
 Docs: README.md and docs/ (commands.md, parafile.md, hooks.md, image.md,
 urls.md, how-it-works.md). Contract version: $PARA_CONTRACT.
@@ -1701,7 +1830,8 @@ main() {
     init)          cmd_init "$@" ;;
     install)       cmd_install "$@" ;;
     completions)   cmd_completions "$@" ;;
-    image-build)   cmd_image_build "$@" ;;
+    image)         cmd_image "$@" ;;
+    image-build)   warn "'para image-build' is deprecated — use 'para image build'"; cmd_image_build "$@" ;;
     "")                usage_brief 0 ;;
     -h|--help|help)    usage_full 0 ;;
     # para wraps `incus exec`, so container muscle memory reaches for `exec`

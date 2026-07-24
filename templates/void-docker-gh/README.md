@@ -32,7 +32,7 @@ bin/para install                        # -> ~/.local/bin/para
 
 # from a copy of this .paraspace/ (or after `para init`) — needs incus + caddy;
 # see the ParaSpace README for one-time host setup
-para image-build                        # build the base image
+para image build                        # build the base image
 para up demo                            # clone + provision + boot a workspace
 para web demo                           # open https://demo.<your PARA_DOMAIN>
 ```

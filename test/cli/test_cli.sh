@@ -9,7 +9,7 @@
 test_help_lists_the_command_surface() {
   local out; out="$("$PARA" --help 2>&1)"
   assert_contains "$out" "up"          "help mentions up"          || return 1
-  assert_contains "$out" "image-build" "help mentions image-build" || return 1
+  assert_contains "$out" "image build" "help mentions image build" || return 1
   assert_contains "$out" "init"        "help mentions init"        || return 1
 }
 
@@ -55,7 +55,7 @@ test_up_refuses_a_name_owned_by_another_project() {
 
 test_image_build_refuses_without_a_base_image() {
   # PARA_BASE_IMAGE has no default on purpose — para never picks your distro, and
-  # a para update must not be able to change it under you. So image-build refuses
+  # a para update must not be able to change it under you. So image build refuses
   # a project whose Parafile declares no base, and does so before it launches
   # anything (the check precedes ensure_backend) — hence CLI-testable. A bare
   # temp project, since the fixture's own Parafile does declare one.
@@ -63,10 +63,31 @@ test_image_build_refuses_without_a_base_image() {
   mkdir -p "$d/.paraspace"
   printf 'PARA_PROJECT=nobase\n' > "$d/.paraspace/Parafile"
   local out rc=0
+  out="$(env PARA_PROJECT_DIR="$d" "$PARA" image build 2>&1)" || rc=$?
+  rm -rf "$d"
+  [ "$rc" -ne 0 ] || { echo "  image build unexpectedly succeeded with no PARA_BASE_IMAGE" >&2; return 1; }
+  assert_contains "$out" "PARA_BASE_IMAGE" "refusal names the missing key"
+}
+
+test_image_build_alias_is_still_accepted() {
+  # `para image-build` is a deprecated alias for `para image build`. It must still
+  # reach cmd_image_build (here: refuse the no-base project, same as the primary
+  # spelling) and warn that it's deprecated — both CLI-testable, pre-backend.
+  local d; d="$(mktemp -d "${TMPDIR:-/tmp}/para-alias.XXXXXX")"
+  mkdir -p "$d/.paraspace"
+  printf 'PARA_PROJECT=alias\n' > "$d/.paraspace/Parafile"
+  local out rc=0
   out="$(env PARA_PROJECT_DIR="$d" "$PARA" image-build 2>&1)" || rc=$?
   rm -rf "$d"
-  [ "$rc" -ne 0 ] || { echo "  image-build unexpectedly succeeded with no PARA_BASE_IMAGE" >&2; return 1; }
-  assert_contains "$out" "PARA_BASE_IMAGE" "refusal names the missing key"
+  [ "$rc" -ne 0 ] || { echo "  image-build alias unexpectedly succeeded with no PARA_BASE_IMAGE" >&2; return 1; }
+  assert_contains "$out" "deprecated"      "alias warns it is deprecated"  || return 1
+  assert_contains "$out" "PARA_BASE_IMAGE" "alias still reaches the build refusal"
+}
+
+test_image_rejects_an_unknown_subcommand() {
+  # The `para image <sub>` dispatcher rejects an unknown subcommand up front,
+  # before any project/backend work — so it's CLI-testable with no incus.
+  assert_fails "$PARA" image not-a-subcommand
 }
 
 test_up_refuses_a_contract_version_mismatch() {

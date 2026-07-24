@@ -33,7 +33,7 @@ brew install caddy colima incus
 
 ```sh
 cd <your project> # a repo set up for para — see below
-para image-build  # once per machine — build the project's base image
+para image build  # once per machine — build the project's base image
 para up ws1       # launch an isolated workspace
 para sh ws1       # shell into the clone
 ```

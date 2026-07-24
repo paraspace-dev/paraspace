@@ -1,7 +1,7 @@
 # void-minimal — the barest paraspace box
 
 The smallest possible [para](../../README.md) template: it **installs nothing and
-boots nothing**. `para image-build` + `para up <name>` stands up a Void Linux
+boots nothing**. `para image build` + `para up <name>` stands up a Void Linux
 workspace with a user and a shell, and that's it — `para sh <name>` drops you in.
 Every place you'd normally add a toolchain, a clone, or an app is marked with a
 comment pointing at where the code goes.
@@ -24,7 +24,7 @@ void-minimal/
 
 ```sh
 bin/para install                        # -> ~/.local/bin/para (once, from a checkout)
-para image-build                        # build the bare base image
+para image build                        # build the bare base image
 para up box                             # stand up a workspace named "box"
 para sh box                             # get a shell inside it
 ```
@@ -39,7 +39,7 @@ The scaffold tells you where each piece goes:
 
 - **`image-build.sh`** — the `pkgs=""` block is empty. Add your packages
   (`pkgs="zsh tmux neovim git"`, or `docker docker-compose` for a stack), then
-  `para image-build`. Installing `zsh` makes the provision hook switch your login
+  `para image build`. Installing `zsh` makes the provision hook switch your login
   shell to it so `skel/zshrc` applies.
 - **`hooks/provision`** — add a clone step, `.env` handling, and richer
   shared-volume seeding. [`void-docker-gh`](../void-docker-gh/.paraspace/hooks/provision)

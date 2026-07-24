@@ -132,8 +132,14 @@ PARAFILE="${PARAFILE:-${PROJECT_ROOT:+$PROJECT_ROOT/.paraspace/Parafile}}"
 # different one. So image-build refuses until the Parafile names a base. The
 # bootstrap is genuinely optional: it exists because the payload runs under
 # `bash -s` and a minimal base may not ship bash (or may need its package index
-# refreshed first) — `sh` is the one interpreter every base image has. Both use
-# `-` not `:-`, so a Parafile can set either to "" and have it mean "none".
+# refreshed first) — `sh` is the one interpreter every base image has.
+#
+# So unlike the fallbacks above, these two lines apply no default at all: the
+# Parafile (sourced at the top of this block) and the environment have already
+# had their say, and these just materialise the names as empty so `set -u`
+# doesn't trip on the reads below. To mean "none", a Parafile must assign
+# plainly (PARA_IMAGE_BOOTSTRAP=""); the `: "${X:=…}"` idiom the templates use
+# fires on empty as well as unset, so it would overwrite it.
 PARA_BASE_IMAGE="${PARA_BASE_IMAGE-}"
 PARA_IMAGE_BOOTSTRAP="${PARA_IMAGE_BOOTSTRAP-}"
 # Project IDENTITY — the single key para uses for ownership, `para ls` scoping, and

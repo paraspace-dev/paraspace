@@ -8,7 +8,7 @@ set -euo pipefail
 #
 # Deliberately NOT Void and NOT Docker: this is the second consumer that proves
 # `para image-build` is generic. It's also what keeps the e2e tier cheap — the
-# published image is ~8.5 MB and boots in a second, where a Docker-capable box
+# published image is ~5.5 MB and boots in a second, where a Docker-capable box
 # is minutes and gigabytes.
 #
 # What it installs is only what para's contract needs, plus the one thing the

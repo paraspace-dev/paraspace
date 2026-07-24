@@ -5,7 +5,7 @@ set -euo pipefail
 #
 # Two tiers:
 #   cli   — no incus. Argument handling, `para init`, help. Fast; CI-safe.
-#   e2e   — the real thing: builds a ~15 MB Alpine image, `para up`s a workspace,
+#   e2e   — the real thing: builds a ~5.5 MB Alpine image, `para up`s a workspace,
 #           and asserts the whole path (hooks -> boot readiness -> Caddy TLS ->
 #           bridge IP -> the app) through actual para commands. Needs incus.
 #
@@ -66,6 +66,12 @@ esac
 # sandbox_teardown is defensive — empty workspace list, unset volume, absent Caddy
 # are all no-ops — so it's safe for the CLI tier too.
 trap sandbox_teardown EXIT
+# EXIT alone is not enough: bash does NOT run an EXIT trap when the shell dies on
+# an UNtrapped fatal signal, and Ctrl-C during an e2e run is the likeliest abort
+# there is — it would leak the run's workspaces, volume, Caddy and temp tree.
+# Trapping INT/TERM to an explicit `exit` puts us back on the normal exit path,
+# which then fires the EXIT trap above. Same shape as bin/para's image-build.
+trap 'echo >&2; echo "interrupted — tearing down…" >&2; exit 130' INT TERM
 
 if [ "$run_e2e" -eq 1 ]; then
   sandbox_e2e

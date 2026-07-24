@@ -7,8 +7,7 @@
 # httpd inside the container — returning the exact sentinel the boot hook wrote,
 # tagged with THIS workspace's name (proving it routed to the right container).
 test_http_route_serves_the_sentinel() {
-  eventually 30 sh -c "curl -sk --max-time 10 --resolve \"$PARA_WS.${PARA_DOMAIN:-paraspace.dev}:$PARA_HTTPS_PORT:127.0.0.1\" \"https://$PARA_WS.${PARA_DOMAIN:-paraspace.dev}:$PARA_HTTPS_PORT/\" | grep -q para-e2e-ok" \
-    || return 1
+  assert_serves "$PARA_WS" || return 1
   local body; body="$(http_get "$PARA_WS")"
   assert_contains "$body" "para-e2e-ok $PARA_WS" "sentinel body carries the workspace name"
 }

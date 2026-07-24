@@ -80,3 +80,23 @@ http_get() { # http_get <workspace>
   curl -sk --max-time 10 --resolve "$host:$PARA_HTTPS_PORT:127.0.0.1" \
     "https://$host:$PARA_HTTPS_PORT/"
 }
+
+# assert_serves <workspace> [timeout-s] — the workspace answers through para's
+# Caddy with the fixture's sentinel. Routing is asynchronous (Caddy reloads on
+# every `up`), so this always retries rather than asking once — reach for it
+# instead of a bare http_get whenever the request follows a state change.
+assert_serves() {
+  local ws="$1" timeout="${2:-30}"
+  eventually "$timeout" _serves_once "$ws" \
+    || { echo "  assert_serves: '$ws' never served the sentinel within ${timeout}s" >&2; return 1; }
+}
+
+# One shot of the above. Split out so `eventually` can re-invoke it as a command
+# (no `sh -c` string, so the workspace name is never re-parsed by a shell).
+# `case`, NOT `curl | grep -q`: the suite runs under pipefail, where grep -q's
+# early exit can SIGPIPE curl and turn a served page into a false negative —
+# the same trap bin/para's instance_running documents.
+_serves_once() {
+  local body; body="$(http_get "$1")" || return 1
+  case "$body" in *para-e2e-ok*) return 0 ;; *) return 1 ;; esac
+}

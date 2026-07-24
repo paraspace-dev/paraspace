@@ -128,10 +128,13 @@ sandbox_e2e() {
   # The fixture's base image, built through para itself — `para image-build`
   # reads the fixture's Parafile (PARA_PROJECT_DIR above) for the Alpine base,
   # the bash bootstrap, and the payload. Doing it this way means an e2e run also
-  # exercises image-build against a non-Void, Docker-free consumer.
-  # Cached across runs: the image is a pure function of the fixture and the
-  # rebuild is the slow part, so an existing alias is reused. --no-build skips
-  # even the check; PARA_TEST_REBUILD=1 forces a fresh build.
+  # exercises image-build against a non-Void, Docker-free consumer — but only on
+  # the run that actually builds. An existing alias is REUSED, because the
+  # rebuild is by far the slow part, so in steady state most runs skip
+  # image-build entirely. Nothing detects that you edited the fixture's payload:
+  # if you touched image-build.sh, the Parafile's base/bootstrap, or
+  # cmd_image_build itself, rebuild explicitly with PARA_TEST_REBUILD=1.
+  # --no-build skips even the existence check.
   local img="${PARA_IMAGE:-alpine-minimal}"
   if [ "${PARA_TEST_NO_BUILD:-0}" != 1 ]; then
     if [ "${PARA_TEST_REBUILD:-0}" = 1 ] || ! incus image info "$img" >/dev/null 2>&1; then
@@ -155,6 +158,12 @@ sandbox_teardown() {
   for ws in "${SANDBOX_WORKSPACES[@]:-}"; do
     [ -n "$ws" ] || continue
     "$PARA" rm "$ws" >/dev/null 2>&1 || true
+    # Backstop straight to incus. `para rm` resolves the container through the
+    # registry, so a run that died before registering (or with a clobbered
+    # registry) would leak the instance despite the line above. The name is
+    # ct_name's `para-<ws>` on a run-unique <ws>, so this can only ever hit
+    # something this run launched.
+    incus delete -f "para-$ws" >/dev/null 2>&1 || true
   done
   # The shared volume para lazily created for this project. It lands on whichever
   # pool para settled on — para-dir (the nested-Docker default) or, if that switch

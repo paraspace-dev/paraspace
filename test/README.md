@@ -47,7 +47,7 @@ commands against a live Incus workspace:
 `test/fixtures/hello/` is the smallest real para project: an Alpine box that
 serves a fixed sentinel over HTTP with busybox `httpd`. It is **not** a template
 (it never ships in the npm package) and it does **not** use Docker — that keeps
-the box ~15 MB and the whole path Docker-free.
+the published image ~5.5 MB and the whole path Docker-free.
 
 The image is built by **`para image-build`**, from the fixture's own
 [`.paraspace/image-build.sh`](fixtures/hello/.paraspace/image-build.sh)
@@ -55,10 +55,17 @@ The image is built by **`para image-build`**, from the fixture's own
 `PARA_BASE_IMAGE`/`PARA_IMAGE_BOOTSTRAP` its Parafile declares
 (`images:alpine/edge` + `apk add --no-cache bash`), published as the
 `alpine-minimal` alias. That's deliberate: the fixture is the non-Void,
-Docker-free second consumer, so every e2e run re-proves that `image-build`
-carries no distro or Docker assumptions of its own. The e2e setup builds it once
-(cached across runs; `--no-build` skips the check entirely, `PARA_TEST_REBUILD=1`
-forces a rebuild).
+Docker-free second consumer, so building it is also the only coverage
+`image-build` has — it's what proves the command carries no distro or Docker
+assumptions of its own.
+
+But the build is **cached**, and nothing invalidates that cache: an existing
+`alpine-minimal` alias is reused as-is. So in steady state most runs skip
+`image-build` entirely and prove nothing about it. **Rebuild explicitly with
+`PARA_TEST_REBUILD=1 test/run --e2e` whenever you touch the fixture's
+`image-build.sh`, its Parafile's base/bootstrap, or `cmd_image_build` itself** —
+otherwise you're testing the image you built last time. `--no-build` skips even
+the existence check.
 
 ## Isolation
 
@@ -137,8 +144,12 @@ tests. A few rules keep the suite honest:
   failure) and `assert_fails` for "para must reject this".
 - **Wait on async state with `eventually`, never a fixed `sleep`.** Boot, routing,
   and state transitions are asynchronous; `eventually <secs> <cmd…>` retries until
-  the command succeeds or the timeout elapses. Reach for `http_get <ws>` to curl a
-  workspace through the run's Caddy hermetically (`--resolve`, para's internal CA).
+  the command succeeds or the timeout elapses. For the routing path specifically,
+  use `assert_serves <ws>` — it already retries, where a bare `http_get <ws>`
+  asks once and will flake if the request follows an `up` (which reloads Caddy).
+  `http_get` is for when you need the body itself, after `assert_serves` has
+  established the route is live; it curls through the run's Caddy hermetically
+  (`--resolve`, para's internal CA).
 - **Bind assertions to a specific workspace.** Assert on *this* workspace's `para
   ls` row (`awk '$1==n{print $3}'`), not "does RUNNING appear somewhere" — in a
   shared registry another row can otherwise mask a bad state here.
@@ -151,7 +162,7 @@ tests. A few rules keep the suite honest:
 test/
   run                 entrypoint (tier selection, sandbox, discovery)
   lib/harness.sh      test_* autodiscovery + pass/fail reporting
-  lib/assert.sh       assert_*, eventually(), http_get()
+  lib/assert.sh       assert_*, eventually(), http_get(), assert_serves()
   lib/sandbox.sh      XDG sandbox, free-IP-band picker, teardown
   cli/                CLI-tier tests (no incus)
   e2e/                e2e-tier tests (incus)

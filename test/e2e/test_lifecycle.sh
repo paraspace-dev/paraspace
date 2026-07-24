@@ -7,17 +7,12 @@
 # assertion to THIS workspace's row rather than "does the word appear anywhere".
 _ls_state() { "$PARA" ls 2>/dev/null | awk -v n="$1" '$1==n{print $3}'; }
 
-# Serve-check bound to a workspace, race-free through para's Caddy.
-_serves() { # _serves <ws>
-  eventually 30 sh -c "curl -sk --max-time 10 --resolve \"$1.${PARA_DOMAIN:-paraspace.dev}:$PARA_HTTPS_PORT:127.0.0.1\" \"https://$1.${PARA_DOMAIN:-paraspace.dev}:$PARA_HTTPS_PORT/\" | grep -q para-e2e-ok"
-}
-
 test_down_up_resume_and_rm() {
   local ws="$PARA_WS2"
 
   # Bring it up and confirm it serves.
   para_do up "$ws" || return 1
-  _serves "$ws" || return 1
+  assert_serves "$ws" || return 1
 
   # down: container stops, registry row preserved, THIS row reports STOPPED.
   para_do down "$ws" || return 1
@@ -29,7 +24,7 @@ test_down_up_resume_and_rm() {
   # reconverges the boot hook, so it serves again and reports RUNNING.
   para_do up "$ws" || return 1
   assert_eq "RUNNING" "$(_ls_state "$ws")" "row reports RUNNING after resume" || return 1
-  _serves "$ws" || return 1
+  assert_serves "$ws" || return 1
 
   # rm: gone from the registry and from incus.
   para_do rm "$ws" || return 1

@@ -4,12 +4,11 @@
 shared home volume per project, and the project's own hooks. Nothing else runs
 on the host.
 
-The pairing is the point. Incus containers are **system** containers, so Docker
-runs *inside* each workspace: your compose stack boots unchanged — same compose
-file, same ports — on that workspace's own network. Every workspace can bind
-`:3000`; nothing collides. Caddy is the front door that makes them all
-reachable anyway: one URL per workspace, proxied to its container IP — no
-remapped ports, no per-branch overrides.
+Incus containers are **system** containers, so Docker runs inside each
+workspace: the compose stack boots unchanged — same compose file, same ports —
+on the workspace's own network. Every workspace can bind `:3000` without
+colliding, and Caddy proxies each workspace's URL to its container IP, so all
+of them stay reachable with no remapped ports and no per-branch overrides.
 
 ```
        browser

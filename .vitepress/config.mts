@@ -10,7 +10,7 @@ export default defineConfig({
   cleanUrls: true,
   lastUpdated: true,
 
-  srcExclude: ['README.md', 'CLAUDE.md', 'templates/**', 'plans/**'],
+  srcExclude: ['README.md', 'CLAUDE.md', 'templates/**', 'plans/**', 'test/**'],
 
   // docs/README.md is the docs index on GitHub and npm; serve it at /docs/.
   rewrites: {

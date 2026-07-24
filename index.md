@@ -4,7 +4,7 @@ layout: home
 hero:
   name: ParaSpace
   text: Parallel dev workspaces on your machine
-  tagline: Every task gets a full, isolated copy of your project — its own clone, its own stack, its own https URL. Built for the LLM era.
+  tagline: Every task gets its own universe — a full, isolated copy of your project with its own clone, stack, and https URL. Built for the LLM era.
   actions:
     - theme: brand
       text: Get started
@@ -14,10 +14,10 @@ hero:
       link: https://github.com/paraspace-dev/paraspace
 
 features:
-  - icon: 📦
+  - icon: 🛰️
     title: Real isolation
     details: Each workspace is an unprivileged Incus system container with its own clone, Docker stack, and bridge IP. Build, run, and break things side by side.
-  - icon: 🌐
+  - icon: 🪐
     title: A URL per workspace
     details: One host Caddy routes https://name.paraspace.dev to each workspace. Open two branches in two tabs and compare.
   - icon: 🔌

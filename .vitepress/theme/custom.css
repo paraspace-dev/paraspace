@@ -1,0 +1,59 @@
+/**
+ * ParaSpace theme: Gruvbox-flavored brand colors with a 70s space-race feel.
+ * Palette reference: https://github.com/morhetz/gruvbox
+ */
+
+:root {
+  --vp-c-brand-1: #d65d0e;
+  --vp-c-brand-2: #e56b12;
+  --vp-c-brand-3: #fe8019;
+  --vp-c-brand-soft: rgba(214, 93, 14, 0.14);
+
+  /* Gruvbox orange is mid-luminance; dark text keeps the buttons readable. */
+  --vp-button-brand-bg: #fe8019;
+  --vp-button-brand-text: #1d2021;
+  --vp-button-brand-border: transparent;
+  --vp-button-brand-hover-bg: #ff9633;
+  --vp-button-brand-hover-text: #1d2021;
+  --vp-button-brand-hover-border: transparent;
+  --vp-button-brand-active-bg: #d65d0e;
+  --vp-button-brand-active-text: #1d2021;
+  --vp-button-brand-active-border: transparent;
+
+  --vp-home-hero-name-color: transparent;
+  --vp-home-hero-name-background: linear-gradient(120deg, #fe8019 30%, #fabd2f);
+}
+
+.dark {
+  --vp-c-brand-1: #fe8019;
+  --vp-c-brand-2: #f57812;
+  --vp-c-brand-3: #d65d0e;
+  --vp-c-brand-soft: rgba(254, 128, 25, 0.16);
+}
+
+/*
+ * The hero image slot holds the terminal demo, which sizes itself; undo the
+ * default theme's fixed-size circular image treatment.
+ */
+.VPHome .VPHero .image-container {
+  width: min(480px, 100%);
+  height: auto;
+  transform: none;
+  margin: 0 auto;
+}
+
+.VPHome .VPHero .image-bg {
+  display: none;
+}
+
+/*
+ * Below 960px the default theme floats the image above the text with negative
+ * margins (sized for a small logo) — the terminal collides with the navbar and
+ * H1 there. Let it fall below the text block and clear it instead.
+ */
+@media (max-width: 959px) {
+  .VPHome .VPHero .image {
+    order: 3;
+    margin: 32px 0 0;
+  }
+}

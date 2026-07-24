@@ -98,7 +98,14 @@ assert_serves() {
 # `case`, NOT `curl | grep -q`: the suite runs under pipefail, where grep -q's
 # early exit can SIGPIPE curl and turn a served page into a false negative —
 # the same trap bin/para's instance_running documents.
+#
+# Matches the sentinel WITH the workspace name ("para-e2e-ok <name>", written by
+# the fixture's boot hook from $PARA_NAME) — not the bare "para-e2e-ok" prefix.
+# The suite keeps several workspaces up at once, so the prefix alone is satisfied
+# by ANY of them: a route that pointed this workspace's host at another
+# workspace's httpd would still pass. Binding to the name makes this an assertion
+# about routing, not just about something being alive.
 _serves_once() {
   local body; body="$(http_get "$1")" || return 1
-  case "$body" in *para-e2e-ok*) return 0 ;; *) return 1 ;; esac
+  case "$body" in *"para-e2e-ok $1"*) return 0 ;; *) return 1 ;; esac
 }

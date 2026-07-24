@@ -122,6 +122,26 @@ PARAFILE="${PARAFILE:-${PROJECT_ROOT:+$PROJECT_ROOT/.paraspace/Parafile}}"
 # Parafile normally sets these; the defaults just keep para working if it doesn't.
 : "${PARA_IMAGE:=para-dev}"
 : "${PARA_CLONE_DIR:=app}"
+# The incus image `para image-build` launches its builder from, and an optional
+# `sh -c` line run in that builder BEFORE the project's image-build.sh payload.
+# Both are the project's call: para builds whatever base you name and knows
+# nothing about its distro or package manager.
+#
+# NEITHER HAS A DEFAULT, deliberately. A default base would mean para picks your
+# distro — and worse, that a para update could silently rebuild your image on a
+# different one. So image-build refuses until the Parafile names a base. The
+# bootstrap is genuinely optional: it exists because the payload runs under
+# `bash -s` and a minimal base may not ship bash (or may need its package index
+# refreshed first) — `sh` is the one interpreter every base image has.
+#
+# So unlike the fallbacks above, these two lines apply no default at all: the
+# Parafile (sourced at the top of this block) and the environment have already
+# had their say, and these just materialise the names as empty so `set -u`
+# doesn't trip on the reads below. To mean "none", a Parafile must assign
+# plainly (PARA_IMAGE_BOOTSTRAP=""); the `: "${X:=…}"` idiom the templates use
+# fires on empty as well as unset, so it would overwrite it.
+PARA_BASE_IMAGE="${PARA_BASE_IMAGE-}"
+PARA_IMAGE_BOOTSTRAP="${PARA_IMAGE_BOOTSTRAP-}"
 # Project IDENTITY — the single key para uses for ownership, `para ls` scoping, and
 # the shared-volume name. Declared in the Parafile (`para init` bakes it to the dir
 # name); defaults to the project directory's basename so an undeclared project still
@@ -1360,10 +1380,10 @@ cmd_image_build() {
   local q=""; [ -t 2 ] || q="-q"
   require_project   # pre-pulls the project's stack images + publishes PARA_IMAGE
   # --from-current: layer this build onto the EXISTING $PARA_IMAGE instead of a
-  # pristine `images:voidlinux`. The whole provisioning payload is idempotent
-  # (install-only-missing packages, guarded user create, guarded bun/claude,
-  # `ln -sf`, a `sed` that no-ops on the second pass, digest-only `docker pull`),
-  # so a re-run applies just the delta in ~a minute instead of redoing the full
+  # pristine $PARA_BASE_IMAGE. This assumes the project's payload is idempotent
+  # (the bundled templates' are: install-only-missing packages, guarded user
+  # create, `ln -sf`, a `sed` that no-ops on the second pass, digest-only
+  # `docker pull`), so a re-run applies just the delta in ~a minute vs. the full
   # multi-minute install + 2.4GB pre-pull. Iterate with this; do one plain (from
   # pristine) build before you commit, so the published image is reproducible
   # from source and hasn't accreted drift from a chain of incremental layers.
@@ -1376,6 +1396,12 @@ cmd_image_build() {
       *) die "usage: para image-build [-q|--quiet|-v|--verbose] [-i|--from-current|--incremental]" ;;
     esac
   done
+  # Checked before anything is launched (and skipped for --from-current, which
+  # builds on $PARA_IMAGE and never touches the base). para pins no default: the
+  # distro is the project's choice, and a defaulted one could change under you
+  # when para updates.
+  [ "$from_current" -eq 1 ] || [ -n "$PARA_BASE_IMAGE" ] \
+    || die "PARA_BASE_IMAGE is not set — declare the incus image to build from in .paraspace/Parafile, e.g. : \"\${PARA_BASE_IMAGE:=images:debian/13}\". See docs/image.md."
   ensure_backend
   ensure_pool
   # NOT `local`: the EXIT-trap cleanup below runs after this function has
@@ -1397,29 +1423,31 @@ cmd_image_build() {
   }
   trap cleanup_builder EXIT
   trap 'echo >&2; warn "interrupted — tearing down builder…"; exit 130' INT TERM
-  local base="images:voidlinux"
+  local base="$PARA_BASE_IMAGE"
   if [ "$from_current" -eq 1 ]; then
     incus image info "$PARA_IMAGE" >/dev/null 2>&1 \
       || die "no existing '$PARA_IMAGE' image to build from — run a plain 'para image-build' first"
     base="$PARA_IMAGE"
     log "Incremental build: layering onto existing '$PARA_IMAGE' (nesting on)…"
   else
-    log "Launching builder (nesting on)…"
+    log "Launching builder from '$base' (nesting on)…"
   fi
   incus $q launch "$base" "$builder" --storage "$PARA_POOL" -c security.nesting=true
   _wait_ct "$builder"
-  # The provisioning payload below is bash (arrays, [[ ]]) run via `bash -s`.
-  # The Void base image already ships bash, but its bundled xbps is a rolling-
-  # release snapshot that can be too stale to install against until it's updated
-  # — so update xbps here first, before the payload runs its own full
-  # `xbps-install -Syu`. `-u` on a named package installs it when absent, so
-  # this also re-materialises bash defensively (covering a future base image
-  # that drops it) in the same shot. Costs ~a second. stderr is left visible on
-  # purpose: the whole build depends on this landing.
-  # Skip it on --from-current: $PARA_IMAGE already has bash + a current xbps.
-  if [ "$from_current" -eq 0 ]; then
-    log "Updating xbps (and ensuring bash) for the provisioning payload…"
-    incus exec "$builder" -- sh -c 'xbps-install -Syu xbps bash >/dev/null'
+  # The provisioning payload below is bash (arrays, [[ ]]) run via `bash -s`, so
+  # the base image must have bash by the time it runs. $PARA_IMAGE_BOOTSTRAP is
+  # the project's chance to put it there — one line run through `sh -c`, the one
+  # interpreter every base image ships, before the payload. It's also where a
+  # rolling-release base refreshes its package manager: Void's bundled xbps can
+  # be too stale to install against until it's updated (the templates declare
+  # `xbps-install -Syu xbps bash` for exactly that), and Alpine/Debian want an
+  # index sync. Unset/empty means none — a base that already has what the
+  # payload needs doesn't need this step at all.
+  # Skip it on --from-current: $PARA_IMAGE was already bootstrapped + provisioned.
+  # stderr is left visible on purpose: the whole build depends on this landing.
+  if [ "$from_current" -eq 0 ] && [ -n "$PARA_IMAGE_BOOTSTRAP" ]; then
+    log "Bootstrapping the builder for the provisioning payload…"
+    incus exec "$builder" -- sh -c "$PARA_IMAGE_BOOTSTRAP"
   fi
   local -a images=(); local _img
   while IFS= read -r _img; do [ -n "$_img" ] && images+=("$_img"); done < <(stack_images)
@@ -1440,8 +1468,8 @@ cmd_image_build() {
   # interrupt `wait` and run the INT trap, whose exit force-deletes the builder
   # (killing the in-container provisioning). `set -e` still aborts on a non-zero
   # provision exit, which fires the EXIT trap the same way.
-  # PARA_USER/UID/GID travel the same way: the payload creates that user (the
-  # Void base image has none), and every `incus file push --uid`/chown in the
+  # PARA_USER/UID/GID travel the same way: the payload creates that user (a
+  # pristine base image has no such user), and every `incus file push --uid`/chown in the
   # rest of para targets the same ids — so passing them here keeps the baked
   # user in lockstep with the running config instead of a hardcoded literal.
   incus exec "$builder" \
@@ -1449,16 +1477,17 @@ cmd_image_build() {
     --env "PARA_USER=$PARA_USER" --env "PARA_UID=$PARA_UID" --env "PARA_GID=$PARA_GID" \
     -- bash -s < "$payload" &
   wait "$!"
-  local driver; driver="$(incus exec "$builder" -- docker info --format '{{.Driver}}' 2>/dev/null || true)"
-  case "$driver" in
-    overlay|overlayfs|overlay2) log "docker storage driver: $driver ✓" ;;
-    *) die "docker driver is '$driver', not overlay(fs) — nested Docker would be slow. Use a dir/ext4 pool (see plan Prerequisites)." ;;
-  esac
+  # No post-provision assertions here on purpose: whether the image needs Docker
+  # at all — and whether Docker's storage driver resolved to overlay(fs) rather
+  # than a slow vfs fallback — is the PROJECT's policy, so that check lives in
+  # the payload that installs Docker (see the templates' image-build.sh). para
+  # only publishes whatever the payload built.
   log "Publishing image as '$PARA_IMAGE'…"
   # Force-stop, don't wait for a graceful shutdown. incus's default `stop` sends
   # the container's init an ACPI-style shutdown signal and waits for it to halt;
-  # Void's runit (unlike Ubuntu's systemd) doesn't answer it, so a plain stop
-  # times out ("Failed shutting down instance … context deadline exceeded"). A
+  # a container init that doesn't answer it (Void's runit, busybox init) makes a
+  # plain stop time out ("Failed shutting down instance … context deadline
+  # exceeded"). A
   # builder about to be snapshotted has nothing to flush cleanly — and we publish
   # from a frozen snapshot anyway (below) — so a hard stop is both safe and the
   # only init-agnostic way to reliably bring it down.
@@ -1505,6 +1534,8 @@ usage_full() {
   # project half is unknown), which reads as a typo — say so instead.
   local vol="$PARA_VOLUME"
   [ -n "$PARA_PROJECT" ] || [ "$PARA_VOLUME" != "para-home-" ] || vol="para-home-<project>  (resolved inside a project)"
+  # No default for the build base — say so rather than print an empty column.
+  local base="${PARA_BASE_IMAGE:-<unset — declare it in the Parafile>}"
   cat <<EOF
 para — parallel dev workspaces on Incus
 
@@ -1571,13 +1602,15 @@ PROJECT & IMAGE
                            files that already exist. --list/--names show the
                            available templates, -f/--force overwrites, --full
                            copies the whole template tree
-  image-build [-q|-v] [-i] build + publish the base image from the project's
-                           .paraspace/image-build.sh, pre-pulling the stack's
-                           external images. -q/--quiet and -v/--verbose force
-                           or keep incus progress bars (auto-quiet when not a
-                           TTY); -i/--from-current (alias --incremental) layers
-                           onto the existing image for fast iteration instead
-                           of starting from pristine Void
+  image-build [-q|-v] [-i] build + publish the base image: launch
+                           \$PARA_BASE_IMAGE, run \$PARA_IMAGE_BOOTSTRAP then the
+                           project's .paraspace/image-build.sh in it, pre-pull
+                           the stack's external images, publish as \$PARA_IMAGE.
+                           -q/--quiet and -v/--verbose force or keep incus
+                           progress bars (auto-quiet when not a TTY);
+                           -i/--from-current (alias --incremental) layers onto
+                           the existing image for fast iteration instead of
+                           starting from a pristine base
 
 CONFIG & AUTH
   key                      print this machine's para pubkey — authorize it on
@@ -1609,6 +1642,7 @@ CONFIGURATION
     PARA_DOMAIN       $PARA_DOMAIN
     PARA_HTTPS_PORT   $PARA_HTTPS_PORT
     PARA_IMAGE        $PARA_IMAGE
+    PARA_BASE_IMAGE   $base
     PARA_POOL         $PARA_POOL
     PARA_BRIDGE       $PARA_BRIDGE
     PARA_VOLUME       $vol

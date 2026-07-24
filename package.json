@@ -29,7 +29,10 @@
     "lint": "bin/lint",
     "site": "vitepress dev",
     "site:build": "vitepress build",
-    "site:preview": "vitepress preview"
+    "site:preview": "vitepress preview",
+    "test": "test/run",
+    "test:cli": "test/run --cli",
+    "test:e2e": "test/run --e2e"
   },
   "devDependencies": {
     "vitepress": "^1.6.4"

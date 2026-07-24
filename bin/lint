@@ -3,9 +3,10 @@ set -euo pipefail
 # ============================================================================
 # lint — shellcheck every bash script in the package.
 #
-# para is pure shell, so this is its test suite: shellcheck over the CLI plus
-# the templates' hooks and image-build.sh. skel/zshrc is zsh — shellcheck can't
-# parse it — and is skipped (it has no bash shebang, so discovery drops it).
+# para is pure shell, so this is its STATIC gate: shellcheck over the CLI, the
+# templates' hooks and image-build.sh, and the test/ suite. The behavioral gate
+# is test/run (see test/README.md). skel/zshrc is zsh — shellcheck can't parse
+# it — and is skipped (it has no bash shebang, so discovery drops it).
 #
 # Discovers targets by shebang (every tracked file whose first line names bash),
 # so a new hook is linted automatically with no list to maintain. Runs from

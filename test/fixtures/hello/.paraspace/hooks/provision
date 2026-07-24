@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+set -euo pipefail
+# para provision hook — runs INSIDE the workspace, in $HOME, before boot, as the
+# uid-1000 user. Idempotent: para re-runs it on every `para up`.
+#
+# The hello fixture has no repo to clone and no toolchain to install (that's baked
+# into the image). Provision does just enough to exercise the shared-volume seam:
+# it drops a one-time marker on the per-project shared volume and links it into
+# $HOME, so the e2e suite can prove the volume is mounted and shared across a
+# project's workspaces.
+
+. "$(dirname "$0")/helpers"
+
+shared="$PARA_SHARED"
+
+# `para sh <ws> -c` (and the interactive shell) cd into ~/$PARA_CLONE_DIR — para's
+# working-copy convention. A real project's clone hook creates it by cloning; this
+# fixture has no repo, so make the dir exist or every `para sh -c` would `cd || exit`
+# into nothing and run as a silent no-op.
+mkdir -p "$HOME/$PARA_CLONE_DIR"
+
+# Seed the shared volume once. Whatever lands here is visible to EVERY workspace
+# of this project (para attaches para-home-<project> at /para/shared to all of
+# them), which is exactly what test_shared asserts.
+if [ ! -f "$shared/.seeded" ]; then
+  stage "Seeding shared volume (one-time)"
+  mkdir -p "$shared"
+  echo "shared-volume-ok" > "$shared/marker"
+  touch "$shared/.seeded"
+fi
+
+# Link the shared marker into $HOME so a `para sh <ws> -c 'cat ~/marker'` sees it.
+[ -f "$shared/marker" ] && ln -sfn "$shared/marker" "$HOME/marker"
+
+stage "Provisioned (hello fixture)"

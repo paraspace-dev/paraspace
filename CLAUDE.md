@@ -54,11 +54,24 @@ seam, decide breaking-vs-additive deliberately and update both the constant and
   organized as small helpers + `cmd_*` handlers dispatched from `main()`. Match
   the surrounding style: terse helpers, `log/warn/die/need`, lowercase function
   names, POSIX-ish where practical.
-- **The test suite is ShellCheck**, run via `bin/lint` (or `npm run lint`) — CI
-  runs the same on every push/PR. It lints the CLI plus the templates' hooks and
-  `image-build.sh`. Hook sources resolve via `.shellcheckrc` (`source-path`), so
-  prefer that over per-file directives. **Run `bin/lint` before finishing any
-  change here** — it's the whole gate.
+- **ShellCheck is the static gate**, run via `bin/lint` (or `npm run lint`) — CI
+  runs the same on every push/PR. It lints the CLI plus the templates' hooks,
+  `image-build.sh`, and the `test/` scripts (discovered by shebang). Hook sources
+  resolve via `.shellcheckrc` (`source-path`), so prefer that over per-file
+  directives. **Run `bin/lint` before finishing any change here** — it's the
+  static gate.
+- **Behavioral tests live in [`test/`](./test/README.md)** (`test/run`, or
+  `npm test`): a CLI tier (no incus, runs in CI) and an e2e tier that drives a
+  real Incus workspace off a tiny Alpine fixture and asserts the incus/Caddy/hook/
+  volume seams (`up` → hooks → boot readiness → Caddy → the app). It's Docker-free
+  by design, so it does not cover the nested-Docker/compose boot path. Run
+  `test/run --e2e` after changing the `up`/route/lifecycle mechanism; every run is
+  sandboxed from your real workspaces. The e2e tier is **Linux-only** (native
+  incus, or a Linux VM on macOS) and **not run in CI** — only the CLI tier is — so
+  run it locally and confirm it's green before merging or marking a PR ready.
+  Tests are autodiscovered `test_*` functions run in name order, so write them
+  **order-independent**; see [`test/README.md`](./test/README.md) for the full
+  conventions (tier choice, `|| return 1`, `eventually`, per-workspace asserts).
 - The `zsh` `skel/` is intentionally not linted (ShellCheck parses only sh/bash).
 - `plans/` holds design notes for in-flight work; not shipped in the npm `files`.
 

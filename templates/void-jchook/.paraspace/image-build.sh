@@ -2,7 +2,8 @@
 set -euo pipefail
 
 # Guest provisioning for the void-jchook base image. Runs as root INSIDE a fresh
-# `images:voidlinux` (glibc) container — launched with security.nesting=true —
+# $PARA_BASE_IMAGE container — `images:voidlinux` (glibc) per the Parafile,
+# launched with security.nesting=true and bootstrapped with $PARA_IMAGE_BOOTSTRAP —
 # invoked by `para image-build`. Installs everything the carried dotfiles need so
 # `para up` only has to clone + `docker compose up`: Docker + compose (runit
 # service enabled), git, and the full interactive environment the skel/ dotfiles
@@ -46,7 +47,7 @@ xbps-install -Syu xbps >/dev/null 2>&1 || true
 xbps-install -Syu -y >/dev/null
 # Install only what's missing — xbps errors (non-fatally, but noisily) on an
 # explicitly-named already-present package, and a few here always are (bash from
-# para's build bootstrap; ca-certificates/sudo from the Void base image).
+# the Parafile's PARA_IMAGE_BOOTSTRAP; ca-certificates/sudo from the Void base image).
 pkgs="bash ca-certificates curl git zsh tmux sudo unzip xz
       docker docker-compose just github-cli neovim nodejs tree-sitter-cli
       base-devel ripgrep fd bat fzf lsd tree kitty-terminfo alacritty-terminfo ncurses-term"
@@ -114,11 +115,16 @@ ln -sf "$HOME_DIR/.local/bin/claude" /usr/local/bin/claude
 echo "==> waiting for docker daemon"
 for _ in $(seq 1 30); do docker info >/dev/null 2>&1 && break; sleep 1; done
 
-echo "==> docker storage driver:"
-# para also verifies this host-side and refuses a non-overlay driver — nested
-# Docker on a btrfs/zfs(<2.2) pool silently falls back to vfs (slow). A dir/ext4
-# pool gives overlayfs.
-docker info --format '{{.Driver}}'
+# Nested Docker on a btrfs/zfs(<2.2) pool silently falls back to the vfs storage
+# driver, which is punishingly slow — a dir/ext4 pool gives overlayfs. para does
+# NOT check this (it knows nothing about Docker): an image that needs Docker is
+# the one that has to refuse to publish itself half-broken.
+echo "==> docker storage driver"
+driver="$(docker info --format '{{.Driver}}' 2>/dev/null || true)"
+case "$driver" in
+  overlay|overlayfs|overlay2) echo "  $driver ✓" ;;
+  *) echo "error: docker driver is '$driver', not overlay(fs) — nested Docker would be slow. Use a dir/ext4 incus pool." >&2; exit 1 ;;
+esac
 
 # Pre-pull the stack's images so `para up` boots without hitting the network in
 # every workspace. The tag list arrives via PARA_PREPULL_IMAGES (set by `para

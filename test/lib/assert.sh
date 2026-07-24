@@ -1,0 +1,111 @@
+#!/usr/bin/env bash
+# assert.sh — assertions for the para test suite. Each prints a diagnostic to
+# stderr and returns non-zero on failure; the harness (harness.sh) treats any
+# non-zero return from a test_* function as a failed test, so a bare `assert_*`
+# call is a hard checkpoint. Keep them small and shellcheck-clean.
+
+# assert <cmd...> — the command must succeed.
+assert() {
+  if ! "$@"; then echo "  assert failed: $*" >&2; return 1; fi
+}
+
+# para_do <para-args...> — run a para command for its SIDE EFFECT (up/down/rm/…).
+# Silent on success; on failure it echoes para's combined output and returns
+# non-zero, so a red test is debuggable instead of a bare `✗`. Use this for
+# mutating calls whose stdout you don't need; capture stdout directly (not via
+# this) when a test asserts on it.
+para_do() {
+  local out line
+  if ! out="$("$PARA" "$@" 2>&1)"; then
+    printf '    para %s failed:\n' "$1" >&2
+    # Gutter every line. A single `printf '    | %s\n' "$out"` prefixes only the
+    # first one and dumps the rest flush left — i.e. most of a multi-line failure.
+    while IFS= read -r line; do printf '    | %s\n' "$line" >&2; done <<<"$out"
+    return 1
+  fi
+}
+
+# assert_eq <expected> <actual> [label]
+assert_eq() {
+  if [ "$1" != "$2" ]; then
+    echo "  assert_eq${3:+ ($3)} failed: expected '$1', got '$2'" >&2
+    return 1
+  fi
+}
+
+# assert_contains <haystack> <needle> [label]
+assert_contains() {
+  case "$1" in
+    *"$2"*) return 0 ;;
+    *) echo "  assert_contains${3:+ ($3)} failed: '$2' not in:" >&2
+       printf '    %s\n' "$1" >&2; return 1 ;;
+  esac
+}
+
+# assert_not_contains <haystack> <needle> [label]
+assert_not_contains() {
+  case "$1" in
+    *"$2"*) echo "  assert_not_contains${3:+ ($3)} failed: found '$2' in:" >&2
+            printf '    %s\n' "$1" >&2; return 1 ;;
+    *) return 0 ;;
+  esac
+}
+
+# assert_fails <cmd...> — the command must FAIL (non-zero). For "para rejects X".
+assert_fails() {
+  if "$@" >/dev/null 2>&1; then
+    echo "  assert_fails failed: '$*' unexpectedly succeeded" >&2
+    return 1
+  fi
+}
+
+# eventually <timeout-s> <cmd...> — retry until the command succeeds or the
+# timeout elapses (0.25s between tries). For race-free waits on async state
+# (an HTTP endpoint, a state transition) without a fixed sleep.
+eventually() {
+  local timeout="$1"; shift
+  local deadline=$((SECONDS + timeout))
+  while [ "$SECONDS" -lt "$deadline" ]; do
+    if "$@" >/dev/null 2>&1; then return 0; fi
+    sleep 0.25
+  done
+  echo "  eventually: '$*' never succeeded within ${timeout}s" >&2
+  return 1
+}
+
+# curl a workspace URL through the run's para Caddy, hermetically (--resolve, so
+# it never depends on public DNS for *.paraspace.dev) and without cert fussing
+# (-k, para's internal CA). Echoes the body; non-zero on transport failure.
+http_get() { # http_get <workspace>
+  local ws="$1" host
+  host="$ws.${PARA_DOMAIN:-paraspace.dev}"
+  curl -sk --max-time 10 --resolve "$host:$PARA_HTTPS_PORT:127.0.0.1" \
+    "https://$host:$PARA_HTTPS_PORT/"
+}
+
+# assert_serves <workspace> [timeout-s] — the workspace answers through para's
+# Caddy with the fixture's sentinel. Routing is asynchronous (Caddy reloads on
+# every `up`), so this always retries rather than asking once — reach for it
+# instead of a bare http_get whenever the request follows a state change.
+assert_serves() {
+  local ws="$1" timeout="${2:-30}"
+  eventually "$timeout" _serves_once "$ws" \
+    || { echo "  assert_serves: '$ws' never served the sentinel within ${timeout}s" >&2; return 1; }
+}
+
+# One shot of the above. Split out so `eventually` can re-invoke it as a command
+# (no `sh -c` string, so the workspace name is never re-parsed by a shell).
+# `case`, NOT `curl | grep -q`: the suite runs under pipefail, where grep -q's
+# early exit can SIGPIPE curl and turn a served page into a false negative —
+# the same trap bin/para's instance_running documents.
+#
+# Matches the sentinel WITH the workspace name ("para-e2e-ok <name>", written by
+# the fixture's boot hook from $PARA_NAME) — not the bare "para-e2e-ok" prefix.
+# The suite keeps several workspaces up at once, so the prefix alone is satisfied
+# by ANY of them: a route that pointed this workspace's host at another
+# workspace's httpd would still pass. Binding to the name makes this an assertion
+# about routing, not just about something being alive.
+_serves_once() {
+  local body; body="$(http_get "$1")" || return 1
+  case "$body" in *"para-e2e-ok $1"*) return 0 ;; *) return 1 ;; esac
+}

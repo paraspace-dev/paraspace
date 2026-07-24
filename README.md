@@ -80,10 +80,16 @@ personal dev environment on the same demo). Each has its own README.
 
 ## Development
 
-para is pure shell, so its test suite is
-[ShellCheck](https://www.shellcheck.net): `bin/lint` (or `npm run lint`). It
-uses a `shellcheck` on your `PATH`, or falls back to the pinned docker image.
-CI runs the same on every push/PR.
+Two gates, both run on every push/PR:
+
+- **`bin/lint`** (or `npm run lint`) — [ShellCheck](https://www.shellcheck.net)
+  over every bash script in the package, discovered by shebang. Uses a
+  `shellcheck` on your `PATH`, or falls back to the pinned docker image.
+- **`test/run`** (or `npm test`) — the behavioral suite, in two tiers. The CLI
+  tier (`--cli`) needs nothing but bash and runs in CI; the e2e tier (`--e2e`)
+  drives a real Incus workspace off a tiny Alpine fixture and is **Linux-only,
+  not run in CI** — run it locally before you merge anything touching the
+  `up`/route/lifecycle mechanism. See [`test/README.md`](./test/README.md).
 
 ## License
 

@@ -62,7 +62,7 @@ because the command runs through a login shell in the clone rather than being
 | Command | What it does |
 |---|---|
 | `para init [<template>] [--list\|--names\|-f\|--force\|--full]` | scaffold `.paraspace/` from a bundled template (default `void-docker-gh`), skipping existing files; `-f`/`--force` overwrites, `--full` copies the whole template tree |
-| `para image-build [-q\|-v] [-i]` | build + publish the base image from `.paraspace/image-build.sh`; `-q`/`--quiet` and `-v`/`--verbose` force or keep incus progress bars; `-i`/`--from-current` (alias `--incremental`) layers onto the existing image for fast iteration — see [The image contract](./image.md) |
+| `para image-build [-q\|-v] [-i]` | build + publish the base image: launch `$PARA_BASE_IMAGE`, run `$PARA_IMAGE_BOOTSTRAP` then `.paraspace/image-build.sh` in it, publish as `$PARA_IMAGE`; `-q`/`--quiet` and `-v`/`--verbose` force or keep incus progress bars; `-i`/`--from-current` (alias `--incremental`) layers onto the existing image for fast iteration — see [The image contract](./image.md) |
 
 ## Config & auth
 

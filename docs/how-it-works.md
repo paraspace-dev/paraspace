@@ -3,22 +3,21 @@
 ## The problem
 
 Run two agents in one working copy and they trip over each other: branches
-change underneath, half-finished edits from one land in the other's context,
-and the mixed diff has to be teased apart into separate PRs afterward. A
-worktree per agent fixes the files — but each task still needs the whole app
-running (services up, database seeded, something to open in a browser), and
-those stacks collide on one machine: same ports, same Docker daemon, same
-`.env`.
+change underneath, half-finished edits land in each other's context, and the
+mixed diff has to be teased apart into separate PRs afterward.
 
 The usual escapes:
 
+- **A worktree per agent** separates the files, but each task still needs the
+  whole app running — and those stacks collide on one machine: same ports,
+  same Docker daemon, same `.env`.
+- **Port offsets and per-branch overrides** move the collisions into config
+  you now maintain by hand.
+- **A VM per workspace** isolates cleanly but reserves fixed RAM and CPU for
+  each — a laptop affords two or three.
 - **Hosted dev environments** do the isolation in the cloud, and the interface
   is the price: web terminals, browser IDEs, routing that fights you — metered
   by the hour while your own machine idles.
-- **Port offsets and per-branch overrides** keep everything local but move the
-  collisions into config you now maintain by hand.
-- **A VM per workspace** isolates cleanly but reserves fixed RAM and CPU for
-  each — a laptop affords two or three.
 
 `para` runs each workspace as an Incus **system** container: isolated like a
 VM, no fixed reservation, and containers still run *inside* it — a Docker

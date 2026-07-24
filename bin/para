@@ -211,14 +211,14 @@ fi
 # (registry field 4) so a global para stays correct across projects on different
 # domains. The default's wildcard (`*.paraspace.dev`) already points at 127.0.0.1.
 : "${PARA_DOMAIN:=paraspace.dev}"
-# Validated like PARA_CLONE_DIR below, and for a sharper reason: PARA_DOMAIN is
-# registry field 4 AND is deliberately settable box-wide from the user config, so a
-# value with a space (`para config-set PARA_DOMAIN "my dev"`) would write a 6-field
-# row — scoped `ls` drops the workspace, and a later `up` refuses it as belonging to
-# a project named after the spilled fragment, unrecoverable without hand-editing the
-# registry. It is also spliced into Caddy site addresses.
-[[ "$PARA_DOMAIN" =~ ^[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?$ ]] \
-  || { printf 'para: PARA_DOMAIN must be a hostname ([A-Za-z0-9.-], no spaces); got %s\n' "$PARA_DOMAIN" >&2; exit 1; }
+# NOT validated here. PARA_DOMAIN is registry field 4 and is spliced into Caddy
+# site addresses, so a value with a space really does corrupt things — but it is
+# also deliberately settable box-wide from the user config, and an `exit 1` at load
+# would repeat the very mistake route validation was just moved out of config load
+# to avoid: `para config-set PARA_DOMAIN "my dev"` writes it unvalidated, and every
+# command afterwards — `ls`, `--help`, `reconcile`, and `config-set` ITSELF — dies,
+# leaving no way back except hand-editing the config file. So it is checked on
+# WRITE (cmd_config_set) and at USE (cmd_up, before the registry row is written).
 # PARA_CLONE_DIR is spliced into guest shell commands (clone path, cd, hook
 # dispatch), so keep it a plain single path segment — no spaces, metacharacters,
 # leading dot, or slashes — rather than trusting the Parafile value blindly.
@@ -369,6 +369,39 @@ validate_name() {
     || die "invalid name '$1' — lowercase letters, digits, hyphens; start with a letter (<=31 chars)"
 }
 
+# PARA_DOMAIN becomes registry field 4 (space-separated, positional) and a Caddy
+# site address. Checked on write and at use rather than at config load — see the
+# note beside the default.
+validate_domain() {
+  [[ "$1" =~ ^[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?$ ]] \
+    || die "PARA_DOMAIN must be a hostname ([A-Za-z0-9.-], no spaces); got '$1'"
+}
+
+# The Caddy site host a route entry resolves to, for workspace <name> on <domain>:
+# "[sub:]port" -> "<sub>.<name>.<domain>", or "<name>.<domain>" for a bare port.
+# LOWERCASED, because DNS and Caddy are case-insensitive: "API:3000" and
+# "api:3001" look distinct to a byte comparison but collapse into ONE Caddy site,
+# whose first handler is terminal — so the second route is lost without a word.
+route_host() { # route_host <entry> <name> <domain>
+  local sub
+  case "$1" in *:*) sub="${1%%:*}" ;; *) sub="" ;; esac
+  sub="$(printf '%s' "$sub" | tr '[:upper:]' '[:lower:]')"
+  if [ -n "$sub" ]; then printf '%s.%s.%s\n' "$sub" "$2" "$3"; else printf '%s.%s\n' "$2" "$3"; fi
+}
+
+# The port half of a route entry.
+route_port() { case "$1" in *:*) printf '%s\n' "${1##*:}" ;; *) printf '%s\n' "$1" ;; esac; }
+
+# Does this comma-separated route list publish the workspace APEX (a bare port)?
+# Only then does https://<name>.<domain> exist — a subdomain-only project has no
+# site there, so printing that URL would send you somewhere with nothing on it.
+has_apex_route() { # has_apex_route <csv>
+  local e _o="$IFS"
+  IFS=,
+  for e in $1; do case "$e" in *:*) ;; *) IFS="$_o"; return 0 ;; esac; done
+  IFS="$_o"; return 1
+}
+
 # Parse, validate and CANONICALIZE $PARA_ROUTES in place. Called from cmd_up (the
 # only place routes are consumed), never at config load — see the note there.
 #
@@ -421,14 +454,23 @@ parse_routes() {
   # start would fail for every workspace on the box. So check the value, not just
   # the pattern. (Rejecting "-" also keeps the no-routes registry sentinel
   # unambiguous.)
-  local _seen=""
+  local _seen="" _i=0
   for _r in "${_routes[@]}"; do
-    [[ "$_r" =~ ^([A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?:)?[0-9]{1,5}$ ]] \
-      || die "PARA_ROUTES entry '$_r' is not \"[sub:]port\" — a port, optionally prefixed by a subdomain (e.g. \"3000\" or \"3000,api:3001\"). Separate entries with commas, spaces or newlines."
-    case "$_r" in
-      *:*) _sub="${_r%%:*}"; _port="${_r##*:}" ;;
-      *)   _sub="";          _port="$_r" ;;
-    esac
+    [ -n "$_r" ] \
+      || die "PARA_ROUTES has an empty entry (a stray or leading comma) — separate entries with a single comma, space or newline."
+    # Subdomain: a DNS label — 1-63 chars, no leading or trailing hyphen. Port:
+    # digits, no leading zeros (so "0080" and "80" can't be two spellings of one
+    # port that the duplicate check below would then treat as distinct).
+    [[ "$_r" =~ ^([A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?:)?(0|[1-9][0-9]{0,4})$ ]] \
+      || die "PARA_ROUTES entry '$_r' is not \"[sub:]port\" — a port (no leading zeros), optionally prefixed by a subdomain of up to 63 characters (e.g. \"3000\" or \"3000,api:3001\")."
+    # Canonical form is lowercased: the host it becomes is case-insensitive, so
+    # the record should be too — otherwise "API:3000" and "api:3001" read as two
+    # routes here and silently collapse into one Caddy site later.
+    _r="$(printf '%s' "$_r" | tr '[:upper:]' '[:lower:]')"
+    _routes[_i]="$_r"
+    _i=$((_i + 1))
+    case "$_r" in *:*) _sub="${_r%%:*}" ;; *) _sub="" ;; esac
+    _port="$(route_port "$_r")"
     # Caddy parses the upstream port as a uint16; 0 and >65535 are hard errors.
     if [ "$_port" -lt 1 ] || [ "$_port" -gt 65535 ]; then
       die "PARA_ROUTES entry '$_r' has port $_port — must be 1-65535 (Caddy rejects anything else, and the reload failure would take down routing for every workspace)."
@@ -436,7 +478,10 @@ parse_routes() {
     # Two entries resolving to the same hostname become two Caddy site blocks with
     # the same address — "ambiguous site definition", which fails the whole config,
     # not just this workspace. `3000,3001` (two apex sites) is the easy mistake.
-    _host="${_sub:-<apex>}"
+    # Compared via route_host so this matches exactly what gen_caddyfile will emit,
+    # case-folding included. The workspace name is irrelevant to a within-list
+    # comparison, so a placeholder stands in for it.
+    _host="$(route_host "$_r" ws "$PARA_DOMAIN")"
     case ",$_seen," in
       *",$_host,"*)
         if [ -n "$_sub" ]; then
@@ -771,7 +816,12 @@ https://localhost$up, https://local.$PARA_DOMAIN$up {
 }
 EOF
     fi
-    local route sub port host routes domain project dom ws_routes
+    # Every site address emitted so far, so the workspace loop below can refuse to
+    # emit a second block for the same host. SEEDED with the passthrough's two
+    # addresses when it's on: a workspace named `local` would otherwise collide
+    # with `local.$PARA_DOMAIN` above and make the whole config ambiguous.
+    local route sub port host routes domain project dom ws_routes seen_hosts=""
+    [ -n "$wc_port" ] && seen_hosts=",localhost,local.$PARA_DOMAIN"
     while read -r name ip routes domain project; do   # project (field 5) consumed so it can't leak into $domain
       [ -z "${name:-}" ] && continue
       # Routes (field 3) and domain (field 4) come from the registry PER WORKSPACE
@@ -783,15 +833,30 @@ EOF
       # "-" is the sentinel for a workspace that declared an empty PARA_ROUTES — it
       # publishes no Caddy site at all (field 3 can't be empty; see cmd_up).
       [ "$routes" = "-" ] && continue
+      # An unknown domain (reconcile's sentinel for an unstamped container) has no
+      # host to serve — emitting "name.-" would be a site nobody can reach.
+      [ "$domain" = "-" ] && continue
       IFS=, read -ra ws_routes <<<"$routes"
       dom="$domain"
       printf '\n# Workspace %s:\n' "$name"
       for route in "${ws_routes[@]}"; do
-        case "$route" in
-          *:*) sub="${route%%:*}"; port="${route##*:}" ;;
-          *)   sub="";            port="$route" ;;
+        port="$(route_port "$route")"
+        host="$(route_host "$route" "$name" "$dom")"
+        # LAST line of defence against an ambiguous Caddyfile, and the only one
+        # that can see the whole machine. parse_routes rejects collisions WITHIN a
+        # workspace, but two hosts can still collide ACROSS rows — a workspace
+        # literally named `local` against the PARA_WORKCOPY passthrough, or nested
+        # domains (workspace `x` on dev.lan with route `api:` vs workspace `api` on
+        # x.dev.lan). Caddy rejects the entire config on a duplicate site address,
+        # so one bad pair would take routing down for every workspace here. Skipping
+        # the later duplicate keeps the config valid and says so, rather than
+        # emitting something `caddy_reload` would swallow the failure of.
+        case ",$seen_hosts," in
+          *",$host,"*)
+            warn "skipping duplicate site $host (workspace '$name') — another workspace already publishes it"
+            continue ;;
         esac
-        [ -n "$sub" ] && host="$sub.$name.$dom" || host="$name.$dom"
+        seen_hosts="$seen_hosts,$host"
         cat <<EOF
 
 https://$host$up {
@@ -908,10 +973,11 @@ run_hook() { # run_hook <hook> <name>
   #   PARA_HOSTNAME/GIT_NAME/GIT_EMAIL — host identity (gitconfig + ssh-key label).
   local PARA_NAME="$name" PARA_SHARED="/para/shared"
   local PARA_URL PARA_HOSTNAME PARA_GIT_NAME PARA_GIT_EMAIL
-  # EMPTY for a workspace that declared no routes — there is no Caddy site, so
-  # handing a hook a URL that resolves to nothing would be a lie. A hook that
-  # prints or curls it should test for empty.
-  if [ -n "$PARA_ROUTES" ]; then PARA_URL="https://$name.$PARA_DOMAIN$(url_port)"; else PARA_URL=""; fi
+  # EMPTY unless some entry claims the APEX. https://<name>.<domain> only exists
+  # when a bare port is routed there — a subdomain-only project publishes
+  # https://api.<name>.<domain> and nothing at the apex, so handing a hook the
+  # apex URL would point it at a host with no site.
+  if has_apex_route "$PARA_ROUTES"; then PARA_URL="https://$name.$PARA_DOMAIN$(url_port)"; else PARA_URL=""; fi
   PARA_HOSTNAME="$(hostname -s 2>/dev/null || hostname)"
   PARA_GIT_NAME="$(git config --global user.name 2>/dev/null || true)"
   PARA_GIT_EMAIL="$(git config --global user.email 2>/dev/null || true)"
@@ -977,6 +1043,9 @@ cmd_up() {
   # command and not `ls`/`rm`/`reconcile`/`--help`. Leaves PARA_ROUTES comma-joined,
   # which is what the registry row, the container stamp and the hook env all carry.
   parse_routes
+  # Same reasoning as parse_routes: PARA_DOMAIN becomes registry field 4 and a
+  # Caddy site address, and is checked where it is used rather than at config load.
+  validate_domain "$PARA_DOMAIN"
   # Field 3 is positional, so a route-less workspace records the "-" sentinel — an
   # empty field would shift domain and project one place left in every reader's
   # `read -r name ip routes domain project`.
@@ -1075,10 +1144,17 @@ cmd_up() {
   log "Booting the stack via the project's boot hook — first run pulls images, be patient…"
   run_hook boot "$name"
   gen_caddyfile; caddy_reload
-  if [ "$rcsv" = "-" ]; then
+  if has_apex_route "$rcsv"; then
+    log "Workspace '$name' ready → https://$name.$PARA_DOMAIN$(url_port)"
+  elif [ "$rcsv" = "-" ]; then
     log "Workspace '$name' ready (no HTTP routes declared — 'para sh $name' for a shell)."
   else
-    log "Workspace '$name' ready → https://$name.$PARA_DOMAIN$(url_port)"
+    # Subdomain-only: name the sites that DO exist rather than an apex that doesn't.
+    local _r _hosts=""
+    local _o="$IFS"; IFS=,
+    for _r in $rcsv; do _hosts="$_hosts https://$(route_host "$_r" "$name" "$PARA_DOMAIN")$(url_port)"; done
+    IFS="$_o"
+    log "Workspace '$name' ready →$_hosts"
   fi
 }
 
@@ -1155,8 +1231,19 @@ cmd_reconcile() {
     domain="$(ct_meta "$ct" user.para.domain)"
     # Same positional-field guard as $routes above and $ip below — an unstamped or
     # unreadable domain would collapse the row to four fields and shift every
-    # reader's parse. "-" is never a valid domain, so it reads as "unknown".
+    # reader's parse. "-" is never a valid domain, so it reads as "unknown"
+    # (gen_caddyfile emits no site for it; `para ls` shows no URL).
     [ -n "$domain" ] || domain="-"
+    # Every stamp goes straight into a SPACE-separated positional row, so each must
+    # be a single token. Empty is defaulted above; a value carrying a space or
+    # newline — hand-set, or stamped by a para old enough to predate PARA_DOMAIN
+    # validation — would shift every reader's parse just as an empty one would, so
+    # skip the row rather than corrupt the registry with it.
+    case "$routes$domain$project" in
+      *[[:space:]]*)
+        warn "skip '$ct' — its para stamps contain whitespace; 'para up $name' restamps it"
+        skipped=$((skipped + 1)); continue ;;
+    esac
     ip="$(incus config device get "$ct" eth0 ipv4.address 2>/dev/null || true)"
     if [ -z "$ip" ]; then
       # An empty ip would collapse the space-joined row to four fields and shift
@@ -1213,9 +1300,14 @@ cmd_ls() {
     # and pick the exact row. (Piping into awk is SIGPIPE-safe — awk drains stdin.)
     local ctn; ctn="$(ct_name "$name")"
     state="$(incus list "$ctn" -c ns -f csv 2>/dev/null | awk -F, -v c="$ctn" '$1==c{print $2}')" || true
-    # A route-less workspace (the "-" sentinel, from an empty PARA_ROUTES) publishes no
-    # Caddy site, so there is no URL to print for it.
-    if [ "$routes" = "-" ]; then url="-"; else url="https://$name.$domain$(url_port)"; fi
+    # No apex site -> no apex URL. Covers both the route-less sentinel ("-") and a
+    # subdomain-only project, and an unknown domain ("-", from reconcile) has no
+    # reachable host at all.
+    if [ "$routes" = "-" ] || [ "$domain" = "-" ] || ! has_apex_route "$routes"; then
+      url="-"
+    else
+      url="https://$name.$domain$(url_port)"
+    fi
     if [ -n "$scope" ]; then
       printf '%-22s %-16s %-9s %s\n' "$name" "$ip" "${state:-MISSING}" "$url"
     else
@@ -1351,6 +1443,12 @@ cmd_web() {
   # "-" is the no-routes sentinel — there is no Caddy site to open.
   [ "$wroutes" != "-" ] \
     || die "workspace '$name' publishes no HTTP routes (its project declares an empty PARA_ROUTES) — there is no URL to open."
+  [ "$wdomain" != "-" ] \
+    || die "workspace '$name' has no recorded domain (its container is unstamped) — run 'para reconcile', or 'para up $name' to re-register it."
+  # Only a bare-port entry publishes the apex; a subdomain-only workspace has no
+  # site at https://<name>.<domain>, so opening it would land on nothing.
+  has_apex_route "$wroutes" \
+    || die "workspace '$name' publishes no apex site — its routes are subdomain-only ($wroutes). Open one of https://<sub>.$name.${wdomain:-$PARA_DOMAIN}$(url_port) instead."
   local url; url="https://$name.${wdomain:-$PARA_DOMAIN}$(url_port)"
   case "$(uname -s)" in
     Darwin) open "$url" ;;
@@ -1370,6 +1468,11 @@ cmd_config_set() {
   # Refuse the per-project keys the loader would ignore anyway, so the mistake
   # surfaces here (where the user is looking) rather than as a warning on every
   # later command.
+  # Checked here rather than at config load: PARA_DOMAIN lands in a positional
+  # registry field and a Caddy site address, but bricking every command on a bad
+  # stored value — including this one, the only way to fix it — is worse than the
+  # corruption. Catch it on the way in.
+  [ "$1" != PARA_DOMAIN ] || validate_domain "$2"
   if parafile_only_key "$1"; then
     die "'$1' is per-project — set it in the project's .paraspace/Parafile, not the user config: a box-wide value would apply it to every project on this machine. See docs/parafile.md."
   fi
@@ -1709,8 +1812,17 @@ cmd_image_build() {
   # image, and this cleanup would delete it outright. The prefix puts the temp name
   # in a namespace no derived image occupies.
   tmp_alias="para-imgbuild-tmp-$PARA_PROJECT"
+  # The prefix makes a collision take a pathological project name, but "unlikely"
+  # is not "impossible" — a project dir named para-imgbuild-tmp-app derives exactly
+  # project `app`'s temp alias, and an explicitly declared PARA_IMAGE can land on
+  # it directly. Refuse rather than publish over someone's real image.
+  [ "$tmp_alias" != "$PARA_IMAGE" ] \
+    || die "PARA_IMAGE '$PARA_IMAGE' collides with the name para uses for its temporary build alias — rename the project, or set PARA_IMAGE explicitly in .paraspace/Parafile."
+  # Set once the new image is published and the old alias is gone: from that
+  # moment $tmp_alias IS the only copy, so the cleanup trap must not delete it.
+  published=0
   cleanup_builder() {
-    incus image delete "$tmp_alias" >/dev/null 2>&1 || true
+    [ "$published" -eq 1 ] || incus image delete "$tmp_alias" >/dev/null 2>&1 || true
     incus delete -f "$builder" >/dev/null 2>&1 || true
   }
   trap cleanup_builder EXIT
@@ -1795,6 +1907,11 @@ cmd_image_build() {
   # the box with NO image. Now the live image is only dropped once the new one
   # is in hand. --reuse in case a prior aborted run left the temp alias behind.
   incus $q publish "$builder/publish" --reuse --alias "$tmp_alias"
+  # From here the temp alias holds the only copy — a Ctrl-C or a failed rename
+  # between these two lines would otherwise fire the trap, delete it, and leave the
+  # box with NO image at all: precisely what publishing to a temp alias exists to
+  # prevent.
+  published=1
   incus image delete "$PARA_IMAGE" >/dev/null 2>&1 || true
   incus image alias rename "$tmp_alias" "$PARA_IMAGE"
   # Stamp provenance so `para image status` can report drift: the hash of the
@@ -1937,7 +2054,8 @@ usage_full() {
   # require_project first). Printing the literal would advertise a default this
   # very branch removed, so say what it really is — mirroring PARA_VOLUME above.
   local img="$PARA_IMAGE"
-  [ -n "$PARA_PROJECT" ] || img="<derived from PARA_PROJECT, inside a project>"
+  [ -n "$PARA_PROJECT" ] || [ "$PARA_IMAGE" != para-dev ] \
+    || img="<derived from PARA_PROJECT, inside a project>"
   cat <<EOF
 para — parallel dev workspaces on Incus
 

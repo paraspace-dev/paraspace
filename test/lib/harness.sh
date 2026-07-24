@@ -35,7 +35,11 @@ run_test() {
   # `|| rc=$?` keeps the runner's `set -e` from aborting on a failing test — the
   # subshell's non-zero is data here, not an error to propagate.
   rc=0
-  ( "$fn" ) || rc=$?
+  # The subshell keeps a test's `cd`/`set -x`/stray exit from leaking; the trap
+  # inside it removes whatever fixtures the test created, on the failure path as
+  # well as the success one. That is why no test carries its own cleanup — and why
+  # an early `return 1` from a failed assert cannot leak state into the next test.
+  ( trap 'scratch_cleanup 2>/dev/null || true' EXIT; "$fn" ) || rc=$?
   local took=$((SECONDS - start))
   if [ "$rc" -eq 0 ]; then
     printf '%s%s✓%s %s %s(%ds)%s\n' "$_t_cr" "$_t_grn" "$_t_off" "$desc" "$_t_gray" "$took" "$_t_off"

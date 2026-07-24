@@ -76,6 +76,15 @@ staying at 1 stays explicable:
   project-agnostic commands work from anywhere. Validation now runs where routes
   are consumed. Consequence worth knowing: an invalid `PARA_ROUTES` is reported by
   `up`, not by the next command you happen to run.
+- **`PARA_URL` is empty unless the workspace publishes an apex site.** Previously
+  it was always `https://<name>.<domain>`, even for a project whose routes are all
+  subdomains — a URL with nothing behind it. Additive in the sense that the new
+  value is only reachable through configurations that were previously invalid or
+  inexpressible, but it is a contract variable gaining a new value, so it is
+  recorded here.
+- **`PARA_DOMAIN` is validated as a hostname**, on write (`para config-set`) and
+  at use (`para up`) — not at config load, for the same reason routes moved: a bad
+  stored value must not disable the commands you would use to repair it.
 - **`PARA_IMAGE` now defaults to `$PARA_PROJECT`** instead of the fixed
   `para-dev`. Incus image aliases are daemon-global, so the old default put two
   projects that both left the key unset on one image — and a build in either

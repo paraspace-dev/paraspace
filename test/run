@@ -53,6 +53,8 @@ done
 . "$HERE/lib/assert.sh"
 # shellcheck source=lib/sandbox.sh
 . "$HERE/lib/sandbox.sh"
+# shellcheck source=lib/project.sh
+. "$HERE/lib/project.sh"
 
 incus_ok=0
 if command -v incus >/dev/null 2>&1 && incus info >/dev/null 2>&1; then incus_ok=1; fi

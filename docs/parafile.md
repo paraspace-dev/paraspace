@@ -130,11 +130,16 @@ for r in $(parse_routes); do …; done      # with the templates' helpers
 
 para validates every entry when you `para up`, before canonicalizing:
 
-- the port must be **1–65535** — Caddy rejects anything else outright;
-- the optional subdomain must be a DNS label (no leading or trailing hyphen);
+- the port must be **1–65535**, with no leading zeros — Caddy rejects an
+  out-of-range port outright, and `0080` vs `80` would otherwise be two spellings
+  of one port that the duplicate check below treats as different;
+- the optional subdomain must be a DNS label — 1–63 characters, no leading or
+  trailing hyphen;
 - no two entries may resolve to the **same hostname** — two bare ports both claim
   the workspace apex, and Caddy refuses the whole config as an "ambiguous site
-  definition", not just that one site;
+  definition", not just that one site. The comparison is case-insensitive, as DNS
+  is: `API:3000,api:3001` is one hostname, not two, and Caddy would silently serve
+  only the first. Entries are lowercased in the canonical form for the same reason;
 - an entry containing a space, or an empty one from a stray comma, is refused
   because it would corrupt the workspace registry.
 
@@ -145,12 +150,28 @@ workspace on the machine.
 
 Validation runs at `up`, not when the `Parafile` is read, so a bad value can never
 cost you the commands you'd use to fix it (`para ls`, `para rm`, `para --help`).
+`para` also refuses to emit an ambiguous Caddyfile across *different* workspaces —
+two projects on nested domains, or a workspace named `local` alongside the
+[working-copy passthrough](#para_workcopy_host--para_workcopy_port) — by skipping
+the later duplicate with a warning rather than writing a config Caddy would reject
+wholesale.
+
+**A bare port is what creates `https://<name>.$PARA_DOMAIN`.** A subdomain-only
+list publishes only its subdomains, so `para ls` shows no apex URL, `para web`
+tells you which hosts do exist, and `$PARA_URL` is empty in your hooks.
 
 ### `PARA_DOMAIN`
 
 Wildcard domain workspaces are served under (`https://<name>.$PARA_DOMAIN`).
 `*.$PARA_DOMAIN` must resolve to `127.0.0.1`. Default `paraspace.dev`, which
 already resolves — see [Workspace URLs](./urls.md).
+
+Must be a hostname (`[A-Za-z0-9.-]`, no spaces): it is recorded per workspace in
+para's registry, which is positional, and is spliced into Caddy site addresses.
+Like `PARA_ROUTES`, it's checked where it's used — `para config-set` refuses a bad
+value on the way in, and `para up` refuses one before recording it — rather than
+at config load, where an invalid stored value would disable every command
+including the one that fixes it.
 
 ### `PARA_VOLUME`
 

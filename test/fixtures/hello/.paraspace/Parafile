@@ -35,14 +35,20 @@
 # provision hook just `mkdir`s it — see hooks/provision.
 : "${PARA_CLONE_DIR:=app}"
 
-# One route: the workspace apex -> the busybox httpd the boot hook starts on :8080.
-#   https://<name>.paraspace.dev  ->  <container-ip>:8080
+# Two routes to the busybox httpd the boot hook starts on :8080:
+#   https://<name>.paraspace.dev      ->  <container-ip>:8080   (apex)
+#   https://api.<name>.paraspace.dev  ->  <container-ip>:8080   (subdomain)
 #
-# Deliberately written in the MULTI-LINE spelling even though it's a single route:
-# para accepts comma-, space-, tab- or newline-separated entries and canonicalizes
-# them to one comma-separated form, and test_routes_reach_the_provision_hook reads
-# back what the hook actually received ("8080") — so this spelling is what proves
-# the normalization end to end, through the hook forwarder.
+# TWO deliberately, and in the MULTI-LINE spelling — both choices are load-bearing
+# for the suite. Two, because a single-entry list makes "keep every entry" and
+# "keep only the first" produce the identical canonical string, which is how a
+# parser that dropped every route after the first once passed the whole suite.
+# Multi-line, because test_routes_reach_the_provision_hook reads back what the hook
+# actually received and asserts it equals "8080,api:8080" — pinning the separator
+# and the entry count, and proving the canonicalization end to end through the hook
+# forwarder. Both point at the same httpd: what is under test is the routing table,
+# not the app.
 PARA_ROUTES="
   8080
+  api:8080
 "

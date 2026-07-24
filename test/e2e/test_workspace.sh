@@ -21,7 +21,10 @@ test_routes_reach_the_provision_hook() {
   # canonicalization: newlines and indentation in, one CSV token out. A raw value
   # would carry whitespace into the registry's positional field 3 and corrupt it.
   local got; got="$("$PARA" sh "$PARA_WS" -c 'cat ~/routes-seen' 2>/dev/null)"
-  assert_eq "8080" "$got" "the hook received PARA_ROUTES, canonicalized"
+  # EXACT, and two entries: this is the suite's only oracle for the canonical form,
+  # so it has to pin the separator (a space here would corrupt the registry's
+  # positional field 3) AND the fact that no entry was dropped.
+  assert_eq "8080,api:8080" "$got" "the hook received both routes, comma-joined"
 }
 
 test_workspace_is_listed_and_running() {

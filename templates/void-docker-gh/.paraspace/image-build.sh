@@ -9,7 +9,8 @@ set -euo pipefail
 #
 # This is yours — para owns no image. Add your toolchain (language runtime,
 # package manager, CLIs) and make it as robust as you like; just keep the image
-# contract (docker→overlayfs, a uid-1000 user in the docker group, bash + git).
+# contract (docker→overlayfs, a $PARA_USER/$PARA_UID user in the docker group,
+# bash + git).
 
 # Workspace user to bake in. Passed by `para image-build`; defaults keep a
 # standalone run working. useradd -m lands the home at /home/$PARA_USER.

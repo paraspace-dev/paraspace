@@ -193,7 +193,7 @@ paraspace/                       (its own repo — see "Repository" below)
                     remote), launch, exec (interactive + batch), file push/pull,
                     state, list. The one place the client lib is touched.
     config/         load config.toml (+ defaults, {sh=} exec, optional config.sh
-                    overlay, env override); machine config; registry
+                    overlay, env override); user config; registry
     caddy/          Caddyfile gen + reload (admin API optional later)
     hook/           run a .paraspace/hooks/<name> inside a workspace with the
                     injected PARA_* env (unchanged contract)

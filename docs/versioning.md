@@ -28,3 +28,18 @@ staying at 1 stays explicable:
   above that is breaking — an existing Parafile without the key stops building —
   but it landed pre-launch, at zero external consumers, so `PARA_CONTRACT` stayed
   at 1 rather than burning a version on a migration nobody had to perform.
+- **`PARA_USER`/`PARA_UID`/`PARA_GID` became `Parafile` keys.** They were
+  defaulted before the `Parafile` was sourced, so a `Parafile` declaring them
+  with the usual `: "${PARA_UID:=…}"` idiom was silently ignored — the value was
+  already set, so the assignment never fired. They're now defaulted alongside
+  `PARA_IMAGE`, after the `Parafile`, which is where the image they describe is
+  configured. The defaults, the injected env, and "a real env var wins" are all
+  unchanged; what used to be ignored now takes effect. One narrow edge is
+  technically breaking: a `Parafile` that *read* one of these at source time
+  (e.g. `PARA_VOLUME="para-home-$PARA_USER"`) used to see the pre-applied default
+  and now trips `set -u` with "unbound variable", since the default no longer
+  exists yet when the `Parafile` runs. That just makes them behave like every
+  other project key (`PARA_DOMAIN`, `PARA_IMAGE`, `PARA_CLONE_DIR` are all
+  defaulted after the `Parafile` and fail the same way) — a `Parafile` should
+  *declare* the keys it owns, not read para's defaults for them — and no bundled
+  template or fixture does this, so `PARA_CONTRACT` stayed at 1.

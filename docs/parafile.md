@@ -59,6 +59,22 @@ identity.
 Optional: which branch the clone hook checks out. Handy for iterating on the
 hooks themselves.
 
+### `PARA_USER` / `PARA_UID` / `PARA_GID`
+
+The workspace user para runs hooks, `para sh`, and `para run` as, and chowns
+every pushed file to. Defaults: `app`, `1000`, `1000`.
+
+It's your `.paraspace/image-build.sh` that makes use of these — it bakes the
+user into `$PARA_IMAGE`, and para's runtime chowns target the same ids. Change
+them only if `1000` is already taken in your base image, and rebuild afterwards,
+or the chowns land on a uid with no passwd entry and the shared volume becomes
+unwritable.
+
+They default to a stable `1000` rather than your host `id -u`: para bind-mounts
+nothing host-side, so there's nothing to line up with. A project that adds
+host-guest file sharing can have its `image-build.sh` honor an override (env or
+user config, which both win over the Parafile) to align the ids.
+
 ### `PARA_DOMAIN`
 
 Wildcard domain workspaces are served under (`https://<name>.$PARA_DOMAIN`).
@@ -102,14 +118,16 @@ Optional but recommended: the `para` contract version your hooks target. `para`
 refuses with a clear error on a mismatch — see
 [Contract versioning](./versioning.md).
 
-## Machine config, not Parafile
+## User config, not Parafile
 
-Machine-level overrides live in `~/.config/para/config`, not the Parafile —
-persist them with `para config-set KEY VALUE`. Notable ones:
+Some knobs describe *your box*, not the project, so they live in the per-user
+config file — `$XDG_CONFIG_HOME/para/config`, i.e. `~/.config/para/config` by
+default. Persist them with `para config-set KEY VALUE`. Notable ones:
 
 - `PARA_HTTPS_PORT` — the port `para` Caddy binds (default `8443`; set `443` for
   port-less URLs — see [Workspace URLs](./urls.md)).
 - `PARA_POOL` — the Incus storage pool; `para` writes this itself when it has to
   create a `dir` pool for nested Docker.
+- `PARA_BRIDGE` — the Incus bridge workspaces attach to (default `incusbr0`).
 
-Precedence everywhere is: environment > machine config > Parafile default.
+Precedence everywhere is: environment > user config > Parafile default.

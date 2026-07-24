@@ -20,7 +20,7 @@ void-docker-gh/
     hooks/provision        # seed+link the shared volume, clone, copy .env
     hooks/boot             # docker compose up -d --wait
     hooks/helpers          # colored output + small guards, sourced by the hooks
-    image-build.sh         # the base image (docker + git + a uid-1000 user)
+    image-build.sh         # the base image (docker + git + a $PARA_USER user)
     skel/zshrc             # dotfiles seeded onto the shared volume
 ```
 
@@ -54,7 +54,8 @@ base image after your directory. Then edit `.paraspace/`:
   service is actually listening (`docker compose up -d --wait` does this when your
   services have healthchecks).
 - **`image-build.sh`** — add your toolchain. Keep the image contract:
-  docker→overlayfs, a uid-1000 user in the `docker` group, bash + git.
+  docker→overlayfs, a `$PARA_USER`/`$PARA_UID` user in the `docker` group,
+  bash + git.
 
 Your services must publish their routed ports on `0.0.0.0` (docker's default
 `"8080:80"` mapping does), so para Caddy can reach them at the container's IP.

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 # para provision hook — runs INSIDE the workspace, in $HOME, before boot, as the
-# uid-1000 user. Idempotent: para re-runs it on every `para up`.
+# $PARA_USER user (uid $PARA_UID). Idempotent: para re-runs it on every `para up`.
 #
 # The hello fixture has no repo to clone and no toolchain to install (that's baked
 # into the image). Provision does just enough to exercise the shared-volume seam:

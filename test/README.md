@@ -37,7 +37,8 @@ commands against a live Incus workspace:
   `test_idempotency`). Note this is the *Docker-free* path: the fixture serves
   with busybox `httpd`, so it does **not** exercise para's nested-Docker/compose
   boot (the image contract's core), only the incus/Caddy/hook/volume seams;
-- `para sh -c` running as the uid-1000 user, byte-clean, exit-status-propagating;
+- `para sh -c` running as the workspace user (`$PARA_USER`/`$PARA_UID`, pinned by
+  the sandbox), byte-clean, exit-status-propagating;
 - the `down` → `up` (resume) → `rm` lifecycle (`test_lifecycle`);
 - the per-project shared volume, shared across a project's workspaces
   (`test_shared`).
@@ -51,7 +52,7 @@ the published image ~5.5 MB and the whole path Docker-free.
 
 The image is built by **`para image-build`**, from the fixture's own
 [`.paraspace/image-build.sh`](fixtures/hello/.paraspace/image-build.sh)
-(`apk add bash busybox-extras sudo`, an `app:1000` user) on the
+(`apk add bash busybox-extras sudo`, plus a `$PARA_USER` user) on the
 `PARA_BASE_IMAGE`/`PARA_IMAGE_BOOTSTRAP` its Parafile declares
 (`images:alpine/edge` + `apk add --no-cache bash`), published as the
 `alpine-minimal` alias. That's deliberate: the fixture is the non-Void,
@@ -72,7 +73,7 @@ the existence check.
 Every run is sandboxed so it never touches your real para state:
 
 - throwaway `XDG_STATE_HOME`/`XDG_CONFIG_HOME`/… under a temp dir — its own
-  registry, Caddyfile, pidfile and machine config;
+  registry, Caddyfile, pidfile and user config;
 - a non-default Caddy port (`9443`), so its Caddy can't collide with a real one;
 - an IP band carved from the addresses **actually free** on the incus bridge —
   across every incus project, since the bridge is machine-global while the

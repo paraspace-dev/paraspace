@@ -3,7 +3,7 @@ set -euo pipefail
 
 # Guest provisioning for the void-minimal base image. Runs as root inside a fresh
 # $PARA_BASE_IMAGE container — `images:voidlinux` (glibc) per the Parafile —
-# invoked by `para image-build`. This is the BAREST image: it installs nothing.
+# invoked by `para image build`. This is the BAREST image: it installs nothing.
 # It just stands up a workspace user on the Void base (which — with the
 # Parafile's PARA_IMAGE_BOOTSTRAP — already ships bash, sudo, ca-certificates,
 # coreutils, and a current xbps), enough for an interactive shell via `para sh`.
@@ -12,7 +12,7 @@ set -euo pipefail
 # toolchain goes; a boot hook that runs an app is where hooks/boot goes. Grow this
 # into templates/void-docker-gh (docker + a clone + a real boot) as you go.
 
-# Workspace user to bake in. Passed by `para image-build`; defaults keep a
+# Workspace user to bake in. Passed by `para image build`; defaults keep a
 # standalone run working. useradd -m lands the home at /home/$PARA_USER.
 PARA_USER="${PARA_USER:-app}"
 PARA_UID="${PARA_UID:-1000}"

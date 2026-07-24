@@ -29,7 +29,7 @@ export PATH="$HOME/.local/bin:$PATH"
 
 # --- where to grow -----------------------------------------------------------
 # INSTALL STUFF:  add packages to .paraspace/image-build.sh (its `pkgs=""` block),
-#                 then `para image-build` to rebuild the base image.
+#                 then `para image build` to rebuild the base image.
 # START THE APP:  clone it in .paraspace/hooks/provision and bring it up in
 #                 .paraspace/hooks/boot; point PARA_ROUTES (Parafile) at its port.
 # Add your aliases, prompt tweaks, and env below.

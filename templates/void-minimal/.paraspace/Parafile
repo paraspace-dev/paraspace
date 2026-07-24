@@ -7,6 +7,9 @@
 # throughout — where you'd add your toolchain, clone, and app. Grow it into
 # void-docker-gh (a runnable docker demo) as your project takes shape.
 #
+# Active below: only the keys a project actually has to decide. Everything para
+# defaults sensibly is listed commented-out at the bottom.
+#
 # Full schema: the ParaSpace docs — docs/parafile.md in the package.
 
 # para contract version these hooks target. para refuses (clearly) on a mismatch.
@@ -17,19 +20,31 @@
 # lives on disk. A plain slug ([a-z0-9-]). (`para init` sets this to your dir name.)
 : "${PARA_PROJECT:=void-minimal}"
 
-# Base image `para up` launches — you build it with `para image-build`.
-# (`para init` sets this to your project's directory name.)
-: "${PARA_IMAGE:=void-minimal}"
-
-# What `para image-build` builds FROM: the incus image its builder launches, and
-# one `sh -c` line run inside it before .paraspace/image-build.sh. para assumes
-# nothing about the distro — any incus image works (`images:debian/13`,
+# What `para image build` builds FROM: the incus image its builder launches, and
+# one `sh -c` line run inside it before .paraspace/image-build.sh. NEITHER has a
+# default — para never picks your distro, and a para update must not be able to
+# change it under you. Any incus image works (`images:debian/13`,
 # `images:alpine/edge`, …); this template targets Void. The bootstrap must leave
 # BASH in the builder (para runs image-build.sh with `bash -s`); here it also
-# refreshes Void's bundled xbps, which is a rolling-release snapshot that can be
-# too stale to install against. Set it to "" if your base needs nothing.
+# refreshes Void's bundled xbps, a rolling-release snapshot that can be too stale
+# to install against. Set it to "" if your base needs nothing.
 : "${PARA_BASE_IMAGE:=images:voidlinux}"
 : "${PARA_IMAGE_BOOTSTRAP:=xbps-install -Syu xbps bash}"
+
+# HTTP routes para publishes through its Caddy — one TLS site per "[sub:]port",
+# comma-separated. This box boots nothing, so it declares NO routes: an empty
+# value is the explicit "this workspace serves no HTTP" (para refuses an *unset*
+# PARA_ROUTES, so a project can't lose its URL to a typo). `para up` still gives
+# you a full box and `para sh <name>`; it just publishes no site, and `para ls`
+# shows no URL. Once you run something, list its port here — a bare port is the
+# workspace apex:
+#   PARA_ROUTES="8080"              # -> https://<name>.$PARA_DOMAIN
+#   PARA_ROUTES="3000,api:3001"     # several: commas, spaces, tabs or newlines
+PARA_ROUTES="${PARA_ROUTES-}"
+
+# ---- optional -----------------------------------------------------------------
+# para's own defaults, spelled out so you don't have to go look them up. Uncomment
+# only what you actually want to change.
 
 # Git URL para clones into each workspace. This barebones template clones NOTHING
 # (its provision hook has no clone step), so it's left unset. Point it at your repo
@@ -37,16 +52,17 @@
 # have an app.
 # : "${PARA_ORIGIN:=git@github.com:you/your-repo.git}"
 
-# Directory under ~ to clone into (once you add a clone step).
+# Directory under ~ to clone into (once you add a clone step). Default: app
 # : "${PARA_CLONE_DIR:=your-repo}"
 
-# Wildcard domain the workspaces live under: https://<name>.$PARA_DOMAIN. Its
-# wildcard `*.$PARA_DOMAIN` must resolve to 127.0.0.1 — the default already does.
-: "${PARA_DOMAIN:=paraspace.dev}"
+# Image `para up` launches, published by `para image build`. Defaults to
+# $PARA_PROJECT — set it only to point several projects at one shared image.
+# : "${PARA_IMAGE:=$PARA_PROJECT}"
 
-# HTTP routes para publishes through its Caddy — one TLS site per "[sub:]port".
-# para requires at least one route to bring a workspace up, so this is a
-# PLACEHOLDER: nothing listens on :8080 in a bare box, so https://<name>.$PARA_DOMAIN
-# will 502 until you run something there (add a boot step + point this at its port).
-# A bare port is the workspace apex: 8080 -> https://<name>.$PARA_DOMAIN
-PARA_ROUTES=( "8080" )
+# Wildcard domain the workspaces live under: https://<name>.$PARA_DOMAIN. Its
+# wildcard must resolve to 127.0.0.1 — the default, paraspace.dev, already does.
+# : "${PARA_DOMAIN:=paraspace.dev}"
+
+# Shared-volume name — one authenticated home per project by default. Pin several
+# projects to a single name to share dotfiles and auth across them.
+# : "${PARA_VOLUME:=para-home-$PARA_PROJECT}"

@@ -12,7 +12,7 @@ than trimming down the runnable [`void-docker-gh`](../void-docker-gh) template.
 ```
 void-minimal/
   .paraspace/
-    Parafile               # identity + a placeholder route (para needs ≥1)
+    Parafile               # identity, the base image to build from, no routes
     image-build.sh         # user + writable /tmp; the pkgs="" install block is EMPTY
     hooks/provision        # seed + link the shell rc; comments mark where a clone goes
     hooks/boot             # no-op: nothing to boot (returns 0 immediately)
@@ -29,9 +29,10 @@ para up box                             # stand up a workspace named "box"
 para sh box                             # get a shell inside it
 ```
 
-`para up` succeeds and the workspace runs, but `https://box.<PARA_DOMAIN>` will
-**502** — nothing listens on the placeholder route yet. That's expected for a bare
-box; it goes away once you add an app.
+`para up` succeeds and the workspace runs, but it publishes **no URL** — this box
+boots nothing, so its Parafile declares an empty `PARA_ROUTES` and `para ls` shows no
+address for it. That's expected for a bare box: list a port in `PARA_ROUTES` once
+you have something listening, and the URL appears on the next `para up`.
 
 ## Grow it into a real project
 
@@ -46,8 +47,9 @@ The scaffold tells you where each piece goes:
   is this same hook fully written out (git-key auth included).
 - **`hooks/boot`** — put your app's start command here (e.g. `docker compose up
   -d --wait`) and return 0 only once the routed service is listening.
-- **`Parafile`** — set `PARA_ORIGIN`/`PARA_CLONE_DIR`, and point `PARA_ROUTES` at
-  your service's real port.
+- **`Parafile`** — set `PARA_ORIGIN`/`PARA_CLONE_DIR`, and list your service's
+  port in `PARA_ROUTES` (it ships as `PARA_ROUTES=""`, the explicit "serves no
+  HTTP", because this box boots nothing).
 
 For a fuller starting point, see [`void-docker-gh`](../void-docker-gh) (a runnable
 docker demo) or [`void-jchook`](../void-jchook) (a full personal dev environment).

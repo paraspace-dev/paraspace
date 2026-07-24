@@ -12,6 +12,21 @@ test_http_route_serves_the_sentinel() {
   assert_contains "$body" "para-e2e-ok $PARA_WS" "sentinel body carries the workspace name"
 }
 
+test_routes_reach_the_provision_hook() {
+  # Two things at once. PARA_ROUTES is a comma-separated scalar, so para's blanket
+  # PARA_* forwarder carries it into hooks like any other key — new, since as a
+  # bash array it was skipped (%q on an array captures element 0 only) and a hook
+  # needing its own routes had to re-source the Parafile. And the fixture declares
+  # its route in the MULTI-LINE spelling, so what the hook receives also proves the
+  # canonicalization: newlines and indentation in, one CSV token out. A raw value
+  # would carry whitespace into the registry's positional field 3 and corrupt it.
+  local got; got="$("$PARA" sh "$PARA_WS" -c 'cat ~/routes-seen' 2>/dev/null)"
+  # EXACT, and two entries: this is the suite's only oracle for the canonical form,
+  # so it has to pin the separator (a space here would corrupt the registry's
+  # positional field 3) AND the fact that no entry was dropped.
+  assert_eq "8080,api:8080" "$got" "the hook received both routes, comma-joined"
+}
+
 test_workspace_is_listed_and_running() {
   local names; names="$("$PARA" ls --names 2>/dev/null)"
   assert_contains "$names" "$PARA_WS" "ls --names includes the workspace" || return 1

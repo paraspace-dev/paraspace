@@ -32,4 +32,10 @@ fi
 # Link the shared marker into $HOME so a `para sh <ws> -c 'cat ~/marker'` sees it.
 [ -f "$shared/marker" ] && ln -sfn "$shared/marker" "$HOME/marker"
 
+# Record the routes para injected. PARA_ROUTES is a comma-separated scalar, so it
+# rides run_hook's blanket PARA_* forwarder like every other key — it could not be
+# forwarded at all while it was a bash array, and a hook that wanted its own routes
+# had to re-source the Parafile. Written where the e2e suite can read it back.
+printf '%s\n' "${PARA_ROUTES-<unset>}" > "$HOME/routes-seen"
+
 stage "Provisioned (hello fixture)"

@@ -45,8 +45,10 @@ without them.
    `Dockerfile`) in the environment;
 4. publishes the result as **`$PARA_IMAGE`**, stamping provenance onto it as
    Incus image properties (`user.para.src_sha`, `user.para.contract`,
-   `user.para.incremental`) so the image is self-describing — that's what
-   `para image status` reads back.
+   `user.para.incremental`, and the baked `user.para.user`/`user.para.uid`) so the
+   image is self-describing — that's what `para image status` reads back, and
+   what lets `para up` refuse an image built with different `PARA_UID`/`PARA_GID`
+   than are configured now.
 
 The bootstrap step exists because step 3 needs bash and step 2 is the only one
 guaranteed to run (`sh` is in every base image). Use it to install bash and/or
@@ -77,11 +79,12 @@ whether they're still in sync:
 
 ```
 $ para image status
-  image      para-dev
+  image      my-app
   built      2026/07/21 14:02 UTC
   source     drifted — .paraspace/ image inputs changed since this build
   base       images:debian/13
   contract   1
+  user       app (1000:1000)
 
   rebuild with: para image build
 ```
@@ -94,6 +97,18 @@ before provenance tracking (or by a plain `incus` action) reports the source as
 `unknown`. A build made with `-i` is flagged: an incremental layer doesn't
 correspond to a clean source hash, so do one pristine `para image build` before
 you rely on it.
+
+"user" is the `PARA_USER` / `PARA_UID:PARA_GID` **para was configured with when
+this image was built**. If they no longer match the configured ids, status marks
+it `DRIFTED` and `para up` refuses to launch — para's chowns would otherwise
+target a uid the image likely has no passwd entry for, leaving the shared volume
+unwritable. Rebuild, or drop the override.
+
+It compares para's build-time config against para's current config, and nothing
+more. It is not a check on what your payload created: para hands `image-build.sh`
+the ids and assumes nothing about what it does with them, so a payload that
+hardcodes a different uid is outside what this can catch. Images built before
+this existed carry no such property and the line is omitted.
 
 `para image rm` deletes `$PARA_IMAGE` — to reclaim space or force a fully clean
 next build. Workspaces already `up` are clones and keep running.

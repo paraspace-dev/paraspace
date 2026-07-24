@@ -4,7 +4,7 @@ set -euo pipefail
 # Guest provisioning for the void-docker-gh base image. Runs as root inside a fresh
 # $PARA_BASE_IMAGE container — `images:voidlinux` (glibc) per the Parafile,
 # launched with security.nesting=true and bootstrapped with $PARA_IMAGE_BOOTSTRAP
-# — invoked by `para image-build`. Installs the minimum a para workspace needs so
+# — invoked by `para image build`. Installs the minimum a para workspace needs so
 # `para up` only has to clone + `docker compose up`.
 #
 # This is yours — para owns no image. Add your toolchain (language runtime,
@@ -12,7 +12,7 @@ set -euo pipefail
 # contract (docker→overlayfs, a $PARA_USER/$PARA_UID user in the docker group,
 # bash + git).
 
-# Workspace user to bake in. Passed by `para image-build`; defaults keep a
+# Workspace user to bake in. Passed by `para image build`; defaults keep a
 # standalone run working. useradd -m lands the home at /home/$PARA_USER.
 PARA_USER="${PARA_USER:-app}"
 PARA_UID="${PARA_UID:-1000}"

@@ -42,13 +42,20 @@ a hook can seed from `~/.para/skel` before the clone even exists.
 everything your `Parafile` sets, and the per-workspace values `para` computes —
 into the hook's environment. So beyond the documented set below, **any
 `PARA_FOO` you put in your `Parafile` reaches your hooks for free**, no `para`
-change needed.
+change needed. The same is true of your own keys in the user config, which is
+how you pass a machine-wide knob to your hooks.
+
+One caveat on where a value may come from: the [per-project
+keys](./parafile.md#1-per-project-keys-are-refused-from-the-user-config) —
+`PARA_PROJECT`, `PARA_CLONE_DIR` and `PARA_ORIGIN` among them — are **not** read
+from the user config, so set those in the `Parafile`.
 
 The documented context is:
 
 | Variable | Meaning |
 |---|---|
-| `PARA_NAME`, `PARA_URL`, `PARA_DOMAIN` | this workspace + its host/domain |
+| `PARA_NAME`, `PARA_URL`, `PARA_DOMAIN` | this workspace + its host/domain. `PARA_URL` is **empty** unless a bare port routes the apex — an empty `PARA_ROUTES`, or a subdomain-only list, means there is no site at `https://<name>.<domain>` to point at |
+| `PARA_ROUTES` | the routes para publishes, always canonical comma-separated `[sub:]port` whatever spelling the `Parafile` used (empty if none) |
 | `PARA_PROJECT` | the project identity slug (also the shared-volume suffix) |
 | `PARA_CLONE_DIR`, `PARA_CLONE_BRANCH`, `PARA_ORIGIN` | what/where to clone |
 | `PARA_SHARED=/para/shared` | the shared-volume mount |
@@ -57,9 +64,14 @@ The documented context is:
 | `PARA_GIT_NAME`/`EMAIL` | the seeded gitconfig |
 | `PARA_CONTRACT` | the contract version `para` provides |
 
-Two caveats:
+Splitting `PARA_ROUTES` is one line, and the bundled templates' `hooks/helpers`
+wraps it as `parse_routes` (plus `route_ports`, for a boot hook waiting on its own
+services):
 
-- `PARA_ROUTES` is an array and is **not** forwarded — read routes from the
-  `Parafile`.
-- `para`'s own internals may also appear in the env; only the variables above are
-  the [versioned contract](./versioning.md).
+```sh
+IFS=, read -ra routes <<<"$PARA_ROUTES"
+for r in $(parse_routes); do … done      # with the templates' helpers
+```
+
+One caveat: `para`'s own internals may also appear in the env; only the variables
+above are the [versioned contract](./versioning.md).

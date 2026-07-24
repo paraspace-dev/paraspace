@@ -17,7 +17,9 @@ para init <template>   # a specific one
 It copies the template's `.paraspace/` (Parafile + hooks + skel +
 image-build.sh) into the current directory, **skipping any file that already
 exists** — so it safely adds `para` to an existing repo without touching your
-code — and names the base image (`PARA_IMAGE`) after your directory.
+code — and sets the project's identity (`PARA_PROJECT`) to your directory name.
+The base image (`PARA_IMAGE`) derives from that, so it's named for your project
+without the Parafile having to carry the name twice.
 
 ## Make it yours
 
@@ -53,7 +55,7 @@ loop.
 | `Parafile` | `para` (host-side) | the keys `para` reads — [reference](./parafile.md) |
 | `hooks/` | the workspace | `provision`, `boot`, plus any shared code they source |
 | `skel/` | your hooks | seed files (dotfiles etc.) synced to `~/.para/skel` |
-| `image-build.sh` | `para image-build` (host-side) | builds the base image |
+| `image-build.sh` | `para image build` (host-side) | builds the base image |
 
 `.paraspace/` is set-up-once plumbing, hidden like `.github` — commit it with the
 project so every machine (and every teammate) gets the same workspaces.

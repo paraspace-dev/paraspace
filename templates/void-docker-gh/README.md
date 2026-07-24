@@ -16,7 +16,7 @@ same demo carrying a full personal dev environment — zsh, tmux, Neovim, Claude
 ```
 void-docker-gh/
   .paraspace/                # all the para plumbing — hidden, set-up-once
-    Parafile               # the few knobs para reads (version, image, origin, routes)
+    Parafile               # the few knobs para reads (version, identity, base image, origin, routes)
     hooks/provision        # seed+link the shared volume, clone, copy .env
     hooks/boot             # docker compose up -d --wait
     hooks/helpers          # colored output + small guards, sourced by the hooks
@@ -43,11 +43,13 @@ to your git host, press Enter, and the clone proceeds. (For a private repo, set
 
 ## Make it yours
 
-Drop this `.paraspace/` into your own repo — `para init` copies it in and names the
-base image after your directory. Then edit `.paraspace/`:
+Drop this `.paraspace/` into your own repo — `para init` copies it in and sets the
+project's identity (`PARA_PROJECT`) to your directory name, which the base image
+name derives from. Then edit `.paraspace/`:
 
-- **`Parafile`** — point `PARA_ORIGIN` at your repo, list your `PARA_ROUTES`
-  (`"[sub:]port"` each), set `PARA_CLONE_DIR`.
+- **`Parafile`** — point `PARA_ORIGIN` at your repo and list your `PARA_ROUTES`
+  (`"[sub:]port"` each, comma/space/newline separated). To clone somewhere other
+  than `~/app`, uncomment `PARA_CLONE_DIR` in the optional block.
 - **`hooks/provision`** — grow the shared-volume seeding and `.env` handling for
   your stack. It's yours; make it as robust as you like.
 - **`hooks/boot`** — the readiness contract: return 0 only once every routed

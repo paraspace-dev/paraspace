@@ -68,4 +68,6 @@ way git and compose find theirs. Only `up`, `image` (build/status/rm), and
 
 `para` writes `PARA_POOL` to the user config itself when the default Incus
 pool is btrfs/zfs-backed — nested Docker needs a `dir` pool on Linux, and `para`
-creates one. `para config-set KEY VALUE` persists any other override.
+creates one. `para config-set KEY VALUE` persists any other override, except the
+[per-project keys](./parafile.md#1-per-project-keys-are-refused-from-the-user-config),
+which belong in the `Parafile`.

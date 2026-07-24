@@ -74,7 +74,7 @@ because the command runs through a login shell in the clone rather than being
 | Command | What it does |
 |---|---|
 | `para key` | print this machine's `para` pubkey — see [Git authentication](./git-auth.md) |
-| `para config-set KEY VALUE` | persist a `PARA_*` override to the user config (`${XDG_CONFIG_HOME:-~/.config}/para/config`) |
+| `para config-set KEY VALUE` | persist a `PARA_*` override to the user config (`${XDG_CONFIG_HOME:-~/.config}/para/config`). Per-project keys (`PARA_PROJECT`, `PARA_IMAGE`, `PARA_BASE_IMAGE`, …) are refused — they belong in the [Parafile](./parafile.md#1-per-project-keys-are-refused-from-the-user-config) |
 | `para config-import <name> <path>…` | copy host dotfiles into workspace `<name>`'s shared volume |
 | `para config-sync [<name>]` | re-push `skel/` to the shared volume — dotfile edits go live in every workspace, no image rebuild |
 | `para install [prefix]` | install the `para` script to `PREFIX/bin/para` (default `~/.local`) + stage templates for `para init`; re-run to update |

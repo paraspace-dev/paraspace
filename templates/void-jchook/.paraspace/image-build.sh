@@ -4,7 +4,7 @@ set -euo pipefail
 # Guest provisioning for the void-jchook base image. Runs as root INSIDE a fresh
 # $PARA_BASE_IMAGE container — `images:voidlinux` (glibc) per the Parafile,
 # launched with security.nesting=true and bootstrapped with $PARA_IMAGE_BOOTSTRAP —
-# invoked by `para image-build`. Installs everything the carried dotfiles need so
+# invoked by `para image build`. Installs everything the carried dotfiles need so
 # `para up` only has to clone + `docker compose up`: Docker + compose (runit
 # service enabled), git, and the full interactive environment the skel/ dotfiles
 # assume — zsh, tmux, Neovim + its toolchain, and Claude Code.
@@ -21,7 +21,7 @@ set -euo pipefail
 # group, bash + git). Not meant to be run on a host — it mutates system packages
 # and services.
 
-# Workspace user to bake in. Passed by `para image-build`; defaults keep a
+# Workspace user to bake in. Passed by `para image build`; defaults keep a
 # standalone run working. $HOME_DIR is where useradd -m lands the home.
 PARA_USER="${PARA_USER:-app}"
 PARA_UID="${PARA_UID:-1000}"

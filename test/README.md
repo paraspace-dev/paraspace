@@ -112,6 +112,26 @@ throwaway XDG tree can fence off:
   para's own `alloc_ip` never re-consults incus, so starting a *real* `para up` in
   another terminal mid-run can still collide. Don't do that while an e2e run is in
   flight.
+- **Storage pools are shared with your real para, deliberately.** The sandbox
+  does *not* pin `PARA_POOL` at a throwaway pool, because `ensure_pool` is the
+  most environment-sensitive logic para has — the btrfs/zfs-driver → `para-dir`
+  switch, the `pool_backing_fs` see-through for a dir pool whose *source* sits on
+  btrfs/zfs, and the ZFS<2.2 idmapped-mount preflight — and the e2e tier is the
+  only place it runs. Pinning a pool would walk past all of it, the same way a
+  cached image walks past `image-build`. Sharing is safe because isolation here
+  is by *name*, not by pool: containers are `para-<run-unique>` and the volume is
+  `para-home-paratest-$$`, teardown is guarded to those, and para has no
+  pool-level destructive operation (it never runs `incus storage delete`).
+  Two consequences worth knowing:
+  - **A run can create a pool, and teardown will not remove it.** On a btrfs/zfs
+    host with no `para-dir`, `ensure_pool` creates one. Teardown deliberately
+    leaves it: `para-dir` is para's own default choice, so your real workspaces
+    very likely live there too, and deleting it could take real storage with it.
+  - **`PARA_POOL` is inherited from your environment** (`bin/para` defaults it to
+    `default`), unlike the identity and image keys the sandbox unsets. That is on
+    purpose — it means an e2e run exercises the pool you actually use — and it is
+    harmless because nothing the run creates is named predictably enough to
+    collide with real state.
 - **`para up` requires outbound DNS.** para gates readiness on resolving
   `github.com` inside the guest, so the e2e tier needs working outbound DNS (the
   image build needs the network anyway — the tier isn't offline-capable).

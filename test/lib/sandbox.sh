@@ -41,6 +41,13 @@ sandbox_base() {
   # sandbox_e2e sets its own run-unique values after this.
   unset PARA_VOLUME PARA_PROJECT PARA_PROJECT_DIR
   unset PARA_IMAGE PARA_BASE_IMAGE PARA_IMAGE_BOOTSTRAP
+  # PARA_POOL is deliberately NOT in that list, and the run shares the real pools.
+  # Pinning a throwaway pool would skip ensure_pool — the btrfs/zfs → para-dir
+  # switch, the dir-pool-on-btrfs see-through, the ZFS<2.2 preflight — which the
+  # e2e tier is the only cover for. It's safe because isolation here is by NAME:
+  # everything the run creates is run-unique, teardown is guarded to those names,
+  # and para has no pool-level destructive op. See test/README.md's known
+  # limitations for the two consequences (a run may create a pool it won't remove).
   # A non-default port so the run's Caddy can't collide with a real para Caddy on
   # :8443, and its own pidfile (under the temp XDG_STATE_HOME) governs only it.
   export PARA_HTTPS_PORT="${PARA_TEST_PORT:-9443}"

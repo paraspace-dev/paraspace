@@ -8,11 +8,12 @@ mixed diff has to be teased apart into separate PRs afterward.
 
 The usual escapes:
 
-- **A worktree per agent** separates the files, but each task still needs the
-  whole app running — and those stacks collide on one machine: same ports,
-  same Docker daemon, same `.env`.
-- **Port offsets and per-branch overrides** move the collisions into config
-  you now maintain by hand.
+- **A worktree per agent** separates the tracked files — but worktrees don't
+  carry `.gitignore`d state, so each one needs its `.env` and data recreated,
+  and the running stacks still collide on ports and databases.
+- **Port offsets and override tooling** can deconflict the ports — but the
+  agent still runs as you, on your host, with your files and your keys in
+  reach.
 - **A VM per workspace** isolates cleanly but reserves fixed RAM and CPU for
   each — a laptop affords two or three.
 - **Hosted dev environments** do the isolation in the cloud, and the interface
@@ -48,6 +49,11 @@ Each workspace has its own IP. Whatever the project runs — bare processes or
 nested containers — binds its usual ports on the workspace's own network, so
 workspaces never collide with each other or with the host. Caddy proxies each
 workspace's URL to its IP; nothing gets remapped.
+
+The isolation cuts both ways: the workspace is also the agent's sandbox. It is
+an unprivileged container with nothing of the host mounted, so an agent can
+install packages, run with permissions wide open, or wreck the place — the
+blast radius ends at the workspace, and `para rm` resets it.
 
 The URL is only one door. `para sh` drops a real shell in a workspace's clone —
 your dotfiles, a real pty, no web terminal — and `para run` opens a tmux

@@ -2,20 +2,27 @@
 
 ## The problem
 
-An agent working a task needs more than a worktree — it needs the whole app
-running: services up, database seeded, something to open in a browser. Three
-agents on three tasks means three running stacks, and they can't share yours.
-The usual routes:
+Run two agents in one working copy and they trip over each other: branches
+change underneath, half-finished edits from one land in the other's context,
+and the mixed diff has to be teased apart into separate PRs afterward. A
+worktree per agent fixes the files — but each task still needs the whole app
+running (services up, database seeded, something to open in a browser), and
+those stacks collide on one machine: same ports, same Docker daemon, same
+`.env`.
+
+The usual escapes:
 
 - **Hosted dev environments** do the isolation in the cloud, and the interface
   is the price: web terminals, browser IDEs, routing that fights you — metered
   by the hour while your own machine idles.
-- **DIY on your machine** — worktrees, port offsets, devcontainers — shares one
-  network and one Docker daemon, so ports, `.env`s, and auth collide across
-  branches. That fiddliness is most of what the hosted platforms are selling
-  relief from.
+- **Port offsets and per-branch overrides** keep everything local but move the
+  collisions into config you now maintain by hand.
+- **A VM per workspace** isolates cleanly but reserves fixed RAM and CPU for
+  each — a laptop affords two or three.
 
-`para` does the isolation locally, with system containers:
+`para` runs each workspace as an Incus **system** container: isolated like a
+VM, no fixed reservation, and containers still run *inside* it — a Docker
+stack boots unchanged. Containers all the way down:
 
 ```
        browser                     terminal
@@ -38,11 +45,10 @@ The usual routes:
 └──────────────────────────────┘
 ```
 
-Each workspace is a **system** container with its own IP. Whatever the project
-runs — bare processes, or containers nested inside the container (Docker boots
-fine) — binds its usual ports on the workspace's own network, so workspaces
-never collide with each other or with the host. Caddy proxies each workspace's
-URL to its IP; nothing gets remapped.
+Each workspace has its own IP. Whatever the project runs — bare processes or
+nested containers — binds its usual ports on the workspace's own network, so
+workspaces never collide with each other or with the host. Caddy proxies each
+workspace's URL to its IP; nothing gets remapped.
 
 The URL is only one door. `para sh` drops a real shell in a workspace's clone —
 your dotfiles, a real pty, no web terminal — and `para run` opens a tmux

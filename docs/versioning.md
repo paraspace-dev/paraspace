@@ -28,3 +28,10 @@ at 1 stays explicable:
   above that is breaking — an existing Parafile without the key stops building —
   but it landed pre-launch, at zero external consumers, so `PARA_CONTRACT` stayed
   at 1 rather than burning a version on a migration nobody had to perform.
+- **`PARA_USER`/`PARA_UID`/`PARA_GID` became `Parafile` keys.** They were
+  defaulted before the `Parafile` was sourced, so a `Parafile` declaring them
+  with the usual `: "${PARA_UID:=…}"` idiom was silently ignored — the value was
+  already set, so the assignment never fired. They're now defaulted alongside
+  `PARA_IMAGE`, after the `Parafile`, which is where the image they describe is
+  configured. Purely additive: the defaults, the injected env, and "a real env
+  var wins" are all unchanged; what used to be ignored now takes effect.

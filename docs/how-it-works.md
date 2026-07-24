@@ -61,11 +61,11 @@ must run inside a project; everything else (`ls`, `sh`, `down`, `rm`, `web`,
 
 | What | Where |
 |---|---|
-| Machine config (`PARA_*` overrides; env wins) | `~/.config/para/config` |
+| User config (`PARA_*` overrides; env wins) | `${XDG_CONFIG_HOME:-~/.config}/para/config` |
 | Generated Caddyfile | `${XDG_STATE_HOME:-~/.local/state}/para/Caddyfile` |
 | Workspace registry (rebuildable — see above) | `${XDG_STATE_HOME:-~/.local/state}/para/workspaces` |
 | Shared home volume | Incus volume `para-home-<project>` |
 
-para writes `PARA_POOL` to the machine config itself when the default Incus
+para writes `PARA_POOL` to the user config itself when the default Incus
 pool is btrfs/zfs-backed — nested Docker needs a `dir` pool on Linux, and para
 creates one. `para config-set KEY VALUE` persists any other override.

@@ -17,8 +17,8 @@ set -euo pipefail
 # the Claude Code binary is prebuilt against glibc.
 #
 # This is yours — para owns no image. Add language runtimes / your own tools; keep
-# the image contract (docker→overlayfs, a uid-1000 user in the docker group, bash
-# + git). Not meant to be run on a host — it mutates system packages and services.
+# the image contract (docker→overlayfs, a $PARA_USER/$PARA_UID user in the docker
+# group, bash + git). Not meant to be run on a host — it mutates system packages and services.
 
 # Workspace user to bake in. Passed by `para image-build`; defaults keep a
 # standalone run working. $HOME_DIR is where useradd -m lands the home.
@@ -56,7 +56,7 @@ for p in $pkgs; do xbps-query "$p" >/dev/null 2>&1 || missing+=("$p"); done
 [ "${#missing[@]}" -eq 0 ] || xbps-install -Sy "${missing[@]}" >/dev/null
 
 # The linuxcontainers Void base image ships /tmp as 0755 root:root (a normal Void
-# install is 1777). Without the sticky world-writable bit, uid-1000 $PARA_USER
+# install is 1777). Without the sticky world-writable bit, $PARA_USER
 # can't create /tmp/<tool> dirs — `para claude` dies with EACCES, and other tools
 # fail the same way. /tmp is on the rootfs, so this persists across restarts.
 echo "==> writable /tmp (sticky 1777)"

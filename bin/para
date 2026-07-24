@@ -25,10 +25,12 @@ set -euo pipefail
 #     * design rationale + where state lives  -> docs/how-it-works.md
 # ============================================================================
 
-# ---- config (env > ~/.config/para/config > defaults) -----------------------
-# The config file holds KEY=VALUE lines for any PARA_* knob below; real
-# environment variables win over it. para writes it itself when it has to
-# pick a non-default value (e.g. PARA_POOL when the default pool is btrfs).
+# ---- user config (env > ~/.config/para/config > defaults) ------------------
+# Per-USER, not per-machine: it lives under $XDG_CONFIG_HOME (or ~/.config), so
+# two accounts on one box get their own. It holds KEY=VALUE lines for any PARA_*
+# knob below; real environment variables win over it. para writes it itself when
+# it has to pick a non-default value (e.g. PARA_POOL when the default pool is
+# btrfs).
 PARA_CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/para"
 PARA_CONFIG="$PARA_CONFIG_DIR/config"
 if [ -f "$PARA_CONFIG" ]; then
@@ -50,14 +52,15 @@ fi
 readonly PARA_CONTRACT=1
 
 # PARA_DOMAIN (the workspace wildcard domain) is PROJECT config — set in the
-# Parafile, defaulted in the fallbacks below — not a machine knob.
+# Parafile, defaulted in the fallbacks below — not a user knob. So are
+# PARA_USER/UID/GID: the workspace user is baked into $PARA_IMAGE by the
+# project's image-build.sh, so it belongs to the project, and it's defaulted with
+# the other project keys below (after the Parafile is sourced, so a real env var
+# still wins over the Parafile).
 PARA_POOL="${PARA_POOL:-default}"
 PARA_BRIDGE="${PARA_BRIDGE:-incusbr0}"
 # PARA_VOLUME (the shared home volume) is derived per-project below, once the
 # project is known — env still wins.
-PARA_USER="${PARA_USER:-app}"
-PARA_UID="${PARA_UID:-1000}"
-PARA_GID="${PARA_GID:-1000}"
 CT_PREFIX="para-"
 # Optional working-copy passthrough: the host:port para Caddy proxies
 # https://localhost to, so a stack you run on the HOST (not in a workspace) keeps
@@ -112,7 +115,7 @@ HOST_ENV="${PROJECT_ROOT:+$PROJECT_ROOT/.env}"
 # Parafile/env set flows to the hook via the PARA_* forwarding in run_hook.
 
 # The per-PROJECT knobs (routes, image, clone dir, hooks) live in .paraspace/Parafile
-# at PROJECT_ROOT, sourced as bash — same PARA_* mechanism as the machine config
+# at PROJECT_ROOT, sourced as bash — same PARA_* mechanism as the user config
 # above. It's authoritative; a real env var still wins; the fallbacks below fill
 # whatever it (and the environment) leave unset.
 PARAFILE="${PARAFILE:-${PROJECT_ROOT:+$PROJECT_ROOT/.paraspace/Parafile}}"
@@ -122,6 +125,17 @@ PARAFILE="${PARAFILE:-${PROJECT_ROOT:+$PROJECT_ROOT/.paraspace/Parafile}}"
 # Parafile normally sets these; the defaults just keep para working if it doesn't.
 : "${PARA_IMAGE:=para-dev}"
 : "${PARA_CLONE_DIR:=app}"
+# The workspace user para runs hooks, `para sh`, and `para run` as, and that every
+# push/chown below targets. It belongs to the PROJECT because the project's
+# image-build.sh is what creates it in $PARA_IMAGE — these values must match the
+# ones baked there or the chowns land on a uid with no passwd entry. Deliberately
+# a stable default rather than the host's `id -u`: nothing host-side is
+# bind-mounted (the shared volume is security.shifted, so the guest's uid maps
+# through the unprivileged idmap to a subuid, never to yours), and on macOS incus
+# runs inside colima's VM where the host uid means nothing at all.
+: "${PARA_USER:=app}"
+: "${PARA_UID:=1000}"
+: "${PARA_GID:=1000}"
 # The incus image `para image-build` launches its builder from, and an optional
 # `sh -c` line run in that builder BEFORE the project's image-build.sh payload.
 # Both are the project's call: para builds whatever base you name and knows
@@ -1635,9 +1649,8 @@ Only 'up', 'image-build', and 'config-sync' must run inside a project (a
 .paraspace/ dir, found from \$PWD upward); everything else works anywhere.
 
 CONFIGURATION
-  Precedence is: environment > machine config > Parafile > default. The
-  machine config is a KEY=VALUE file; write it with 'para config-set'.
-  Resolved here:
+  Precedence is: environment > user config > Parafile > default. The user
+  config is a KEY=VALUE file; write it with 'para config-set'. Resolved here:
 
     PARA_DOMAIN       $PARA_DOMAIN
     PARA_HTTPS_PORT   $PARA_HTTPS_PORT
@@ -1646,10 +1659,11 @@ CONFIGURATION
     PARA_POOL         $PARA_POOL
     PARA_BRIDGE       $PARA_BRIDGE
     PARA_VOLUME       $vol
+    PARA_USER         $PARA_USER ($PARA_UID:$PARA_GID)
 
   Fixed paths, derived from XDG and not overridable:
 
-    machine config    $PARA_CONFIG
+    user config       $PARA_CONFIG
     state (registry)  $PARA_STATE_DIR
 
 PREREQUISITES (one-time per machine)

@@ -42,7 +42,7 @@ else
 fi
 
 # Void incus ships /tmp as 0755 root:root; a normal install is sticky 1777. Without
-# the sticky world-writable bit, uid-1000 $PARA_USER can't create /tmp/<tool> dirs
+# the sticky world-writable bit, $PARA_USER can't create /tmp/<tool> dirs
 # (bun, claude, etc. die with EACCES). /tmp is on the rootfs, so this persists.
 echo "==> writable /tmp (sticky 1777)"
 chmod 1777 /tmp

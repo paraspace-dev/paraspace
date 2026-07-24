@@ -73,6 +73,7 @@ and adapt the hooks to your stack (`hooks/provision` seeds + clones,
 `hooks/boot` brings services up). `para config-sync` pushes `skel/` edits live to
 running workspaces with no image rebuild. Add a language runtime in
 `image-build.sh` (there's a commented Bun example). Keep the image contract:
-docker→overlayfs, a uid-1000 user in the `docker` group, bash + git.
+docker→overlayfs, a `$PARA_USER`/`$PARA_UID` user in the `docker` group, bash +
+git.
 
 Full schema + the hook/image contracts: [`../../docs/`](../../docs/README.md).

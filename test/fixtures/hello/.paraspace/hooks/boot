@@ -24,7 +24,7 @@ printf 'para-e2e-ok %s\n' "$PARA_NAME" > "$docroot/index.html"
 # bind the in-use port, which is fine — an httpd is already up; we only need to
 # guarantee it's listening before we return.
 #
-# Absolute path on purpose: hooks run as the uid-1000 user via `su -`, whose PATH
+# Absolute path on purpose: hooks run as $PARA_USER via `su -`, whose PATH
 # is /bin:/usr/bin — it does NOT include /usr/sbin, where busybox-extras installs
 # the httpd symlink. A bare `httpd` would be "command not found".
 /usr/sbin/httpd -p "$port" -h "$docroot" 2>/dev/null || true

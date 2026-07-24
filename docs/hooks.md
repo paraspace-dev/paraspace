@@ -1,8 +1,9 @@
 # Hooks
 
 para runs a project's hooks **inside the workspace, in `$HOME`**, as the
-uid-1000 user. Everything domain-specific — git, gh, dotfiles, `.env`, booting
-the stack — lives here, never in para.
+workspace user (`$PARA_USER`, uid `$PARA_UID` — `app`/`1000` by default).
+Everything domain-specific — git, gh, dotfiles, `.env`, booting the stack —
+lives here, never in para.
 
 ## The two hooks
 
@@ -37,7 +38,7 @@ a hook can seed from `~/.para/skel` before the clone even exists.
 
 ## The environment para injects
 
-para forwards **every `PARA_*` variable in scope** — the machine config,
+para forwards **every `PARA_*` variable in scope** — the user config,
 everything your `Parafile` sets, and the per-workspace values para computes —
 into the hook's environment. So beyond the documented set below, **any
 `PARA_FOO` you put in your `Parafile` reaches your hooks for free**, no para

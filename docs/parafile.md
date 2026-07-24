@@ -59,6 +59,24 @@ identity.
 Optional: which branch the clone hook checks out. Handy for iterating on the
 hooks themselves.
 
+### `PARA_USER` / `PARA_UID` / `PARA_GID`
+
+The workspace user para runs hooks, `para sh`, and `para run` as, and chowns
+every pushed file to. Defaults: `app`, `1000`, `1000`.
+
+These belong to the *project*, not to you: your `.paraspace/image-build.sh`
+creates this user inside `$PARA_IMAGE` (para passes all three into it), and
+para's runtime chowns target the same ids. Change them only if `1000` is
+already taken in your base image — and rebuild the image afterwards, or the
+chowns will land on a uid with no passwd entry and the shared volume becomes
+unwritable.
+
+They deliberately do **not** default to your host `id -u`. Nothing host-side is
+bind-mounted into a workspace: the shared volume is `security.shifted`, so the
+guest's uid maps through the unprivileged idmap to a subuid rather than to
+yours. On macOS, Incus runs inside colima's Linux VM, where your host uid has
+no meaning at all.
+
 ### `PARA_DOMAIN`
 
 Wildcard domain workspaces are served under (`https://<name>.$PARA_DOMAIN`).
@@ -102,14 +120,16 @@ Optional but recommended: the para contract version your hooks target. para
 refuses with a clear error on a mismatch — see
 [Contract versioning](./versioning.md).
 
-## Machine config, not Parafile
+## User config, not Parafile
 
-Machine-level overrides live in `~/.config/para/config`, not the Parafile —
-persist them with `para config-set KEY VALUE`. Notable ones:
+Some knobs describe *your box*, not the project, so they live in the per-user
+config file — `$XDG_CONFIG_HOME/para/config`, i.e. `~/.config/para/config` by
+default. Persist them with `para config-set KEY VALUE`. Notable ones:
 
 - `PARA_HTTPS_PORT` — the port para Caddy binds (default `8443`; set `443` for
   port-less URLs — see [Workspace URLs](./urls.md)).
 - `PARA_POOL` — the Incus storage pool; para writes this itself when it has to
   create a `dir` pool for nested Docker.
+- `PARA_BRIDGE` — the Incus bridge workspaces attach to (default `incusbr0`).
 
-Precedence everywhere is: environment > machine config > Parafile default.
+Precedence everywhere is: environment > user config > Parafile default.

@@ -8,8 +8,13 @@ pre-pulled Docker images get baked in once instead of on every `up`.
 
 para's own mechanism needs very little of the image:
 
-- a **uid-1000 user** (`$PARA_USER`, `app` by default) — para runs hooks,
-  `para sh`, and `para run` as it, and every file it pushes is chowned to it;
+- a **workspace user** — `$PARA_USER` with uid/gid `$PARA_UID`/`$PARA_GID`
+  (`app` and `1000`/`1000` by default). para runs hooks, `para sh`, and
+  `para run` as it, and every file it pushes is chowned to those ids, so the
+  user your `image-build.sh` creates **must** match them (it gets all three in
+  its environment — see below). Override them in the
+  [Parafile](./parafile.md#para_user--para_uid--para_gid) if `1000` is taken in
+  your base image;
 - **bash** — para invokes hooks and shells via `su -s /bin/bash`;
 - **git**, if your hooks clone (the bundled templates' do; para itself never
   runs git).
@@ -17,7 +22,7 @@ para's own mechanism needs very little of the image:
 Everything else is your project's choice. If your stack is Docker Compose —
 as the bundled templates' is — then the image also needs **docker** with
 nesting resolving to **overlayfs** (a `dir`/ext4 Incus pool; btrfs/zfs<2.2
-silently falls back to the slow vfs driver) and that uid-1000 user in the
+silently falls back to the slow vfs driver) and that workspace user in the
 `docker` group. para doesn't know or check that; the templates'
 `image-build.sh` verifies it for you, because the payload that installs Docker
 is what should refuse to publish a half-broken image.

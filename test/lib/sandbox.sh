@@ -53,6 +53,12 @@ sandbox_base() {
   export PARA_HTTPS_PORT="${PARA_TEST_PORT:-9443}"
   # No prompts, no pty — scripted.
   export PARA_NONINTERACTIVE=1
+  # Pin the workspace user rather than inherit it. These are project keys with a
+  # documented default, but a real user config (~/.config/para/config) could set
+  # them, and then the fixture image and the assertions would disagree. Exporting
+  # them makes the run deterministic AND gives the tests one place to read the
+  # expected ids from, instead of a literal 1000 sprinkled around.
+  export PARA_USER=app PARA_UID=1000 PARA_GID=1000
 }
 
 # The bridge's /24 prefix, e.g. "10.120.251". Mirrors bin/para's subnet_prefix.

@@ -1,6 +1,6 @@
 # Project setup
 
-para needs one thing from a project: a **`.paraspace/`** directory at the repo
+`para` needs one thing from a project: a **`.paraspace/`** directory at the repo
 root, holding a **`Parafile`** (config) and a **`hooks/`** dir (provisioning).
 `para` finds your project by walking up from `$PWD` for the `.paraspace/` dir.
 
@@ -16,7 +16,7 @@ para init <template>   # a specific one
 
 It copies the template's `.paraspace/` (Parafile + hooks + skel +
 image-build.sh) into the current directory, **skipping any file that already
-exists** — so it safely adds para to an existing repo without touching your
+exists** — so it safely adds `para` to an existing repo without touching your
 code — and names the base image (`PARA_IMAGE`) after your directory.
 
 ## Make it yours
@@ -50,7 +50,7 @@ loop.
 
 | Entry | Read by | Purpose |
 |---|---|---|
-| `Parafile` | para (host-side) | the keys para reads — [reference](./parafile.md) |
+| `Parafile` | `para` (host-side) | the keys `para` reads — [reference](./parafile.md) |
 | `hooks/` | the workspace | `provision`, `boot`, plus any shared code they source |
 | `skel/` | your hooks | seed files (dotfiles etc.) synced to `~/.para/skel` |
 | `image-build.sh` | `para image-build` (host-side) | builds the base image |
@@ -60,7 +60,7 @@ project so every machine (and every teammate) gets the same workspaces.
 
 ## Pin the contract
 
-Set `PARA_VERSION` in the `Parafile` to the para contract you build against.
+Set `PARA_VERSION` in the `Parafile` to the `para` contract you build against.
 A globally-updated `para` then refuses with a clear error instead of silently
 misbehaving if the interface changed — see
 [Contract versioning](./versioning.md).

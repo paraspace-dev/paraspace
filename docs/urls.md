@@ -6,12 +6,12 @@ no configuration. Every part of that URL is adjustable:
 
 - the **`:8443`** can go away ([remove the port](#removing-the-port));
 - **`paraspace.dev`** can be [your own domain](#using-your-own-domain);
-- the certificate comes from para Caddy's local CA, which your browser needs to
+- the certificate comes from `para` Caddy's local CA, which your browser needs to
   [trust once](#trusting-the-certificate).
 
 ## Removing the port
 
-para's Caddy binds `:8443` by default because any user can. For clean,
+`para`'s Caddy binds `:8443` by default because any user can. For clean,
 port-less URLs (`https://my-feature.paraspace.dev`), move it to `:443`:
 
 ```sh
@@ -40,7 +40,7 @@ under your own domain instead:
 
 ## Trusting the certificate
 
-para Caddy serves the wildcard with its own internal CA, so browsers distrust
+`para` Caddy serves the wildcard with its own internal CA, so browsers distrust
 it until that root is installed — `para start` reminds you:
 
 ```sh

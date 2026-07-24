@@ -42,6 +42,7 @@ export default defineConfig({
             { text: 'Hooks', link: '/docs/hooks' },
             { text: 'The image contract', link: '/docs/image' },
             { text: 'Contract versioning', link: '/docs/versioning' },
+            { text: 'Internals', link: '/docs/internals' },
           ],
         },
       ],

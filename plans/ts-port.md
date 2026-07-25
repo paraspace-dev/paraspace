@@ -1,22 +1,52 @@
 # Porting `bin/para` to TypeScript
 
-Status: planned; revised after two independent reviews (adversarial fact-check
-against `bin/para` + architecture/sequencing review). The contract does **not**
-change: `PARA_CONTRACT` stays 1, hooks/templates/`image-build.sh`/`skel/` stay
-shell, and the behavioral test suite (`test/run`) is the oracle the port must
-satisfy verb by verb.
+Status: **shelved pending a trigger** (see `plans/cut-and-harden.md`, whose
+Phase -1 work lands first either way). Revised after three independent
+reviews: an adversarial fact-check against `bin/para`, an
+architecture/sequencing review, and a devil's-advocate review of the premise
+itself — the last of which measured and rejected two claims earlier drafts of
+this document leaned on, so the case below is restated at its true strength.
+The contract does **not** change: `PARA_CONTRACT` stays 1,
+hooks/templates/`image-build.sh`/`skel/` stay shell, and the behavioral test
+suite (`test/run`) is the oracle the port must satisfy verb by verb.
 
-## Why (one paragraph)
+## Why — the case at its measured strength
 
-`bin/para` is 2,244 lines: 848 comment lines against 1,289 of code, and a large
-share of the comments are warnings about bash itself — `${a+set}` testing
-element zero, `:=` firing on empty, unquoted expansion needing `set -f`, `%q`
-capturing element 0 of arrays, SIGPIPE-under-pipefail, the `set -e` AND-OR
-exemption. The Parafile-audit PR (#9) spent most of its 430 net lines on bug
-classes a typed language makes unrepresentable (scalar/array confusion,
-positional-registry field shifts, unset-vs-empty). We are pre-launch with zero
-external consumers and a black-box test suite; this is the cheapest moment the
-port will ever have.
+`bin/para` is 2,244 lines (1,289 code, 848 comments). Two claims earlier
+drafts made here did not survive measurement and are retracted:
+
+- ~~"A large share of the comments warn about bash itself."~~ Classified:
+  only ~100–150 comment lines (12–18%) are bash-mechanics warnings; the
+  great majority are domain spec (incus alias globality, publish/swap
+  ordering, su/pty/SIGWINCH, Caddy ambiguity, the vfs/idmap footguns) that
+  ports verbatim and gains nothing from types.
+- ~~"PR #9 spent most of its lines on bug classes a typed language makes
+  unrepresentable."~~ Scored: ~1.5 of that PR's seven fixes were
+  bash-the-language; the rest were policy and domain decisions a TS
+  implementation would have needed identically. The one shipped bug
+  (`PARA_ROUTES=()` reading as unset) traces to a design choice — an array
+  key — that bash steered but did not force, and that is already reversed.
+
+What actually survives as the case for the port, per the same review:
+
+1. **The `set -e` invisible-context class** — load-bearing `|| true`s, the
+   AND-OR exemption — is structurally eliminated by throw-by-default and is
+   beyond shellcheck's reach; in bash it can only ever be mitigated.
+2. **Top-level execution structure** — config load running before the
+   helpers exist. (Phase -1 improves this in bash with `load_config()`;
+   a real `main()` removes the class.)
+3. **The `%q`-through-`su -c` quoting cliff** — still handwritten in TS,
+   but centralized behind one typed boundary.
+4. **Type-checked refactoring at scale**, which matters if — and only if —
+   the tool is meant to grow substantially and take outside contributors.
+
+That is a real but narrow case: it justifies porting **when growth demands
+it**, not as an unconditional win. The trigger conditions are recorded in
+`plans/cut-and-harden.md`; when one fires, re-baseline this plan first —
+Phase -1 shrinks the surface it must carry (install removed, boundary
+policy moved behind Parafile keys) and lands overlapping items this plan
+previously scheduled itself (the three sanctioned fixes, `config-dump`,
+the registry accessor), which then drop out of the phases below.
 
 ## Goals
 
@@ -51,7 +81,7 @@ port will ever have.
 | Entry shim | `bin/para` becomes a small sh shim (below) | picks the fast runtime when present; `PARA_RUNTIME=node\|bun` override for debugging and CI |
 | CLI framework | `@cliffy/command` **1.2.1** (stable since 1.0.0, 2026-02; exact-version pinned), imported only by one adapter file | declarative, typed, dynamic completion resolvers; the adapter contains framework risk on principle |
 | Bundler | `bun build --target=node --sourcemap=linked` → one ESM file + map, zero runtime deps | JSR/npm dep tree is dev-time only; users never see it |
-| Unit tests | `bun test` for pure modules (routes, config, registry, quoting) | the tier bash couldn't have |
+| Unit tests | `bun test` for pure modules (routes, config, registry, quoting) | first-class unit tier (bash gets a narrower one via Phase -1's source guard; this one needs no sourcing tricks) |
 | Behavioral tests | `test/run` — with the two carve-outs noted in Testing | it drives `$PARA` as a black box |
 | Lint | `tsc --noEmit`, typescript-eslint strict, `knip`; shellcheck stays for the shell that remains | `bin/lint` runs all of it |
 

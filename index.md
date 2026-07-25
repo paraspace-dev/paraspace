@@ -14,15 +14,21 @@ hero:
       link: https://github.com/paraspace-dev/paraspace
 
 features:
-  - icon: 🛰️
-    title: Real isolation
-    details: Each workspace is an unprivileged Incus system container with its own clone, Docker stack, and bridge IP. Build, run, and break things side by side.
   - icon: 🪐
-    title: A URL per workspace
-    details: One host Caddy routes https://name.paraspace.dev to each workspace. Open two branches in two tabs and compare.
+    title: Real isolation
+    details: Each workspace is an unprivileged Incus system container with its own clone, app stack, and bridge IP. Safely run your coding agents in YOLO mode, without impacting your host or other workspaces.
+  - icon: 🛰️
+    title: A subdomain per workspace
+    details: Caddy routes <code>*.name.paraspace.dev</code> to each exposed http(s) service. Same ports in every workspace, no offsets to juggle.
+  - icon: 🔑
+    title: Authenticate once
+    details: Credentials live on a shared per-project volume. Run gh auth login in one workspace and the whole project is authed — one revocable key per machine, never your host keys.
+  - icon: 💻
+    title: A real terminal
+    details: para sh is a native shell in the container — a real pty, your dotfiles, no web terminal needed. Bring your zsh, tmux, and Neovim config.
   - icon: 🔌
     title: Bring your own stack
-    details: ParaSpace is a generic mechanism, like docker compose. Your project's .paraspace/ dir — a Parafile and hooks — holds everything project-specific.
+    details: ParaSpace is a generic mechanism, like docker compose. Your project's <code>.paraspace</code> dir has total control, top to bottom.
   - icon: 🤖
     title: Made for agents
     details: Run several coding agents in parallel, each in its own workspace, without collisions on ports, databases, or checkouts.

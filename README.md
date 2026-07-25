@@ -65,27 +65,19 @@ Full docs at **[paraspace.dev](https://paraspace.dev)**, and in
 
 ## Templates
 
-[`templates/`](./templates) holds three runnable templates:
-[`void-docker-gh`](./templates/void-docker-gh) (the `para init` default — a
-small, complete Docker demo), [`void-minimal`](./templates/void-minimal) (the
-barest box, all comments), and [`void-jchook`](./templates/void-jchook) (a full
-personal dev environment on the same demo). Each has its own README.
+[`templates/`](./templates) holds three runnable templates —
+`void-docker-gh` (the `para init` default), `void-minimal` and `void-jchook`.
+Each has its own README; [Project setup](./docs/project-setup.md) compares them.
 
 ## Development
 
-Two gates, both run on every push/PR:
+`bin/lint` (ShellCheck) and `test/run` (the behavioral suite) both gate every
+PR. The e2e tier is Linux-only and not run in CI — run it locally before
+merging anything touching `up`, routes or lifecycle. See
+[`test/README.md`](./test/README.md).
 
-- **`bin/lint`** (or `npm run lint`) — [ShellCheck](https://www.shellcheck.net)
-  over every bash script in the package, discovered by shebang. Uses a
-  `shellcheck` on your `PATH`, or falls back to the pinned docker image.
-- **`test/run`** (or `npm test`) — the behavioral suite, in two tiers. The CLI
-  tier (`--cli`) needs nothing but bash and runs in CI; the e2e tier (`--e2e`)
-  drives a real Incus workspace off a tiny Alpine fixture and is **Linux-only,
-  not run in CI** — run it locally before you merge anything touching the
-  `up`/route/lifecycle mechanism. See [`test/README.md`](./test/README.md).
-
-The docs site is [VitePress](https://vitepress.dev): `npm run site` to preview,
-`npm run site:build` to check for dead links.
+`npm run site` previews the VitePress docs; `npm run site:build` checks for
+dead links.
 
 ## License
 

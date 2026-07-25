@@ -35,9 +35,8 @@ run *inside* it, so a Docker stack boots unchanged.
 
 The common shape for "agents in a sandbox" is a browser tab: the agent's TUI in
 an iframe, your app in another tab, a web terminal in a third, a proxy chain
-behind all of it. That shape is part of what you pay for the isolation, and the
-cost isn't on the pricing page — TUIs misbehave outside a real terminal, and
-live reload rarely survives the proxies.
+behind all of it. That shape is part of what you pay for the isolation: TUIs
+misbehave outside a real terminal, and live reload rarely survives the proxies.
 
 para inverts it. The workspace is a container on your own box:
 
@@ -78,9 +77,9 @@ para setting.
 
 Run `gh auth login` in any workspace and every workspace of that project is
 authenticated — including the one you create next week, and after a reboot.
-Credentials live on an Incus volume attached to each workspace at
-`/para/shared`, not a host bind mount: inside the virtualized filesystem, on
-the pool's native driver. Fast, and on the container side of the boundary.
+Credentials live on a [volume](./internals.md#the-shared-home-volume) shared by
+the project's workspaces — on the container side of the boundary, not a host
+bind mount.
 
 Re-authenticating each new sandbox is what makes people stop at two.
 
@@ -122,8 +121,7 @@ file a template ships:
 exec "$PARA_BIN" sh "$1" -c "exec claude --name $1"
 ```
 
-So the answer to "can para do X for my project" is that your project can — and
-the engine stays small enough to read in an afternoon.
+So the answer to "can para do X for my project" is that your project can.
 
 ## What it isn't
 

@@ -55,14 +55,7 @@ into a scratch directory to diff against a current template. Otherwise:
 | `para run`, `claude`, `web`, `key`, `config-sync` | project commands in `.paraspace/commands/` |
 | `para reconcile`, `para install`, `para image-build` | deleted |
 
-New, and worth adopting: `PARA_READY_HOST` (wait for guest DNS to
+New since then: `PARA_READY_HOST` (wait for guest DNS to
 resolve a host your hooks need), `.paraspace/commands/` (your own `para` verbs),
 and `para doctor`.
 
-## Why the pin is worth setting
-
-`para` is normally installed globally and shared across every project on the
-machine. Without a pin, updating it silently changes the ground under a
-project whose hooks were written against an older interface — and the failure
-shows up as a broken clone or a stack that won't boot, not as a version error.
-With a pin, you get the version error.

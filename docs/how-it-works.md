@@ -53,9 +53,8 @@ There are two doors into a workspace: its URL, and `para sh`.
 
 There is no para daemon and no para database: a workspace records its own
 identity on its container, so `incus` is the only thing that has to remember
-anything. `para up` starts what it needs, including Caddy.
-
-Nothing else runs on the host.
+anything. `para up` starts what it needs, including Caddy — which, besides the
+Incus daemon, is the only para-related process on your host.
 
 ## macOS: one extra layer
 

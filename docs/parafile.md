@@ -7,14 +7,14 @@ can be left out — a Parafile that restates a default is a copy that goes stale
 
 ## What you have to decide
 
-| Key | Needed by | Why there's no default |
-|---|---|---|
-| `PARA_BASE_IMAGE` | `para image build` | para never picks your distro |
-| `PARA_ROUTES` | `para up` | which port your app listens on is project policy |
-| `PARA_ORIGIN` | your clone hook, not para | para doesn't guess your repo |
+para picks neither your distro, your port, nor your repo, so three keys are
+yours to decide:
 
-`PARA_ORIGIN` is here because the bundled templates' `provision` hook needs it;
-para itself never reads it. A project whose hooks don't clone omits it.
+| Key | If you don't |
+|---|---|
+| `PARA_BASE_IMAGE` | `para image build` refuses — it has no default |
+| `PARA_ROUTES` | the workspace publishes no HTTP and has no URL |
+| `PARA_ORIGIN` | the templates' clone hook fails; para itself never reads it |
 
 ## Every key para reads
 
@@ -53,10 +53,9 @@ PARA_ROUTES="3000,api:3001"
 The order is **`sub:port`** — left is where you arrive, right is where it goes,
 the same direction as `docker -p` and `ssh -L`.
 
-Separate entries with commas, spaces, tabs or newlines, whichever reads best —
-a long list laid out one route per line is a first-class spelling. para
-normalizes them to one space-separated form, which is what your hooks see and
-what `for r in $PARA_ROUTES` reads.
+Commas, spaces, tabs and newlines all separate entries, so a long list can go
+one route per line. [Hooks](./hooks.md#the-environment-para-injects) see one
+normalized space-separated list.
 
 para does **not** validate routes — [`caddy validate`](./urls.md) does, before
 every reload, and it names the site it rejected. A bad port or two workspaces
@@ -69,11 +68,9 @@ in case you didn't mean it. Note that only a **bare port** creates
 
 ### `PARA_IMAGE`
 
-Defaults to `$PARA_PROJECT`, so a project normally never sets it. Incus image
-aliases are daemon-global: a fixed default would put two projects that both
-left this unset on the same image, and a build in either would republish the
-other's out from under it. Set it explicitly only to point several projects at
-one shared image, or to name an image built elsewhere.
+Set it only to point several projects at one image, or to name an image built
+elsewhere. Aliases are Incus-daemon-global, so two projects naming the same
+image share it: `para image build` in either republishes it for both.
 
 ### `PARA_BASE_IMAGE` and `PARA_IMAGE_BOOTSTRAP`
 
@@ -92,9 +89,7 @@ Alpine, `apt-get update` on Debian. Leave it unset if your base needs nothing.
 The workspace user para runs hooks and `para sh` as, and chowns every pushed
 file to. Your `image-build.sh` creates that user — it gets all three in its
 environment — so if you change them, **rebuild the image**, or the chowns land
-on a uid with no passwd entry and the shared volume becomes unwritable. They
-default to a stable `1000` because para bind-mounts nothing host-side, so
-there's nothing to line up with.
+on a uid with no passwd entry and the shared volume becomes unwritable.
 
 ## Keys para only forwards to hooks
 
@@ -105,18 +100,17 @@ where you set them.
 - **`PARA_ORIGIN`** — the git URL your clone hook clones. A Parafile at its own
   repo's toplevel can derive it:
   `: "${PARA_ORIGIN:=$(git -C "$PARA_PROJECT_DIR" remote get-url origin)}"`.
-  para won't do that itself: for a project nested inside a larger repo it would
-  walk up and clone the wrong thing.
+  Don't use that in a project nested inside a larger repo — it walks up and
+  finds the outer remote.
 - **`PARA_CLONE_BRANCH`** — which branch to check out. Applies at clone time
   only; to move an existing workspace, `para rm` then `para up`.
 
 ## Your own keys
 
-**Any `PARA_FOO` you set here reaches your hooks, your project commands, and
-your image build for free** — documented or not, no para change needed. That's
-how a project declares its own knobs: the default template's `PARA_GH_AUTH` is
-one, and a project that pre-pulls Docker images sets its own `PARA_PREPULL` and
-reads it in `image-build.sh`. The engine never learns the key exists.
+Any `PARA_FOO` you set reaches your hooks, project commands and image build
+untouched — that's how a project declares its own knobs (`PARA_GH_AUTH` in the
+default template, a `PARA_PREPULL` your `image-build.sh` reads). See
+[Hooks](./hooks.md#the-environment-para-injects).
 
 ## Precedence
 
@@ -126,7 +120,7 @@ Two sourced bash files and the engine's defaults, in that order:
 environment  >  user config  >  Parafile  >  para's defaults
 ```
 
-No code implements that — it falls out of bash and two idioms:
+Write your keys with these idioms and the environment can still win:
 
 ```sh
 : "${PARA_DOMAIN:=myapp.dev}"      # a value, unless the environment has one

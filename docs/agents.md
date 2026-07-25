@@ -17,10 +17,6 @@ Each gets its own clone, its own database, its own stack on its own IP. Two
 agents editing the same file in different workspaces never see each other's
 edits, so the diffs stay separable and each one becomes its own PR.
 
-`para up` is idempotent — re-running it on an existing workspace restarts and
-reconverges rather than erroring, which is the normal loop when you're
-iterating on a hook.
-
 ## Let the agent off the leash
 
 The reason to run an agent with permissions wide open is that the workspace is
@@ -28,7 +24,7 @@ the boundary. It's an unprivileged container with none of your host mounted, so
 the agent can install packages, rewrite the tree, and run whatever it likes;
 `para rm` resets it.
 
-Two things are *not* isolated, and both are worth deciding about deliberately:
+Two things are *not* isolated:
 
 - **the network** — workspaces have ordinary outbound access. para does no
   egress filtering; that's an Incus network ACL if you want it.
@@ -70,7 +66,7 @@ exec "$PARA_BIN" sh "$1" -c "
 "
 ```
 
-Because `para sh` owns the terminal handling, these stay one-liners — see
+They stay one-liners because `para sh` owns the terminal handling — see
 [Commands](./commands.md#project-commands).
 
 For the agent to feel like home, put your dotfiles in `.paraspace/skel/` and
@@ -111,12 +107,7 @@ shared one. When the branch has landed:
 para rm fix-login
 ```
 
-The shared volume — and with it your authentication — survives. Only the
-workspace goes.
+The shared volume — and with it your authentication — survives.
 
-## When something's wrong
-
-`para doctor` checks the host and prints the resolved config; it's the first
-thing to run when an `up` fails for reasons that don't look like your project's.
-Common failures and what they mean are in
-[Troubleshooting](./troubleshooting.md).
+When an `up` fails for reasons that don't look like your project's, run
+`para doctor` — see [Troubleshooting](./troubleshooting.md).

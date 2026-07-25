@@ -22,11 +22,10 @@ para's own mechanism needs very little:
 
 Everything else is your project's choice. If your stack is Docker Compose — as
 the bundled templates' is — the image also needs **docker**, that workspace user
-in the `docker` group, and nesting that resolves to **overlayfs** (a `dir`/ext4
-Incus pool; btrfs and ZFS < 2.2 silently fall back to the very slow `vfs`
-driver). para doesn't know or check that; the templates' `image-build.sh`
-verifies it, because the payload that installs Docker is what should refuse to
-publish a half-broken image.
+in the `docker` group, and nesting that resolves to **overlayfs** — on a btrfs
+or ZFS pool it [falls back to the very slow `vfs`
+driver](./troubleshooting.md#everything-inside-the-workspace-is-slow), silently.
+para doesn't check that; the templates' `image-build.sh` does.
 
 For full ergonomics also include `tmux`, a login shell like `zsh`, and whatever
 agent CLI you use — para degrades rather than breaks without them.
@@ -40,18 +39,14 @@ The command is base-agnostic plumbing:
 3. pipes your **`.paraspace/image-build.sh`** into it as root under `bash -s`,
    with every `PARA_*` exported ahead of it;
 4. publishes the result as **`$PARA_IMAGE`**, stamping `user.para.src_sha` so
-   the image can tell you later whether its source has changed.
+   the image can tell you later whether its source has changed. A failed or
+   interrupted build leaves the existing image untouched.
 
-The bootstrap step exists because step 3 needs bash and step 2 is the only one
-guaranteed to run — `sh` is in every base image. Use it to install bash and
-refresh the package index; a base that already has what your payload needs
-doesn't need it at all.
+Both keys live in the
+[Parafile](./parafile.md#para_base_image-and-para_image_bootstrap), which is
+also where the per-distro bootstrap examples are.
 
-Both keys live in the [Parafile](./parafile.md#para_base_image-and-para_image_bootstrap).
-`PARA_BASE_IMAGE` has **no default**: the distro is entirely the project's call,
-so a para update can never swap the ground your image is built on.
-
-Two things worth knowing:
+Two caveats:
 
 - Images are **per-arch** — build on the machine that runs them (arm64 on
   Apple Silicon).
@@ -76,17 +71,10 @@ $ para image status
   source   drifted — the image inputs changed since this build
 ```
 
-`source` compares a hash stamped at build time against the current
-**reproducibility surface**: the `image-build.sh` payload, `$PARA_IMAGE_BOOTSTRAP`
-and `$PARA_BASE_IMAGE`. If any of those changed, a rebuild would produce
-something different and status says `drifted`. An image built before provenance
-stamping, or by a plain `incus` action, reports `unknown`.
+`drifted` means the `image-build.sh` payload, `$PARA_IMAGE_BOOTSTRAP` or
+`$PARA_BASE_IMAGE` changed since the build, so rebuilding would give you
+something different. `unknown` means the image predates provenance stamping, or
+was built by a plain `incus` action.
 
 `para image rm` deletes `$PARA_IMAGE` — to reclaim space or force a fully clean
 next build. Workspaces already `up` are clones and keep running.
-
-## If a build is interrupted
-
-`para image build` publishes to a temporary alias and swaps it in only once the
-new image exists, so an interrupted or failed build never leaves you with no
-image. Ctrl-C tears the builder down and leaves `$PARA_IMAGE` as it was.

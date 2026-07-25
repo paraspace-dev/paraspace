@@ -41,7 +41,7 @@ diff <(para sh ws1 -c 'cat package.json') package.json
 
 The command is handed to bash as a single string, so pipes, redirects and `&&`
 work as written — quote the whole thing or your host shell eats them first. Two
-things worth knowing:
+caveats:
 
 - It's a **non-interactive login bash**: `/etc/profile` and `~/.bash_profile`
   are read, but the interactive rc your `skel/` installs is not, so `PATH`
@@ -51,8 +51,7 @@ things worth knowing:
   `-c 'vim …'` works from a terminal while `| tee`, `> file` and `$(…)` stay
   byte-clean. `PARA_NONINTERACTIVE=1` forces the no-pty path.
 
-There is no `para exec`: this is that command, and it lives on `sh` because it
-runs through a login shell in the clone rather than as bare argv.
+There is no `para exec` — this is it.
 
 ## Host
 
@@ -62,15 +61,12 @@ runs through a login shell in the clone rather than as bare argv.
 | `para doctor` | check this machine and print the resolved config — see [Troubleshooting](./troubleshooting.md) |
 | `para config <edit\|init\|path>` | open, seed, or locate the [user config](./parafile.md#user-config-not-parafile) |
 
-The user config is hand-edited sourced bash, so `config` only helps you open it:
-
 ```sh
-para config edit    # $VISUAL/$EDITOR on it, creating it first if it doesn't exist
+para config edit    # opens it in $VISUAL/$EDITOR, creating it first if needed
 ```
 
-That's the only one of the three you need. `para config init` seeds the file
-without opening it (`--force` to overwrite an existing one), and
-`para config path` prints its location — both for scripting.
+That's the only one you need day to day. `init` seeds the file without opening
+it (`--force` overwrites); `path` prints its location — both for scripting.
 
 ## Project
 
@@ -88,9 +84,6 @@ source <(para completions bash)   # ~/.bashrc
 source <(para completions zsh)    # ~/.zshrc
 ```
 
-Completion offers workspace names at position 2 for any verb that isn't an
-engine verb — including every project command — which is the right default with
-no configuration.
 
 ## Project commands
 

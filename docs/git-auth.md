@@ -35,7 +35,7 @@ Because the key lives on the
 workspace of the project inherits it — you authorize once per machine, not per
 workspace.
 
-That cuts both ways, and it's worth deciding deliberately: anything running in
+That cuts both ways: anything running in
 a workspace, [an agent included](./agents.md#let-the-agent-off-the-leash), can
 push wherever this key is authorized. A deploy key scoped to the one repository
 is the tighter choice; an account-wide key is the convenient one.

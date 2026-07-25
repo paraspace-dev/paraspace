@@ -20,8 +20,8 @@ flows live.
 
 ### `boot`
 
-Brings the stack up. The **readiness contract** is the whole point: return zero
-only once every routed service is actually listening.
+Brings the stack up. The **readiness contract**: return zero only once every
+routed service is actually listening.
 
 ```sh
 docker compose up -d --wait          # blocks until healthchecks pass
@@ -41,7 +41,7 @@ Hooks are executed **by path**, so their own shebang decides the interpreter.
 ## How your project reaches the workspace
 
 Before the hooks run, para replaces the guest's `~/.paraspace` with your
-project's `.paraspace/` directory. Same name on both sides, one concept:
+project's `.paraspace/` directory. Same name on both sides:
 
 | In the guest | What it is |
 |---|---|

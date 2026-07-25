@@ -29,7 +29,7 @@ features:
       height: 32
       wrap: true
     title: Caddy at the doorway
-    details: Not in your stack. Each workspace has its own IP, so your app binds its usual ports — nothing remapped, nothing path-rewritten, and WebSockets and hot reload just work.
+    details: Each workspace has its own IP, so your app binds its usual ports — nothing remapped, nothing path-rewritten, so WebSockets and hot reload work with no configuration.
   - icon:
       light: /icons/key-light.svg
       dark: /icons/key-dark.svg

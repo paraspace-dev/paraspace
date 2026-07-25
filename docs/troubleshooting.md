@@ -37,8 +37,8 @@ project
 ```
 
 `✓` passed, `!` is advice, `✗` is a failure — and any `✗` exits non-zero. The
-`config` block is also the answer to "what did para actually resolve," which is
-worth checking whenever a setting doesn't seem to be taking effect.
+`config` block is also the answer to "what did para actually resolve" — check it
+whenever a setting doesn't seem to be taking effect.
 
 ## The host
 

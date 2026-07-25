@@ -1,7 +1,6 @@
 <template>
   <div class="para-hero">
     <div class="space" aria-hidden="true">
-      <i class="star" v-for="n in 9" :key="n" />
       <span class="orbit"><span class="sat" /></span>
     </div>
 
@@ -52,15 +51,14 @@
   padding: 28px 0 0 28px;
 }
 
-/* Nebula glow */
+/* The page nebula supplies the ambient color now; this is just the warm bloom
+   that lifts the terminal off it. */
 .para-hero::before {
   content: '';
   position: absolute;
-  inset: -10%;
-  background:
-    radial-gradient(closest-side at 35% 65%, rgba(254, 128, 25, 0.22), transparent 70%),
-    radial-gradient(closest-side at 70% 30%, rgba(142, 192, 124, 0.18), transparent 70%);
-  filter: blur(42px);
+  inset: -6%;
+  background: radial-gradient(closest-side at 45% 55%, rgba(254, 128, 25, 0.2), transparent 72%);
+  filter: blur(38px);
   pointer-events: none;
 }
 
@@ -72,31 +70,9 @@
   pointer-events: none;
 }
 
-.star {
-  position: absolute;
-  width: 2px;
-  height: 2px;
-  border-radius: 50%;
-  background: var(--gb-fg);
-  opacity: 0;
-}
-.dark .star { animation: twinkle 4s ease-in-out infinite; }
-.star:nth-child(1) { top: 6%; left: 10%; }
-.star:nth-child(2) { top: 14%; left: 82%; animation-delay: 0.9s; }
-.star:nth-child(3) { top: 27%; left: 4%; animation-delay: 1.7s; width: 3px; height: 3px; }
-.star:nth-child(4) { top: 9%; left: 46%; animation-delay: 2.4s; }
-.star:nth-child(5) { top: 38%; left: 94%; animation-delay: 0.4s; }
-.star:nth-child(6) { top: 70%; left: 2%; animation-delay: 1.2s; }
-.star:nth-child(7) { top: 86%; left: 22%; animation-delay: 2.9s; width: 3px; height: 3px; }
-.star:nth-child(8) { top: 92%; left: 68%; animation-delay: 1.9s; }
-.star:nth-child(9) { top: 62%; left: 88%; animation-delay: 3.4s; }
-
-@keyframes twinkle {
-  0%, 100% { opacity: 0.15; }
-  50% { opacity: 0.75; }
-}
-
-/* Mission-diagram orbit: dashed ellipse + a small satellite tracing it. */
+/* Mission-diagram orbit: dashed ellipse + a small satellite tracing it. The
+   starfield belongs to the page nebula (Nebula.vue) — a second, denser field
+   clustered on the terminal read as a smudge. */
 .orbit {
   position: absolute;
   inset: 6% -4%;
@@ -114,6 +90,20 @@
   box-shadow: 0 0 8px 1px color-mix(in srgb, var(--gb-aqua) 60%, transparent);
   offset-path: ellipse(50% 50% at 50% 50%);
   animation: orbit 26s linear infinite;
+}
+
+/*
+ * Bright-aqua glows nicely against the nebula, but on the daytime sky it lands
+ * within ~1.2:1 of the aqua behind it and disappears — and so would the brand
+ * orange, at almost the same luminance. The orbit crosses both mid-aqua sky and
+ * white cloud, so no single bright tint covers the range: light mode uses a dark
+ * marker, which is what an object silhouetted against a bright sky looks like
+ * anyway, with a thin light rim so it keeps an edge on either backdrop. The glow
+ * goes too, since a bloom on a bright sky reads as fuzz rather than light.
+ */
+html:not(.dark) .sat {
+  background: #3c3836;
+  box-shadow: 0 0 0 1.5px rgba(255, 255, 255, 0.6);
 }
 
 /* No offset-path support → keep the ring, skip the satellite. */
@@ -141,6 +131,11 @@
 }
 .ghost.g1 { transform: translate(14px, -14px); opacity: 0.45; }
 .ghost.g2 { transform: translate(28px, -28px); opacity: 0.2; }
+
+/* Against the daytime sky the dark ghosts read as gray smudges rather than
+   dimmer terminals, so they pull back. */
+html:not(.dark) .ghost.g1 { opacity: 0.28; }
+html:not(.dark) .ghost.g2 { opacity: 0.12; }
 
 .term {
   position: relative;
@@ -232,8 +227,7 @@
 /* ---- Motion preferences ------------------------------------------------ */
 
 @media (prefers-reduced-motion: reduce) {
-  .line, .dark .star { animation: none; opacity: 1; }
-  .dark .star { opacity: 0.5; }
+  .line { animation: none; opacity: 1; }
   .typed { animation: none; width: 11ch; }
   .sat { animation: none; }
   .cursor { animation: none; }

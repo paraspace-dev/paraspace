@@ -1,199 +1,432 @@
 # The minimal engine: a total rewrite of `bin/para`
 
-Status: planned. This **supersedes** `plans/cut-and-harden.md` (PR #11),
-`plans/ts-port.md` (PR #10), and `plans/go-rewrite.md` — all three were
-answers to "how do we live with these 2,244 lines"; this plan's answer is
-that most of them should not exist in the engine at all. Decisions, made:
-**bash**, rewritten minimal; **`PARA_CONTRACT` 2**, redesigned freely
-(pre-launch: madi, the templates, and the fixtures migrate in the same
-pass — the "bank the breakage now" argument from go-rewrite.md, finally
-banked); **open verb dispatch to host-side template hooks** as the one new
-primitive that does most of the halving.
+Status: planned. **Supersedes** `plans/cut-and-harden.md` (PR #11),
+`plans/ts-port.md` (PR #10), and `plans/go-rewrite.md`. Decisions, made:
+**bash**, rewritten from an empty file; **`PARA_CONTRACT` 2**, redesigned
+freely (pre-launch — madi, the templates and the fixtures migrate in the same
+pass); **no compatibility with contract 1 at all**.
 
-## The thesis
+## The goal
 
-para's one rule is that the engine is a generic mechanism holding zero
-project policy. The current `bin/para` violates it in both directions: it
-carries policy (claude/tmux sessions, a pubkey path, one template's skel
-layout, compose parsing, install plumbing), and it lacks the primitive that
-would let templates carry that policy themselves. The rewrite fixes the
-architecture, and the line count follows: **target ≤ 1,100 lines** (from
-2,244), achieved by subtraction and by a clean rewrite — not by compressing
-prose. The maintainer's habitability complaint is answered structurally: a
-small engine that does one thing is readable in any language, which is why
-the language question, so hard at 2,244 lines, dissolved at 1,100 — bash,
-written fresh, no compat baggage, no policy, no apologies.
+`para` is glue over `incus` and `caddy`. The code should read like it. The
+2,244-line `bin/para` reads like a compliance document: every command carries a
+paragraph explaining the bash it needed, every config key carries a guard
+against a way it could be misused, and the same three ideas are spelled four
+different ways.
 
-## The one new primitive: open verb dispatch
+The target is **habitability, not line count** — the line count is a symptom.
+Held to four rules:
+
+1. **No bash gymnastics.** If a line needs a warning comment about bash, write
+   the line that doesn't need one. Nothing gets explained by a paragraph.
+2. **Inheritance, not enforcement.** Config resolves by ordinary bash rules.
+   No denylists, no `declare -p` probing, no "did they set it or leave it
+   unset" archaeology. A user who puts a nonsense value in their config gets
+   nonsense; `para doctor` is where we tell them so.
+3. **One way to do each thing.** One door into a workspace, one env-forwarding
+   rule, one place that knows about TTYs, one place that knows about Caddy.
+4. **Simplicity beats features.** When a feature costs a mechanism, the feature
+   goes. Several do below.
+
+Line budget falls out at **~950** (from 2,244), but the real gates are: **no
+function longer than ~30 lines, no comment longer than ~3 lines.** A comment
+that wants to be longer is a docs page with a one-line pointer.
+
+## Six structural decisions
+
+Each one deletes a *category* of code, not a few lines. Guards mostly evaporate
+here rather than being cut — they existed because a data structure was fragile,
+and the structure changes.
+
+### 1. Incus is the database. Delete the registry.
+
+Verified on incus 6.22: `incus list` takes **config keys and device keys as
+columns**, and config keys as **filters**.
+
+```
+$ incus list 'user.para.project=madi' -f csv \
+    -c 'n,s,user.para.project,user.para.routes,user.para.domain,devices:eth0.ipv4.address'
+para-ws2,STOPPED,madi,9000 api:3000 pgweb:8081,madisonai.dev,10.120.251.200
+```
+
+One call, ~17 ms, correct for stopped instances (the device column is the
+*configured* static IP), scoped by project *by incus*, no bash filtering. The
+container already had to be self-describing for `reconcile` to work — so make
+the stamp the only record and delete everything that mirrored it.
+
+**Deletes:** `$XDG_STATE_HOME/para/workspaces` and every reader/writer of it
+(`ip_of`, `project_of`, `registry_remove`, `first_running_ct`, the awk one-liners
+in `web`/`ls`, the mktemp-rewrite dance); the `-` sentinels; every "an empty
+field would shift every reader's parse" guard; the whitespace-in-stamp guard;
+the registry-vs-container double ownership check; **`para reconcile` entirely**
+(it exists only to repair drift between two copies of one fact). `alloc_ip`
+reads the addresses actually in use on the bridge (`--all-projects`) instead of
+para's own bookkeeping — which is strictly more correct, and lets
+`test/lib/sandbox.sh` drop its ~50-line IP-band carving too.
+
+**Costs:** `para ls` needs incus reachable. Fine — everything else does.
+Routes are stamped **space-separated** so no CSV field can contain a comma and
+parsing stays `IFS=, read -r`.
+
+### 2. Config is two sourced bash files. That is the whole precedence story.
+
+```sh
+PARA_PROJECT_DIR="${PARA_PROJECT_DIR:-$(find_project_root || true)}"
+parafile="$PARA_PROJECT_DIR/.paraspace/Parafile"
+
+[ -f "$PARA_CONFIG" ] && . "$PARA_CONFIG"     # ~/.config/para/config — your box
+[ -f "$parafile" ]    && . "$parafile"        # .paraspace/Parafile — the project
+: "${PARA_DOMAIN:=paraspace.dev}"             # …engine defaults, last
+```
+
+Both files are sourced bash using **one idiom**, the one the Parafile already
+uses:
+
+- `: "${PARA_X:=value}"` — "here's a value, unless the environment has one."
+- `PARA_X=value` — "I insist," which is a legitimate thing for a project to say.
+
+That is the entire model: **environment > whichever file is sourced first >
+the other file > engine defaults.** User config first (your box outranks a
+project on box-shaped keys), Parafile second, defaults last. No code implements
+any of it.
+
+**Deletes:** the `parafile_only_key` denylist and its warning path; the
+`printf -v` hand-rolled loader; `ROUTES_DECLARED` and the `declare -p`
+array-detection dance; the set-vs-unset probing on `PARA_HOST_ENV`; the
+load-time regex validation of `PARA_CLONE_DIR` / `PARA_CLONE_BRANCH` /
+`PARA_PROJECT`; `validate_domain` and its on-write / on-use split; the
+`usage_full` special-casing of unresolvable values. Roughly 180 lines of
+guards, gone, and the remaining ones are gone for *structural* reasons — see
+decisions 3 and 4.
+
+Kept: `validate_name` for workspace names (one regex, one message — the most
+typed input, and it becomes a DNS label). Everything else, incus rejects loudly
+and clearly on its own.
+
+### 3. Every "your box is misconfigured" check moves to `para doctor`.
+
+~200 lines of preflight — colima version, cgroup-v1-inside-/sys/fs/cgroup,
+`getcap cap_net_bind_service`, `idmapped_mounts`, OpenZFS ≥ 2.2, pool driver,
+dir-pool-on-btrfs see-through — is real, hard-won domain knowledge sitting in
+the hot path of every `up`. It moves, verbatim in spirit, into one command that
+exists to say what's wrong. `para doctor` also absorbs:
+
+- resolved config introspection (deleting that section of `--help`),
+- wildcard DNS actually resolving to 127.0.0.1 (a new check, and a common
+  first-run failure),
+- "your user config sets `PARA_PROJECT` box-wide, which is probably wrong" —
+  **the denylist, re-expressed as advice instead of enforcement.**
+
+`up` keeps only what it can't proceed without: incus reachable, image exists,
+pool exists (die with the exact `incus storage create` line). And `ensure_pool`
+stops **mutating** — no more auto-switching `PARA_POOL` to `para-dir` and
+writing it into the user's config file behind their back. It warns; doctor
+explains; the user decides.
+
+One line replaces the rest: on a failed `up`, print *"if this looks like a host
+problem, run `para doctor`."*
+
+### 4. One door into a workspace, and it holds all the terminal knowledge.
+
+Every guest execution — `para sh`, hooks, and (via `para sh`) project commands
+— goes through one function. See "Terminal semantics" below; this is the part
+of the old file that is **most** worth preserving and the part currently
+duplicated across `wexec`, `wexec_tty`, `cmd_sh`, `cmd_claude` and `cmd_run`
+with four subtly different spellings.
+
+The guest script stops being spliced together host-side. Everything the guest
+needs is already in the guest, in `~/.paraspace/env`:
+
+```sh
+guest_prelude='
+  . ~/.paraspace/env
+  infocmp "${TERM:-}" >/dev/null 2>&1 || export TERM=xterm-256color
+  cd "$HOME/$PARA_CLONE_DIR" 2>/dev/null || cd "$HOME"
+'
+```
+
+Nothing is interpolated except the user's own command, appended verbatim. The
+`'…'"$var"'…'` quoting sandwiches disappear — and with them the injection
+surface that `PARA_CLONE_DIR`'s validation regex existed to cover.
+
+### 5. One env-forwarding rule, everywhere.
+
+**Every `PARA_*` variable in scope is forwarded to anything para runs on your
+behalf** — guest hooks, project commands, and the image-build payload.
+
+```sh
+# The one way para hands its context to anything it runs for you.
+para_env() { local v; for v in "${!PARA_@}"; do printf 'export %s=%q\n' "$v" "${!v}"; done; }
+```
+
+Written to `~/.paraspace/env` for the guest, prepended to the payload on stdin
+for `image build` (`{ para_env; cat "$payload"; } | incus exec … -- bash -s`),
+and for host-side project commands it's the one-liner `export "${!PARA_@}"`.
+
+**Deletes:** the `--env PARA_USER --env PARA_UID --env PARA_GID` special cases
+in image build; the array-skip guard in the forwarder; and — the good part —
+**`stack_images()` and the whole `PARA_PREPULL` concept.** para no longer parses
+`docker-compose.yml` and `Dockerfile` (madi policy that never belonged here),
+and doesn't replace it with a key either: a project that pre-pulls images sets
+`PARA_PREPULL` in its Parafile and reads it in its own `image-build.sh`. **The
+engine never learns the key exists.** That is the generic-mechanism boundary
+working as designed.
+
+### 6. Let `caddy validate` be the validator.
+
+`caddy validate --config … --adapter caddyfile` runs before every reload, and
+its failure is surfaced instead of swallowed (a known bug fix). Once it does,
+`parse_routes`' ~70 lines — port range 1–65535, leading zeros, DNS-label shape,
+within-workspace host collisions — and `gen_caddyfile`'s cross-row duplicate
+guard are re-implementations of a check Caddy does better, whose only reason for
+existing was that a bad value used to *corrupt the registry*. There is no
+registry. Route handling becomes:
+
+```sh
+# Routes may be written with commas, spaces, tabs or newlines. Canonical form is
+# lowercase, space-separated — what para stamps and what `for r in $PARA_ROUTES` reads.
+normalize_routes() { printf '%s' "$1" | tr 'A-Z,\t\n' 'a-z   '; }
+```
+
+Input spelling stays as forgiving as it is today (commas are the readable
+choice for a short list; newlines for a long one); only the canonical form
+changes. No squeeze or trim: every consumer word-splits anyway. Deliberately a
+string transform rather than an `IFS=$', \t\n'` split — the split form needs
+`set -f` and an IFS save/restore around it, which is exactly the paragraph
+(`PARA_ROUTES="30*"` resolving against your `$PWD`) this rewrite is trying not
+to have.
+
+A bad route now fails at `caddy validate`, loudly, naming the site, with nothing
+written.
+
+## Terminal semantics: the things that must not be lost
+
+`para claude` took real debugging. All of it survives, in one function, stated
+once:
+
+| What | Why |
+|---|---|
+| `su -` — never `incus exec --user` | `su` runs initgroups, so supplementary groups load (`docker`, without which the stack hits permission-denied on the socket) |
+| `su --pty` on the interactive path | with `-c`, plain `su` stays the terminal's foreground process and drops SIGWINCH; the TUI never repaints on resize (stuck-small claude, misplaced cursor). `--pty` proxies the tty and forwards resizes |
+| `incus exec -t` only when **stdin and stdout are both** TTYs; explicit `-T` otherwise | a pty echoes NULs and translates `\n`→`\r\n`; forcing `-t` on stdin alone corrupts `para sh x -c … \| tee`, `> file`, and `$(…)`. Bare auto-mode ignores `PARA_NONINTERACTIVE`, so be explicit in both directions |
+| `infocmp "$TERM" \|\| export TERM=xterm-256color`, in the guest | a host `$TERM` (ghostty) with no terminfo in the container hard-fails tmux/claude; otherwise pass the native terminal through untouched |
+| `exec` at the end | the workspace command's exit status becomes para's |
+| `-s /bin/bash` for `-c` | deterministic semantics regardless of the image's login shell; hooks are run **by path** so their own shebang decides |
+
+New, documented consequence: `su --pty` is util-linux `su`. **busybox `su` (Alpine)
+has no `--pty`**, so an interactive `para sh` on a busybox image fails loudly.
+That's an image requirement (`docs/image.md`), not something the engine papers
+over. The e2e fixture is unaffected — it runs non-interactive.
+
+## Project commands: `.paraspace/commands/<verb>`
+
+The one new primitive, and the one that lets policy leave the engine.
 
 ```
 para <verb> [args…]
-  known engine verb        -> engine
-  .paraspace/hooks/host/<verb> exists -> exec it, HOST-side, with the full
-                              resolved PARA_* env injected (same blanket
-                              forwarding as guest hooks)
-  otherwise                -> unknown command error
+  engine verb                      -> engine (engine always wins)
+  .paraspace/commands/<verb>       -> exec it, on the HOST, with every PARA_*
+                                      exported, args passed through verbatim
+  otherwise                        -> unknown command
 ```
 
-Like `git-<foo>`: a template ships a file, and `para <foo>` exists — no
-engine change, no PR to paraspace. Host hooks run on the host with the
-user's tty (interactive flows work naturally), receive every resolved
-`PARA_*`, and **compose by calling back into para** (`para ls --names`,
-`para sh <ws> -c …`, `incus` directly if they choose). Workspace resolution
-is the hook's business — para passes args through verbatim. ~15 lines of
-dispatch replaces ~250 lines of engine verbs, and it is the extension
-mechanism this tool always implied.
+Host-side, with the user's tty, so interactive flows work naturally. Also
+exported: `PARA_BIN` (this script's path, so a command can call back reliably)
+and `PARA_PROJECT_DIR`. Workspace resolution is the command's business — para
+passes args through untouched.
 
-Engine verbs shadow hooks (the engine namespace wins; a template cannot
-silently replace `para up`). `para --help` lists discovered host verbs in
-their own section, sourced from the files' `# summary:` first-comment line.
+Because `para sh` owns the terminal semantics, the commands that used to be
+hardcoded engine verbs are now one-liners a template ships:
 
-## What the engine keeps (mechanism only)
+```sh
+#!/usr/bin/env bash
+# summary: claude in the workspace clone
+exec "$PARA_BIN" sh "$1" -c "exec claude --name $1"
+```
 
-| Verb | Why it's mechanism |
+```sh
+#!/usr/bin/env bash
+# summary: tmux session — claude in window 1, a shell in window 2
+exec "$PARA_BIN" sh "$1" -c '
+  tmux has-session -t '"$1"' 2>/dev/null && exec tmux attach -t '"$1"'
+  tmux new-session -d -s '"$1"' -n claude "claude --name '"$1"'"
+  tmux new-window  -t '"$1"': -n sh
+  exec tmux attach -t '"$1"'
+'
+```
+
+- **`--help`** lists discovered commands under `PROJECT COMMANDS`, with the
+  `# summary:` line if the file has one, name-only if not.
+- **Completion** gets them from `para commands` (bare names, one per line, the
+  sister of `para ls --names`), and offers workspace names at position 2 for any
+  non-engine verb — the right default with zero configuration.
+- **Security**: they run with your privileges, like any script in a repo you
+  cloned. Engine verbs shadow them so a template can't silently redefine
+  `para up`; everything discovered is listed in `--help` so nothing runs
+  invisibly. `para doctor` flags a command that shadows an engine verb.
+
+## Hooks, simplified
+
+Two guest hooks, unchanged in spirit: **`provision`** (idempotent, before boot)
+and **`boot`** (readiness contract). Simplifications:
+
+- **Guest staging dir `~/.para` → `~/.paraspace`.** Host `.paraspace/` pushes to
+  guest `~/.paraspace/` — same name, same content, one concept instead of two.
+  Hooks live at `~/.paraspace/hooks/<name>`, skel at `~/.paraspace/skel`, the
+  seeded env at `~/.paraspace/host.env`, para's context at `~/.paraspace/env`.
+- **`PARA_ROUTES` is space-separated** in the injected env, so a hook writes
+  `for r in $PARA_ROUTES` and the templates' `parse_routes` / `route_ports`
+  helpers **delete themselves**.
+- **`PARA_HOST_ENV`** loses its set-but-missing / unset-means-default / empty-
+  means-nothing three-way. Default `$PROJECT_ROOT/.env`; push it if it exists;
+  otherwise don't. Three lines.
+- **The push is one command**, not a hooks/skel/env/chmod sequence with a
+  conditional.
+- Hooks are **executed by path** (their shebang decides), not `bash <path>`.
+
+Everything else about hooks is deleted *from the engine* rather than changed:
+there is no third hook class. Host-side behavior is a project command.
+
+## The command surface (contract 2)
+
+**Engine keeps** — mechanism only:
+
+| Verb | |
 |---|---|
-| `up` / `down` / `rm` / `start` / `stop` | incus lifecycle, IP allocation, volume attach, registry, hooks, Caddy |
-| `ls` (+ `--names`) | registry reader; completion feeder |
-| `sh` | the TTY door into a workspace (`exec incus … su -`); everything else builds on it |
-| `reconcile` | registry ↔ container-stamp repair |
-| `image build` / `status` / `rm` | the publish/swap choreography and provenance stamps are engine-grade |
-| `init` (+ `--list`/`--names`) | how a consumer gets a template; pure file copy |
-| `config-set` | the user-config write path + denylist |
-| `completions <shell>` | generated from the verb table + discovered host verbs |
-| `--help` / `--version` | resolved-config introspection stays |
+| `up` / `down` / `rm` | incus lifecycle, IP allocation, volume attach, stamp, hooks, Caddy |
+| `ls [--all] [--names]` | one incus query, formatted |
+| `sh <name> [-c …]` | the one door into a workspace |
+| `caddy start\|stop\|status` | the host side of the glue (was `para start`/`stop`) |
+| `image build\|status\|rm` | the publish/swap choreography is engine-grade |
+| `config init\|path` | seed / locate the user config (see below) |
+| `init [<template>]` | file copy |
+| `doctor` | everything that used to be inline preflight |
+| `commands` | project-command names (completion + `--help` feeder) |
+| `completions <shell>` | generated from the verb table + discovered commands |
+| `--help` / `--version` | ~45 lines, not 160 |
 
-Internals that carry over **as spec** (the domain knowledge is the valuable
-part of the old file; it is rewritten around, not discarded): the backend
-preflight (colima, dir-pool/vfs footgun, idmap/OpenZFS), `wait_ready`'s
-agent+DNS budget, `gen_caddyfile` with the cross-row duplicate-host guard,
-the image publish/swap with temp alias + `published` latch, `su`-vs-`exec`
-initgroups and `su --pty` SIGWINCH semantics (now documented once, at `sh`),
-the `${!PARA_@}` blanket hook-env forwarder, ownership stamps.
+**Offloaded to `.paraspace/commands/`** (templates ship them; nothing is lost
+for a project that wants them): `claude`, `run`, `key`, `web`, `config-sync`.
 
-## What offloads to templates (host hooks, shipped per template)
+**Deleted outright**: `reconcile` (decision 1), `config-set` and the
+auto-persist path (decision 3), `config-import` (it was `incus file push` sugar
+— a project command if anyone wants it), `install` (npm is the funnel),
+`image-build` (the deprecated alias), `stack_images` (decision 5).
 
-| Was | Becomes |
+### `para config init | path`
+
+The user config is hand-edited sourced bash now, so the engine's job is to help
+you find it and start it — not to write it for you.
+
+- **`config path`** prints `$XDG_CONFIG_HOME/para/config`. That's the whole
+  command, and it makes `$EDITOR "$(para config path)"` the documented way to
+  edit it (no `config edit` verb needed).
+- **`config init`** seeds it, refusing to clobber without `--force`. No bundled
+  asset and no drift, because it's **generated from para's own resolved
+  values** — which also makes the box-level knob list exist in exactly one
+  place:
+
+```sh
+{ echo '# para user config — sourced bash. ":=" yields to the environment,'
+  echo '# a plain assignment insists. Uncomment what you want to change.'
+  for k in PARA_DOMAIN PARA_HTTPS_PORT PARA_POOL PARA_BRIDGE PARA_IP_LO PARA_IP_HI; do
+    printf '# : "${%s:=%s}"\n' "$k" "${!k}"
+  done
+} > "$PARA_CONFIG"
+```
+
+`para doctor` prints the resolved values and the path, so the two commands
+compose with the one place that diagnoses.
+
+**Kept from contract 1** because they're proven: the Parafile as sourced bash;
+blanket `PARA_*` forwarding; `/para/shared` and the `security.shifted` volume;
+container stamps; `PARA_VERSION` pinning (a v1 project gets a clear refusal).
+
+**Image-build details that survive verbatim** — the domain knowledge, not the
+prose: force-stop before publish (init-agnostic), publish from a **snapshot**
+(the dir-pool lstat race), publish to a temp alias then swap with the
+`published` latch (never destroy the working image first), EXIT/INT traps that
+tear the builder down, background `incus exec … & wait` so Ctrl-C works, `-q`
+when stderr isn't a TTY, `PARA_IMAGE_BOOTSTRAP` via `sh -c` before the payload.
+Dropped: the `user.para.uid` / `user.para.user` / `user.para.contract` /
+`user.para.incremental` stamps and the `up`-time drift refusal built on them
+(doctor's job). Kept: `user.para.src_sha` and `image status`'s drift report.
+
+## Line budget
+
+| Section | est. |
 |---|---|
-| `cmd_claude`, `cmd_run` (claude/tmux session policy) | `hooks/host/claude`, `hooks/host/run` in `void-jchook` (and any template that wants them) |
-| `cmd_key` (hardcoded `/para/shared/ssh/…` path) | `hooks/host/key` in templates whose provision hook creates that key |
-| `cmd_config_sync` (one template's skel layout + statusline chmod) | `hooks/host/config-sync` owned by the template whose skel it is |
-| `cmd_config_import` | `hooks/host/config-import` (it was `incus file push` sugar) |
-| `cmd_web` (xdg-open an URL) | `hooks/host/web`, or nothing — `para ls` prints the URL |
-| `stack_images` (compose/Dockerfile parsing) | the template's Parafile derives `PARA_IMAGE_PREPULL` itself (sourced bash — it can); engine pre-pulls whatever the key lists, or nothing |
-| `cmd_install` + XDG staging | gone; npm is the funnel |
-| `image-build` alias | gone |
+| header + config load (defaults, two sourced files, derived keys) | 70 |
+| helpers (log/warn/die/need/interactive/validate_name/url/para_env) | 60 |
+| incus queries (list/get/ct_name/alloc_ip/stamp) | 70 |
+| caddy (generate/validate/start/stop/reload) | 90 |
+| `ws_exec` + `sh` | 45 |
+| hooks (push + run) | 45 |
+| `up` / `down` / `rm` | 110 |
+| `ls` | 35 |
+| `image build` / `status` / `rm` | 130 |
+| `init` | 60 |
+| `doctor` | 110 |
+| dispatch + project commands + help + completions | 130 |
+| **total** | **~955** |
 
-Because the hooks own their own paths, the `PARA_PUBKEY`/`PARA_RUN` keys the
-cut-and-harden plan invented are unnecessary — offloading beats
-parameterizing.
+A section over budget is the review signal that policy is creeping back.
 
-## Contract 2
+## Decisions taken
 
-Breaking (the reason this is v2):
+1. **`start`/`stop` → `caddy start|stop|status`.** `para stop` sat one word from
+   `para down` and meant something unrelated. `up` still starts Caddy
+   automatically; macOS colima autostart moves to `doctor`/`up`.
+2. **`config-set` → `config init` + `config path`.** Nothing writes the config
+   automatically any more (decision 3), so the engine seeds and locates it and
+   otherwise stays out of the way.
+3. **`PARA_ROUTES` canonical form is space-separated**, input spelling
+   unchanged (commas, spaces, tabs, newlines all separate entries).
 
-- **Host hooks + open dispatch** exist; `hooks/` splits into `hooks/host/`
-  and the guest hooks (`provision`, `boot` — names and semantics unchanged).
-- Verbs removed from the engine (table above): consumers that called them
-  get them back from their template's hooks.
-- Anything else found mid-rewrite that contract 1 got wrong gets fixed
-  deliberately and logged in versioning.md — this is the one window where
-  that is free.
+## Still open
 
-Kept from contract 1 (proven good): the Parafile as sourced bash with the
-same core keys and `:=` precedence; the blanket `PARA_*` env forwarding into
-hooks (now host hooks too); the guest `~/.para` layout; `PARA_VERSION`
-pinning — a v1 project gets the clear refusal, and the migration is
-documented in versioning.md (for madi and the templates it is: move files
-into `hooks/host/`, set `PARA_VERSION=2`).
-
-## Clean-room properties (day one, not retrofits)
-
-The rewrite starts from an empty file and steals proven fragments
-deliberately. Baked in from the first commit:
-
-- **Registry is KEY=VALUE per workspace** (`workspaces.d/<name>`): no
-  positional fields, no `-` sentinels, no whitespace guards — the entire
-  PR #9 bug class is unrepresentable.
-- **No top-level execution**: `main()` calls `load_config()`; helpers exist
-  before anything runs; a **source guard** makes every pure helper
-  unit-testable, and a `test/unit/` tier ships with the rewrite.
-- The three known bug fixes are just how it's written: `caddy validate`
-  before reload with surfaced failures; `route_host` lowercases the whole
-  host; no dead fallbacks.
-- shellcheck with the optional checks
-  (`check-set-e-suppressed,check-extra-masked-returns,add-default-case`) +
-  `shfmt` in `bin/lint` from the start — the new file is written under the
-  rules, not graded against them later.
-- Comments are **domain spec only**. Bash-mechanics commentary is treated as
-  a smell: if a line needs a bash warning, write the line that doesn't.
-
-## Line budget (the honesty check on "half or more")
-
-| Section | est. lines |
-|---|---|
-| config load + validation + denylist | ~200 |
-| backend preflight (incus/colima/pool/idmap/volume) | ~200 |
-| caddy (start/validate/reload/generate) | ~100 |
-| registry (KEY=VALUE) | ~40 |
-| lifecycle verbs (up/down/rm/start/stop/ls/reconcile) | ~250 |
-| image (build/status/rm) | ~150 |
-| `sh` | ~40 |
-| `init` | ~80 |
-| dispatch + open-verb fallback + help + completions | ~80 |
-| misc helpers (log/die/validate/poll) | ~60 |
-| **total** | **~1,100** |
-
-Domain comments are inside those numbers. If it lands at 1,200 it still
-succeeded; if a section balloons past its budget, that's the review signal
-that policy is creeping back in.
+- **`web` and `key` leave the engine.** Recommend yes — they're a template's
+  `xdg-open` and a template's key path, and they make the two best demos of the
+  new mechanism, so the default template ships them. `para ls` prints the URL
+  either way. Say no and they stay as engine verbs (~15 lines each, now that
+  there are no route sentinels to interrogate).
 
 ## Migration (one branch, staged, suite-green at the end)
 
-1. **Write the engine** against the e2e fixture first: new `bin/para`
-   developed as `bin/para2` beside the old one; the `hello` fixture gains a
-   `hooks/host/` verb so dispatch is exercised from day one. The e2e tier
-   (which drives mostly kept verbs — up/sh/ls/routes/volume) is adapted as
-   the rewrite proceeds; the CLI tier is rewritten against the new surface;
-   the unit tier is new.
-2. **Migrate the bundled templates**: each gains its `hooks/host/` files
-   (the offload table above), drops what it no longer needs, sets
-   `PARA_VERSION=2`.
-3. **Docs pass**: parafile.md, hooks.md (host hooks are new contract
-   surface), commands.md (smaller), how-it-works, versioning.md's contract-2
-   entry with the v1→v2 migration guide. CLAUDE.md's line-count references
-   update.
-4. **Migrate madi** (the repo-root `.paraspace/`) in the same change that
-   swaps `bin/para2` → `bin/para` and deletes the old script. Git history
-   keeps the 2,244-line original; nothing of it survives in the tree.
+1. **Write the engine** as `bin/para2` beside the old one, against the e2e
+   fixture (`test/run` takes `PARA=` — make its assignment `: "${PARA:=…}"`).
+   The fixture gains a `.paraspace/commands/` verb so dispatch is exercised from
+   day one. CLI tier rewritten against the new surface; e2e tier adapted as the
+   rewrite proceeds. **No unit tier** — a reversal of the earlier plan: the CLI
+   tier already runs the real binary, and a source guard plus a third tier is
+   machinery this engine doesn't need.
+2. **Migrate the bundled templates**: `commands/` files, `hooks/helpers` loses
+   `parse_routes`/`route_ports`, `~/.para` → `~/.paraspace`, `PARA_VERSION=2`.
+3. **Docs pass**: `parafile.md` (precedence section shrinks to a paragraph),
+   `hooks.md`, new `commands.md` section for project commands, `image.md` (the
+   `su --pty` image requirement), `versioning.md`'s contract-2 entry with the
+   v1→v2 migration, `internals.md` (no registry), CLAUDE.md's line counts.
+4. **Migrate madi** (repo-root `.paraspace/`, including its own
+   `commands/claude` and `commands/run`) in the same change that swaps
+   `bin/para2` → `bin/para` and deletes the old script.
 
-Gates throughout: `bin/lint` (new rules), CLI + unit tiers in CI, full e2e
-locally including one `PARA_TEST_REBUILD=1` run and a real
-`void-docker-gh` boot before the swap.
-
-## What happens to the other plans
-
-- `cut-and-harden.md` (PR #11): superseded — its A-cuts become offloads
-  (better: templates keep the features), its B-hardening items are
-  clean-room properties above. Close or repurpose the PR.
-- `ts-port.md` (PR #10): stays shelved; its triggers still apply *to the
-  1,100-line engine*, where a port would be a fraction of the analyzed
-  cost — but the habitability motivation that drove it is answered here
-  first. Its subprocess-pattern catalog and Parafile-eval analysis remain
-  the reference if a port ever fires.
-- `go-rewrite.md`: already superseded; its "bank the breakage" argument is
-  realized by contract 2, its completion insight by the dispatch design.
+Gates: `bin/lint` (add `check-set-e-suppressed`, `check-extra-masked-returns`,
+`add-default-case`, plus `shfmt`) from the first commit — the new file is
+written under the rules, not graded against them later; CLI tier in CI; full
+e2e locally including one `PARA_TEST_REBUILD=1` run and a real `void-docker-gh`
+boot before the swap.
 
 ## Risks
 
-- **Contract 2 is a real break** — mitigated by owning every consumer
-  (madi, templates, fixtures) and shipping the migration guide in the same
-  PR set. `PARA_VERSION=1` projects fail loudly, as designed.
+- **Contract 2 is a hard break** — mitigated by owning every consumer and
+  shipping the migration in the same PR set. `PARA_VERSION=1` fails loudly.
 - **A rewrite can drop invisible behavior** — mitigated by treating the old
-  file's domain comments as the checklist (they are the spec of the
-  invisible behavior), and by the e2e suite surviving mostly intact.
-- **Policy creep back into the engine** — the line budget per section is
-  the tripwire; the open dispatch removes the excuse ("just one more verb").
-- **Host hooks are new attack/confusion surface** — engine verbs shadow
-  hooks; discovered verbs are listed in help so nothing runs invisibly;
-  hooks run with the user's own privileges, same as any script in a repo
-  they cloned (documented in hooks.md).
+  file's domain comments as the checklist (they are the spec of the invisible
+  behavior), and by the "terminal semantics" and "image-build details" tables
+  above being explicit inventories rather than a promise to remember.
+- **Fewer guards means uglier failures for the misconfigured.** Accepted
+  deliberately: `para doctor` is the answer, and it's a better one, because it
+  runs when you're looking for answers instead of when you're trying to work.
+- **`para ls` now requires incus.** Accepted.
+- **Policy creep back into the engine** — the section budget is the tripwire,
+  and project commands remove the excuse ("just one more verb").

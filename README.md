@@ -52,11 +52,14 @@ hooks to your stack. The walkthrough is
 Full docs at **[paraspace.dev](https://paraspace.dev)**, and in
 [`docs/`](./docs/README.md):
 
-- [Why ParaSpace](./docs/why.md) — the case, and what it costs.
+- [Why ParaSpace](./docs/why.md) — the case, and what it costs ·
+  [Prior art](./docs/prior-art.md) — how it compares, and when to pick
+  something else.
 - [Getting started](./docs/getting-started.md) · [How it
   works](./docs/how-it-works.md) · [Running coding
   agents](./docs/agents.md)
-- [Project setup](./docs/project-setup.md) — adapting `para` to your project.
+- [Project setup](./docs/project-setup.md) — adapting `para` to your project ·
+  [Cookbook](./docs/cookbook.md) — recipes for the common needs.
 - [Commands](./docs/commands.md) · [The Parafile](./docs/parafile.md) ·
   [Hooks](./docs/hooks.md) · [The image contract](./docs/image.md) ·
   [Contract versioning](./docs/versioning.md)

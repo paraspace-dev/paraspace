@@ -71,6 +71,12 @@ everything your `Parafile` sets, and the per-workspace values para computes.
 So any `PARA_FOO` you invent reaches your hooks for free, no para change
 needed.
 
+**Scalars only.** Forwarding is one `export NAME=value` line per variable, so
+a bash array does not survive it — `PARA_PORTS=(3000 3001)` arrives as just
+`3000`, silently, because that's what `$PARA_PORTS` expands to. Associative
+arrays fare no better. Pass a delimited string and split it in the hook, the
+way `PARA_ROUTES` does.
+
 The documented contract is:
 
 | Variable | Meaning |

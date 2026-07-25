@@ -15,7 +15,9 @@ keeps its own setup in a `.paraspace/` directory at its repo root.
 **I want to try it.**
 [Why ParaSpace](./why.md) makes the case ·
 [Getting started](./getting-started.md) installs it and launches your first
-workspace · [How it works](./how-it-works.md) is the mental model.
+workspace · [How it works](./how-it-works.md) is the mental model ·
+[Prior art](./prior-art.md) is the honest comparison, including when to pick
+something else.
 
 **I want to run agents in parallel.**
 [Running coding agents](./agents.md) — one agent per workspace, YOLO mode and
@@ -25,7 +27,7 @@ what it does and doesn't isolate, and the review loop.
 [Project setup](./project-setup.md) — `para init`, then the pieces that make a
 project para-enabled: the [Parafile](./parafile.md), the [hooks](./hooks.md),
 the [image](./image.md), and any [commands](./commands.md#project-commands) you
-want to add.
+want to add. The [Cookbook](./cookbook.md) has recipes for the common ones.
 
 **Something is broken.**
 [Troubleshooting](./troubleshooting.md) — `para doctor` and what its checks
@@ -42,8 +44,8 @@ mean.
   `para image build` builds one.
 - [Workspace URLs](./urls.md) — dropping the `:8443`, using your own domain,
   and trusting the local CA.
-- [Git authentication](./git-auth.md) — authorizing the key your workspaces
-  clone and push with.
+- [Shared authentication](./shared-auth.md) — sign in once per project: the
+  VCS key, `gh`, agent sessions, API tokens.
 - [Contract versioning](./versioning.md) — how the `para`↔project interface is
   versioned, and what breaks on a bump.
 - [Internals](./internals.md) — self-describing workspaces, the shared volume,

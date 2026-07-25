@@ -1,9 +1,13 @@
 # The Parafile
 
 `.paraspace/Parafile` is your project's config: the few `PARA_*` variables
-`para` itself reads. It is **sourced as bash**, every key is a scalar, and
+`para` itself reads. It is **sourced as bash** and
 [precedence](#precedence) is whatever bash does. Most keys default sensibly and
 can be left out — a Parafile that restates a default is a copy that goes stale.
+
+Every value is a **scalar**. Arrays aren't forwarded to your hooks — they
+arrive as their first element — so a list is a delimited string, as
+`PARA_ROUTES` is. See [Hooks](./hooks.md#the-environment-para-injects).
 
 ## What you have to decide
 

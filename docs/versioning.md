@@ -9,14 +9,19 @@ The `para`↔project interface is versioned. It covers everything a project's
 - the [`Parafile` keys](./parafile.md),
 - the [project-command](./commands.md#project-commands) mechanism.
 
-`para` implements a contract version, currently **1**. Declare the one your
-`.paraspace/` was built against in your Parafile:
+`para` implements a contract version, currently **1**. It is always a plain
+incrementing integer — never a range, a semver string, or a `>=`. Comparing it
+is `=`, and that will not change.
+
+Every bundled template already declares the one it was written against, so
+`para init` pins it for you:
 
 ```sh
 : "${PARA_CONTRACT:=1}"
 ```
 
-It is an ordinary `Parafile` key, so it reaches your hooks like any other.
+It is an ordinary `Parafile` key, so it reaches your hooks like any other. You
+touch it once, when you migrate your own `.paraspace/` to a new contract.
 
 If the two don't match, para **refuses with a clear error** instead of silently
 misbehaving — so a globally-updated `para` shared across projects can't quietly
@@ -24,9 +29,11 @@ break yours. Declaring nothing works, and `para doctor` suggests adding it.
 
 The rules:
 
-- A **breaking** change to the interface bumps `PARA_CONTRACT`.
+- A **breaking** change to the interface bumps `PARA_CONTRACT` by one.
 - **Additive** changes (a new variable, a new optional key) don't.
 - A project bumps its own `PARA_CONTRACT` when it migrates its `.paraspace/`.
+- There is no range syntax and no compatibility window: one integer, compared
+  for equality.
 
 ## Migrating from the pre-release engine
 

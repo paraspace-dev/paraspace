@@ -128,7 +128,8 @@ The base image is per-project and per-arch, and it isn't built for you. Run
 ### `Permission denied (publickey)` during the first `up`
 
 The machine's para key isn't authorized at your git host yet. `para up` is
-idempotent, so authorize it and re-run — [Git authentication](./git-auth.md).
+idempotent, so authorize it and re-run — [Shared
+authentication](./shared-auth.md).
 
 ### `up` succeeds but the URL returns 502
 

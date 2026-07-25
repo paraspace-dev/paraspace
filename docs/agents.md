@@ -31,7 +31,7 @@ Two things are *not* isolated:
 - **the git key** — the [shared volume](./internals.md#the-shared-home-volume)
   holds the project's key, so an agent can push to whatever that key is
   authorized for. Scope it narrowly if that matters; see
-  [Git authentication](./git-auth.md).
+  [Shared authentication](./shared-auth.md).
 
 Everything else — your home directory, your host SSH keys, your cloud
 credentials — isn't reachable from inside a workspace, because it was never

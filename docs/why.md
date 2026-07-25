@@ -12,13 +12,12 @@ diff has to be teased apart into separate PRs afterward. Give each agent a real
 place to work and that whole class of problem goes away — but "a real place to
 work" is harder to assemble than it sounds.
 
-| The usual escape | What it fixes | What it leaves |
-|---|---|---|
-| A worktree per agent | the tracked files | no `.gitignore`d state, so every worktree needs its `.env` and data recreated; the running stacks still collide on ports and databases; and the agent still runs **as you, on your host** |
-| Port offsets and override files | the port collisions | the same host, the same keys, the same filesystem — plus a growing pile of per-agent config to keep straight |
-| A devcontainer per branch | the toolchain | spawning them per branch, [which is exactly what you want for parallel agent work][perevillega], is where they get painful |
-| A VM per workspace | isolation, cleanly | fixed RAM and CPU reserved per VM; a laptop affords two or three |
-| Cloud sandboxes and hosted dev environments | isolation, elastically | a metered bill while your own machine idles — and the interface is part of the price (below) |
+A worktree separates the files but not the running stack, and the agent still
+runs as you. Port offsets deconflict the ports and nothing else. Devcontainers
+get awkward spawned per branch. A VM per task reserves its RAM whether it's
+busy or not. Cloud sandboxes bill by the second while your own machine idles.
+[Prior art](./prior-art.md) covers each properly, including when you should
+pick one over `para`.
 
 The tell is that people who do this seriously end up stacking them —
 [Mike McQuaid's 2026 setup][mikemcquaid] is worktrees *plus* a macOS sandbox
@@ -124,22 +123,24 @@ So the answer to "can para do X for my project" is that your project can.
 
 ## What it isn't
 
-- **A hosted service.** Workspaces run on your hardware — no control plane,
-  nothing to log into, and Linux or macOS only (macOS runs Incus in a Colima
-  VM). Base images are per-arch: build on the machine that runs them.
+- **A hosted service.** Workspaces run on your hardware, on Linux or macOS.
+  There is no control plane and nothing to log into.
 - **A boundary against hostile code.** It's a strong boundary against an agent
   doing something dumb or a dependency doing something rude — not a claim that
   container escape is impossible.
 - **A git workflow.** Each workspace gets its own clone; branching, review and
   merge stay exactly what they were.
 
+[Prior art](./prior-art.md#when-not-to-use-para) has the fuller version,
+including which alternative to reach for instead.
+
 ## Next
 
 [Getting started](./getting-started.md) to launch one ·
 [How it works](./how-it-works.md) for the architecture ·
-[Running coding agents](./agents.md) for the practice.
+[Running coding agents](./agents.md) for the practice ·
+[Prior art](./prior-art.md) for the alternatives.
 
 [Incus]: https://linuxcontainers.org/incus/
-[perevillega]: https://perevillega.com/posts/2026-03-03-ai-sandbox-coding-agents/
 [mikemcquaid]: https://mikemcquaid.com/sandboxed-agent-worktrees-my-coding-and-ai-setup-in-2026/
 [hn]: https://news.ycombinator.com/item?id=48892468

@@ -42,7 +42,7 @@ Two things to expect on a fresh machine:
 - **`para image build` takes several minutes.** It's per-project and per-arch,
   and it only happens again when the image source changes.
 - **The first `up` may pause at a printed SSH key**, so you can authorize it
-  with your git host — see [Git authentication](./git-auth.md).
+  with your git host — see [Shared authentication](./shared-auth.md).
 
 Your browser will distrust the workspace's certificate until you run
 `caddy trust` once — see [Workspace URLs](./urls.md).

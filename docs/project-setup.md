@@ -16,7 +16,9 @@ para init <template>   # a specific one
 
 It copies the template's `.paraspace/` into the current directory, **skipping
 any file that already exists** — so it safely adds `para` to an existing repo
-without touching your code.
+without touching your code. The scaffolded `Parafile` already pins the
+[contract](./versioning.md) it was written against, so there's nothing to set
+up there.
 
 ## What's in `.paraspace/`
 
@@ -57,17 +59,9 @@ para up my-feature     # clone, provision, boot
 reconverges instead of erroring, so "fix a hook, re-run `up`" is the normal
 loop.
 
-## Pin the contract
-
-Set `PARA_CONTRACT` in the `Parafile` to the contract your `.paraspace/` targets:
-
-```sh
-: "${PARA_CONTRACT:=1}"
-```
-
-A globally-updated `para` then refuses with a clear error rather than silently
-misbehaving if the interface changed — see
-[Contract versioning](./versioning.md).
+The [Cookbook](./cookbook.md) has recipes for what usually comes next:
+authenticating `gh`, seeding a database, bringing your dotfiles, pre-pulling
+images, and adding `para` verbs of your own.
 
 ## Add your own verbs
 

@@ -47,11 +47,9 @@ jobs:
             exit 1
           fi
 
-      # Run explicitly so a failure names which gate broke; package.json's
-      # prepublishOnly runs them again under `npm publish` so a manual publish
-      # from a laptop can't skip them.
-      - run: bin/lint
-      - run: test/run --cli
+      # Run the gates before npm talks to the registry at all; prepublishOnly
+      # runs the same script under `npm publish`, so a laptop can't skip them.
+      - run: npm run check
 
       # npm swallows every OIDC failure and falls back to a token that isn't
       # there, so verbose is what names a misconfigured trusted publisher when

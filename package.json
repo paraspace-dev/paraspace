@@ -27,13 +27,16 @@
   ],
   "scripts": {
     "lint": "bin/lint",
-    "site": "vitepress dev",
-    "site:build": "vitepress build",
-    "site:preview": "vitepress preview",
-    "prepublishOnly": "bin/lint && test/run --cli",
     "test": "test/run",
     "test:cli": "test/run --cli",
     "test:e2e": "test/run --e2e",
+    "check": "npm run lint && npm run test:cli",
+    "site": "vitepress dev",
+    "site:build": "vitepress build",
+    "site:preview": "vitepress preview",
+    "release": "bin/release",
+    "preversion": "npm run check",
+    "prepublishOnly": "npm run check",
     "prune-branches": "bin/prune-branches"
   },
   "devDependencies": {

@@ -82,3 +82,9 @@ PARA_ROUTES="${PARA_ROUTES-8080}"
 # para copies the project's own .env into each clone if it has one. Point this at
 # a different base .env to seed instead, or set it empty to seed nothing.
 # : "${PARA_HOST_ENV:=$PARA_PROJECT_DIR/.env}"
+
+# Docker images to bake into the base image, so `para up` doesn't pull them in
+# every workspace. This is THIS PROJECT'S key, not one para knows about: para
+# forwards every PARA_* to .paraspace/image-build.sh, which pre-pulls whatever
+# it finds here. Space-separated tags, matching your compose file.
+# : "${PARA_PREPULL_IMAGES:=caddy:2-alpine postgres:17-alpine}"

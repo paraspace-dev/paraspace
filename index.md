@@ -4,7 +4,7 @@ layout: home
 hero:
   name: ParaSpace
   text: Parallel dev workspaces on your machine
-  tagline: Every task gets its own universe — a full, isolated copy of your project with its own clone, stack, and https URL. Built for the LLM era.
+  tagline: A full, isolated copy of your project per task — its own clone, its own stack, its own https URL. Run coding agents in parallel without collisions.
   actions:
     - theme: brand
       text: Get started

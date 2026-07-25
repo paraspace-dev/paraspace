@@ -27,6 +27,37 @@
      gruvbox gold stays in the site's warm family while reading as its own
      thing (faded variant for light-bg contrast). */
   --vp-code-color: #94600e;
+
+  /* Nebula palette, for the dark theme's night sky. Deep-space values on hues
+     gruvbox already owns (purple #b16286, light purple #d3869b, blue #458588)
+     so it reads as the same brand, not a purple bolt-on. Gas 4 is the existing
+     brand orange doing double duty as the nebula's warm core. */
+  --neb-plum: #4b2a63;
+  --neb-rose: #d3869b;
+  --neb-gas-1: #4b2a63;
+  --neb-gas-2: #b16286;
+  --neb-gas-3: #427b86;
+  --neb-gas-4: #fe8019;
+  --neb-fil-1: #5a2a6b;
+  --neb-fil-2: #b16286;
+  --neb-fil-3: #427b86;
+
+  /* Daytime palette, for the light theme. Light mode doesn't try to be a
+     nebula — white has no darkness for gas to glow against, so it read as
+     either candy or a smudge every way it was tried. It's a late-afternoon sky
+     instead: aqua overhead off gruvbox blue #458588, paling downward, with a
+     cumulus deck (see Sky.vue) filling everything below its own contour, so the
+     blue only ever shows above the cloud. */
+  --sky-high: #5794a8;
+  --sky-mid: #a2cad7;
+  --sky-low: #e6f1f4;
+
+  /* Washed out, not luminous: the daytime moon is barely brighter than the sky
+     around it. Venus reads as a clean point because planets don't scintillate. */
+  --moon-lit: #fbf8ee;
+  --moon-dim: #dfe3e0;
+  --moon-mare: #b9bfc2;
+  --venus-core: #fffdf2;
 }
 
 .dark {
@@ -85,5 +116,163 @@
   .VPHome .VPHero .image {
     order: 3;
     margin: 32px 0 0;
+  }
+}
+
+/*
+ * The sky layer lives in the `layout-top` slot, so it needs .Layout as its
+ * containing block.
+ */
+.Layout {
+  position: relative;
+}
+
+/*
+ * Extra headroom under the navbar on the landing page. The default leaves an
+ * 80px band between the nav and the headline, which is too little sky to place
+ * the moon and Venus in without them crowding the terminal's top corner — and
+ * the hero reads better with the room regardless.
+ */
+@media (min-width: 960px) {
+  .VPHome .VPHero {
+    padding-top: calc(var(--vp-nav-height) + var(--vp-layout-top-height, 0px) + 132px);
+  }
+}
+
+/*
+ * Above 960px the default theme already drops the navbar's background on
+ * `home.top`; below it the bar stays opaque and cuts a gray band across the
+ * nebula. Let it go transparent there too — the nebula is darkest overhead in
+ * dark mode and palest in light, so the nav controls keep their contrast
+ * either way. `screen-open` keeps its background: the mobile menu needs it.
+ */
+.VPNavBar.home.top:not(.screen-open),
+.VPNavBar.home.top:not(.screen-open) .content-body {
+  background-color: transparent;
+}
+
+.VPNavBar.home.top:not(.screen-open) .divider-line {
+  background-color: transparent;
+}
+
+/*
+ * Feature cards as glass panes lit by whichever sky is behind them: the fill
+ * fades to fully transparent toward the bottom-right so the sky shows through,
+ * and the 1px border is a gradient that dissolves along the same diagonal — the
+ * card looks lit from the top-left rather than outlined. backdrop-filter does
+ * the actual glass work on whatever passes behind. Light mode picks up the
+ * afternoon sky's cool blue; dark mode picks up the nebula's rose and plum.
+ */
+.VPHome .VPFeature {
+  position: relative;
+  border-color: transparent;
+  background: linear-gradient(
+    168deg,
+    color-mix(in srgb, var(--vp-c-bg-soft) 96%, transparent) 0%,
+    color-mix(in srgb, var(--vp-c-bg-soft) 68%, transparent) 54%,
+    transparent 100%
+  );
+  backdrop-filter: blur(10px) saturate(1.1);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.75),
+    0 20px 44px -30px color-mix(in srgb, var(--sky-high) 62%, transparent);
+  transition:
+    box-shadow 0.25s,
+    transform 0.25s;
+}
+
+.VPHome .VPFeature::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(
+    168deg,
+    color-mix(in srgb, var(--sky-high) 42%, transparent),
+    color-mix(in srgb, var(--sky-high) 16%, transparent) 46%,
+    transparent 76%
+  );
+  /* Two-layer mask minus the content box = a 1px gradient ring. */
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+  transition: background 0.25s;
+}
+
+.VPHome .VPFeature:hover {
+  transform: translateY(-2px);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    0 26px 52px -28px color-mix(in srgb, var(--sky-high) 78%, transparent);
+}
+
+.VPHome .VPFeature:hover::before {
+  background: linear-gradient(
+    168deg,
+    color-mix(in srgb, var(--sky-high) 66%, transparent),
+    color-mix(in srgb, var(--sky-high) 26%, transparent) 46%,
+    transparent 78%
+  );
+}
+
+.dark .VPHome .VPFeature::before {
+  background: linear-gradient(
+    168deg,
+    color-mix(in srgb, var(--neb-rose) 38%, transparent),
+    color-mix(in srgb, var(--neb-plum) 16%, transparent) 46%,
+    transparent 76%
+  );
+}
+
+.dark .VPHome .VPFeature:hover::before {
+  background: linear-gradient(
+    168deg,
+    color-mix(in srgb, var(--neb-rose) 60%, transparent),
+    color-mix(in srgb, var(--neb-plum) 26%, transparent) 46%,
+    transparent 78%
+  );
+}
+
+.dark .VPHome .VPFeature {
+  background: linear-gradient(
+    168deg,
+    color-mix(in srgb, var(--vp-c-bg-soft) 88%, transparent) 0%,
+    color-mix(in srgb, var(--vp-c-bg-soft) 48%, transparent) 54%,
+    transparent 100%
+  );
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, var(--neb-rose) 16%, transparent),
+    0 20px 44px -30px color-mix(in srgb, var(--neb-plum) 70%, transparent);
+}
+
+.dark .VPHome .VPFeature:hover {
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, var(--neb-rose) 28%, transparent),
+    0 26px 52px -28px color-mix(in srgb, var(--neb-plum) 85%, transparent);
+}
+
+/* The icon chip is a lit tile on the pane: near-white with a sky tint in light
+   mode, which also puts the orange glyphs against their complement, and
+   plum-cast in dark mode. */
+.VPHome .VPFeature .icon {
+  background: color-mix(in srgb, var(--sky-mid) 20%, var(--vp-c-bg));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--sky-high) 26%, transparent);
+}
+
+.dark .VPHome .VPFeature .icon {
+  background: color-mix(in srgb, var(--neb-plum) 14%, var(--vp-c-default-soft));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--neb-rose) 14%, transparent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .VPHome .VPFeature:hover {
+    transform: none;
   }
 }

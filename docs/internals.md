@@ -74,5 +74,6 @@ matches. Engine verbs are checked first, so a project can't shadow one —
 | Workspace identity | the container's own Incus config |
 | Shared home volume | Incus volume `para-home-<project>` |
 
-para never writes to your config file. `para config init` seeds it once, and
-after that it's yours.
+para never changes your config behind your back. It seeds the file from a
+commented template the first time you run `para config edit`, and after that
+it's yours.

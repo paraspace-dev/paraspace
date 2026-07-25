@@ -46,7 +46,7 @@ diff against a current template. Otherwise:
 | `PARA_PREPULL_IMAGES` injected into the image build | gone — set your own key and read it in `image-build.sh` |
 | image stamped uid/user/contract/incremental | only `user.para.src_sha` |
 | `para start` / `para stop` | `para caddy start\|stop\|status` |
-| `para config-set KEY VALUE` | `para config init`, then edit `para config path` |
+| `para config-set KEY VALUE` | `para config edit` — the file is hand-edited now |
 | `para run`, `claude`, `web`, `key`, `config-sync` | project commands in `.paraspace/commands/` |
 | `para reconcile`, `para install`, `para image-build` | deleted |
 

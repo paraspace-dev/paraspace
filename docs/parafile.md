@@ -139,8 +139,9 @@ So `PARA_ROUTES="3000" para up ws` works for a one-off.
 ## User config, not Parafile
 
 Some knobs describe *your box*, not the project, so they belong in
-`$XDG_CONFIG_HOME/para/config` — seed it with `para config init`, edit it with
-`$EDITOR "$(para config path)"`. It's sourced bash with the same two idioms.
+`$XDG_CONFIG_HOME/para/config`. Open it with `para config edit`, which creates
+it from a commented template on first use. It's sourced bash with the same two
+idioms.
 
 | Key | Default | What it does |
 |---|---|---|

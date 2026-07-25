@@ -60,15 +60,17 @@ runs through a login shell in the clone rather than as bare argv.
 |---|---|
 | `para caddy <start\|stop\|status>` | the para Caddy that serves `*.$PARA_DOMAIN`. `para up` starts it for you; `stop` leaves workspaces running |
 | `para doctor` | check this machine and print the resolved config — see [Troubleshooting](./troubleshooting.md) |
-| `para config <init\|path>` | seed the [user config](./parafile.md#user-config-not-parafile), or print its path |
+| `para config <edit\|init\|path>` | open, seed, or locate the [user config](./parafile.md#user-config-not-parafile) |
 
-The user config is hand-edited sourced bash, so `config` only helps you find and
-start it:
+The user config is hand-edited sourced bash, so `config` only helps you open it:
 
 ```sh
-para config init                  # seed it (--force to replace)
-$EDITOR "$(para config path)"     # edit it
+para config edit    # $VISUAL/$EDITOR on it, creating it first if it doesn't exist
 ```
+
+That's the only one of the three you need. `para config init` seeds the file
+without opening it (`--force` to overwrite an existing one), and
+`para config path` prints its location — both for scripting.
 
 ## Project
 

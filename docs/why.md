@@ -53,31 +53,26 @@ through a `skel/` directory your own hooks copy in.
 So parallel work becomes a window-manager problem rather than a tab-management
 one: one workspace per desktop, navigated with the keybindings you already have.
 
-### The sandbox is the point
+### An agent can't reach your host
 
-The reason to turn off permission prompts is that the blast radius is small
-enough not to care about. Inside a workspace:
+You can turn off permission prompts because the blast radius stops at the
+workspace. Inside one:
 
 - it is an **unprivileged** container — root inside is an unprivileged uid
   outside;
 - **nothing of your host is mounted.** para pushes your `.paraspace/` directory
-  and, optionally, one `.env`. Your home directory, SSH keys and cloud
-  credentials aren't reachable — not "protected by policy," just not present;
+  and, optionally, one `.env` — that's the whole surface. Your home directory,
+  SSH keys and cloud credentials aren't there to be read;
 - it's disposable: `para rm my-feature` and the whole thing is gone.
 
-The failure people actually worry about — [an agent uploading a home
-directory][hn] — isn't mitigated here so much as unreachable. That's the
-difference between a rule and a boundary.
+So [an agent uploading a home directory][hn] can't happen here — there is
+nothing mounted to upload.
 
-**What it doesn't isolate**, worth knowing before you rely on it: the workspace
-has ordinary outbound network access, and it mounts the shared volume holding
-the git key you authorized. An agent can reach the internet and push to the
-repositories that key allows. para does no egress filtering — if you need it,
-that's an Incus network ACL, not a para setting.
-
-In [harness engineering][fowler] terms — *Agent = Model + Harness* — para is
-neither the guides nor the sensors. It's the **place the harness runs**: a
-reproducible workspace with the real stack booted, cheap to throw away.
+**What it doesn't isolate:** the workspace has ordinary outbound network
+access, and it mounts the shared volume holding the git key you authorized. An
+agent can reach the internet and push to the repositories that key allows. para
+does no egress filtering — if you need it, that's an Incus network ACL, not a
+para setting.
 
 ### Authenticate once per project
 
@@ -87,8 +82,7 @@ Credentials live on an Incus volume attached to each workspace at
 `/para/shared`, not a host bind mount: inside the virtualized filesystem, on
 the pool's native driver. Fast, and on the container side of the boundary.
 
-This is the difference between having N sandboxes and having a project that has
-workspaces. Re-authenticating each new sandbox is what makes people stop at two.
+Re-authenticating each new sandbox is what makes people stop at two.
 
 ### Caddy sits at the doorway, not in your stack
 
@@ -151,5 +145,4 @@ the engine stays small enough to read in an afternoon.
 [Incus]: https://linuxcontainers.org/incus/
 [perevillega]: https://perevillega.com/posts/2026-03-03-ai-sandbox-coding-agents/
 [mikemcquaid]: https://mikemcquaid.com/sandboxed-agent-worktrees-my-coding-and-ai-setup-in-2026/
-[fowler]: https://martinfowler.com/articles/harness-engineering.html
 [hn]: https://news.ycombinator.com/item?id=48892468

@@ -16,8 +16,7 @@ port-less URLs (`https://my-feature.paraspace.dev`), move it to `:443` in your
 [user config](./parafile.md#user-config-not-parafile):
 
 ```sh
-para config init                  # once, if you don't have one yet
-$EDITOR "$(para config path)"     # : "${PARA_HTTPS_PORT:=443}"
+para config edit    # uncomment: : "${PARA_HTTPS_PORT:=443}"
 ```
 
 On Linux, non-root can't bind ports below 1024, so also grant the caddy binary

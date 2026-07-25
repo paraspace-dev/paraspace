@@ -34,8 +34,7 @@ the Incus bridge. Whatever the project runs inside — bare processes or nested
 containers — binds its usual ports on that IP, so workspaces never collide with
 each other or with the host, and nothing gets remapped.
 
-There are two doors into a workspace: its URL, and `para sh`. Agents use the
-same ones you do.
+There are two doors into a workspace: its URL, and `para sh`.
 
 ## The pieces
 

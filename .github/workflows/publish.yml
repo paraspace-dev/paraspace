@@ -1,13 +1,16 @@
 name: publish
 
 # Publish to npm when a v* tag is pushed: `npm version <bump> && git push --follow-tags`.
-# Needs an npm automation token in the NPM_TOKEN repo secret.
+#
+# Authentication is npm trusted publishing (OIDC) — no NPM_TOKEN, nothing
+# long-lived to leak. It needs a trusted publisher registered for the package
+# on npmjs.com naming this repo and this file; see README's Development section.
 on:
   push:
     tags: ['v*']
 
-# id-token lets npm attest provenance — the published package links back to
-# this workflow run. contents stays read: publishing writes nothing to the repo.
+# id-token mints the OIDC token npm authenticates with. contents stays read:
+# publishing writes nothing back to the repo.
 permissions:
   contents: read
   id-token: write
@@ -17,9 +20,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      # Node 24 for npm >= 11.5.1, which trusted publishing requires.
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24
           registry-url: https://registry.npmjs.org
 
       # The tag names the release; package.json is what npm actually publishes.
@@ -39,6 +43,7 @@ jobs:
       - run: bin/lint
       - run: test/run --cli
 
-      - run: npm publish --provenance --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      # Trusted publishing generates the provenance attestation itself, so no
+      # --provenance flag. --access public is only meaningful on the first
+      # publish, and is a no-op after.
+      - run: npm publish --access public

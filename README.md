@@ -82,7 +82,9 @@ merging anything touching `up`, routes or lifecycle. See
 `npm run site` previews the VitePress docs; `npm run site:build` checks for
 dead links.
 
-Releases publish from a `v*` tag:
+Releases publish from a `v*` tag, over npm [trusted
+publishing](https://docs.npmjs.com/trusted-publishers) — no token in the repo,
+and npm attests the provenance itself:
 
 ```sh
 npm version minor && git push --follow-tags

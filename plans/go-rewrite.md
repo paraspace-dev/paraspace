@@ -1,5 +1,14 @@
 # Plan: rewrite `para` in Go
 
+> **Status: superseded.** Written before the Parafile audit (PR #9); its
+> premises are stale — `bin/para` is ~2,244 lines, `PARA_CONTRACT` 1 is now a
+> published, documented contract (docs/versioning.md) rather than freely
+> breakable, and paraspace ships on npm. The rewrite question was re-evaluated
+> in `plans/ts-port.md` ("Why TypeScript and not Go"), which is the current
+> decision record; both rewrites are shelved behind the triggers in
+> `plans/cut-and-harden.md` (PR #11). Kept for its arguments — notably that
+> dynamic completions make startup and completion quality one requirement.
+
 ## Goal
 
 Rewrite the `para` CLI from its current ~1400-line bash script (`bin/para`) into

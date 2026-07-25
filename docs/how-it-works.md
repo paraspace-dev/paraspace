@@ -10,8 +10,8 @@ For the argument about *why* this shape, see [Why ParaSpace](./why.md).
 
 ```
        browser                     terminal
-       │  https://ws1.<domain>:8443   │
-       ▼                              │  para sh ws2
+       │  https://ws1.<domain>        │
+       ▼                          para sh ws2
 ┌──────────────────────────────┐      │
 │          host Caddy          │      │
 │  TLS + routes for *.<domain> │      │

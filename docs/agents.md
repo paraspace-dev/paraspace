@@ -1,14 +1,15 @@
 # Running coding agents
 
-The workflow para is built for: one agent per workspace, several at a time,
-each with a real stack running and a URL you can open.
+ParaSpace is designed to help you run a coding agent per workspace, several
+workspaces at a time, each with its own working copy, a real stack running, and
+a URL you can open.
 
 ## One workspace per task
 
 Name the workspace after the task, because the name is also the hostname:
 
 ```sh
-para up fix-login       # → https://fix-login.paraspace.dev:8443
+para up fix-login       # → https://fix-login.paraspace.dev
 para up dark-mode
 para up flaky-tests
 ```
@@ -81,8 +82,8 @@ para ls
 
 ```
 NAME                 STATE     IP               PROJECT        URL
-fix-login            RUNNING   10.62.14.201     myapp          https://fix-login.paraspace.dev:8443
-dark-mode            RUNNING   10.62.14.202     myapp          https://dark-mode.paraspace.dev:8443
+fix-login            RUNNING   10.62.14.201     myapp          https://fix-login.paraspace.dev
+dark-mode            RUNNING   10.62.14.202     myapp          https://dark-mode.paraspace.dev
 ```
 
 One workspace per window-manager desktop works well: each desktop holds that

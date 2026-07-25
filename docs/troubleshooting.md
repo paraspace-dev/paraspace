@@ -22,7 +22,7 @@ config
 
 host
   ✓ caddy present
-  ✓ para Caddy running on :8443
+  ✓ para Caddy running on :443
   ✓ *.paraspace.dev resolves to 127.0.0.1
 
 incus

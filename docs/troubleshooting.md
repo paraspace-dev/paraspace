@@ -141,7 +141,7 @@ service is listening (`docker compose up -d --wait`). Check from inside:
 para sh <name> -c 'ss -ltnp'
 ```
 
-### `this project targets para contract N, but this para provides 2`
+### `this project targets para contract N, but this para provides 1`
 
 A globally-updated `para` met a project pinned to an older contract, and refused
 rather than misbehaving. See [Contract versioning](./versioning.md).

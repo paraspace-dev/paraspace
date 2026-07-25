@@ -9,13 +9,14 @@ The `para`↔project interface is versioned. It covers everything a project's
 - the [`Parafile` keys](./parafile.md),
 - the [project-command](./commands.md#project-commands) mechanism.
 
-`para` provides a contract version (`PARA_CONTRACT`, currently **1**) and
-injects it into hooks. Declare the one you build against in your Parafile,
-using the same key:
+`para` implements a contract version, currently **1**. Declare the one you
+build against in your Parafile:
 
 ```sh
 : "${PARA_CONTRACT:=1}"
 ```
+
+It is an ordinary `Parafile` key, so it reaches your hooks like any other.
 
 If they don't match, para **refuses with a clear error** instead of silently
 misbehaving — so a globally-updated `para` shared across projects can't quietly

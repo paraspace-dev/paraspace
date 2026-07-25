@@ -79,7 +79,7 @@ The documented contract is:
 | `PARA_USER`, `PARA_UID`, `PARA_GID` | the workspace user's identity |
 | `PARA_HOSTNAME` | the host's short hostname — the ssh-key label |
 | `PARA_GIT_NAME`, `PARA_GIT_EMAIL` | your host git identity, for a seeded gitconfig |
-| `PARA_CONTRACT` | the contract version this para provides |
+| `PARA_CONTRACT` | the [contract](./versioning.md) your `Parafile` targets — para has already refused a mismatch by the time a hook runs, so this is only ever the one you asked for |
 
 `PARA_NONINTERACTIVE` is yours rather than para's: set it in the environment to
 force the scripted path, and para forwards it like any other `PARA_*` so your

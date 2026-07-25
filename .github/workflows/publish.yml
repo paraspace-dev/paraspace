@@ -1,0 +1,44 @@
+name: publish
+
+# Publish to npm when a v* tag is pushed: `npm version <bump> && git push --follow-tags`.
+# Needs an npm automation token in the NPM_TOKEN repo secret.
+on:
+  push:
+    tags: ['v*']
+
+# id-token lets npm attest provenance — the published package links back to
+# this workflow run. contents stays read: publishing writes nothing to the repo.
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+
+      # The tag names the release; package.json is what npm actually publishes.
+      # A mismatch ships the wrong version under the right name.
+      - name: tag matches package.json
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          pkg="$(node -p "require('./package.json').version")"
+          if [ "$tag" != "$pkg" ]; then
+            echo "tag v$tag does not match package.json version $pkg" >&2
+            exit 1
+          fi
+
+      # Run explicitly so a failure names which gate broke; package.json's
+      # prepublishOnly runs them again under `npm publish` so a manual publish
+      # from a laptop can't skip them.
+      - run: bin/lint
+      - run: test/run --cli
+
+      - run: npm publish --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

@@ -82,6 +82,12 @@ merging anything touching `up`, routes or lifecycle. See
 `npm run site` previews the VitePress docs; `npm run site:build` checks for
 dead links.
 
+Releases publish from a `v*` tag:
+
+```sh
+npm version minor && git push --follow-tags
+```
+
 ## License
 
 [MIT](./LICENSE)

@@ -13,7 +13,7 @@
     "container",
     "cli"
   ],
-  "homepage": "https://github.com/paraspace-dev/paraspace#readme",
+  "homepage": "https://paraspace.dev",
   "bugs": "https://github.com/paraspace-dev/paraspace/issues",
   "repository": {
     "type": "git",
@@ -30,6 +30,7 @@
     "site": "vitepress dev",
     "site:build": "vitepress build",
     "site:preview": "vitepress preview",
+    "prepublishOnly": "bin/lint && test/run --cli",
     "test": "test/run",
     "test:cli": "test/run --cli",
     "test:e2e": "test/run --e2e",

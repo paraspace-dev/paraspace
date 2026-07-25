@@ -10,7 +10,10 @@ preserve-not-implement. Unshelve when **any one** of:
    incus client, plugin API, JSON output surface);
 2. external contributors exist and bash friction shows up in real issues/PRs;
 3. ≥2 **shipped** (not review-caught) bash-semantics bugs after Phase -1's
-   registry rewrite and unit tier land.
+   registry rewrite and unit tier land;
+4. **the maintainer's standing judgment that the script's hostility to
+   reading and modification costs more than the port** — the primary
+   motivation (see Why), which external metrics inform but do not own.
 
 Revised after three independent reviews; the Why section states the case at
 its post-review strength. All `bin/para`/test line references and version
@@ -23,7 +26,21 @@ suite (`test/run`) is the oracle the port must satisfy verb by verb.
 
 ## Why — the case at its measured strength
 
-`bin/para` is 2,244 lines (1,289 code, 848 comments). The case for the port:
+**The primary motivation is habitability, and it is the maintainer's own.**
+`bin/para` is a 2,244-line single file that its maintainer finds hostile to
+read, comprehend, and modify — every function wrapped in defensive prose,
+every change requiring bash's semantics and the domain's semantics held in
+mind at once — and development measurably slowed because of it. For a
+solo pre-launch project, maintainer velocity is project velocity; this is a
+first-class engineering fact that the measured findings below inform but do
+not override. What the port buys against it: the same domain logic as ~20
+small typed modules — signatures instead of conventions, data structures
+instead of positional strings, no incantations between reader and logic.
+What it does not buy: a simpler domain. The su/pty, publish/swap, and
+Caddy-semantics comments port verbatim because they describe incus and
+Caddy, not bash.
+
+The measured supporting case (1,289 code / 848 comment lines):
 
 1. **The `set -e` invisible-context class** — load-bearing `|| true`s, the
    AND-OR exemption — is structurally eliminated by throw-by-default and is

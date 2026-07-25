@@ -12,6 +12,17 @@ test_http_route_serves_the_sentinel() {
   assert_contains "$body" "para-e2e-ok $PARA_WS" "sentinel body carries the workspace name"
 }
 
+test_subdomain_route_serves_the_same_workspace() {
+  # The fixture declares TWO routes (8080 and api:8080) and until now only the
+  # apex was ever requested — so route_host's `sub:port` branch, the entire
+  # subdomain mechanism, was asserted only as a string a hook received. Any
+  # change that yields a different-but-valid hostname kept the tier green while
+  # every subdomain URL para prints 404s.
+  assert_serves "$PARA_WS" 30 api || return 1
+  local body; body="$(http_get "$PARA_WS" api)"
+  assert_contains "$body" "para-e2e-ok $PARA_WS" "the subdomain reached THIS workspace"
+}
+
 test_routes_reach_the_provision_hook() {
   # Two things at once. PARA_ROUTES rides para's blanket PARA_* forwarder into
   # hooks like any other key; and the fixture declares its routes in the

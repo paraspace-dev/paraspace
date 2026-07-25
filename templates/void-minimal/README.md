@@ -23,7 +23,7 @@ void-minimal/
 ## Try it
 
 ```sh
-bin/para install                        # -> ~/.local/bin/para (once, from a checkout)
+npm i -g paraspace                      # once (or run bin/para from a checkout)
 para image build                        # build the bare base image
 para up box                             # stand up a workspace named "box"
 para sh box                             # get a shell inside it

@@ -26,7 +26,8 @@ MIN_INCUS_EXPECTED=6.22   # keep in step with bin/para's MIN_INCUS
 test_help_lists_the_command_surface() {
   local out; out="$("$PARA" --help 2>&1)"
   assert_contains "$out" "up"          "help mentions up"          || return 1
-  assert_contains "$out" "sh"          "help mentions sh"          || return 1
+  # "sh", not "sh <name>", would also match the "bash" in `para completions bash`
+  assert_contains "$out" "sh <name>"   "help mentions sh"          || return 1
   assert_contains "$out" "image"       "help mentions image"       || return 1
   assert_contains "$out" "caddy"       "help mentions caddy"       || return 1
   assert_contains "$out" "doctor"      "help mentions doctor"
@@ -209,7 +210,7 @@ test_doctor_checks_incus_can_do_what_para_needs() {
   # incus that can't do it makes para see every workspace as address-less.
   local stub out
   stub="$(a_stub_incus 6.2 no)"
-  out="$(cd "$(a_project)" && env PATH="$stub:$PATH" "$PARA" doctor 2>&1)" || true
+  out="$(cd "$(a_project)" && env -u PARA_PROJECT_DIR PATH="$stub:$PATH" "$PARA" doctor 2>&1)" || true
   assert_contains "$out" "6.2 cannot select device columns" "an incapable incus is named and failed" || return 1
   assert_contains "$out" "$MIN_INCUS_EXPECTED" "the message says what to upgrade to" || return 1
   # And it keeps going. A diagnostic that stops at the first thing it cannot
@@ -218,15 +219,64 @@ test_doctor_checks_incus_can_do_what_para_needs() {
 
   # Capable but older than what para is tested against: a warning, not a refusal.
   stub="$(a_stub_incus 6.14 yes)"
-  out="$(cd "$(a_project)" && env PATH="$stub:$PATH" "$PARA" doctor 2>&1)" || true
+  out="$(cd "$(a_project)" && env -u PARA_PROJECT_DIR PATH="$stub:$PATH" "$PARA" doctor 2>&1)" || true
   assert_contains "$out" "6.14 is older than" "an untested-but-capable incus warns" || return 1
 
   # Current: neither.
   stub="$(a_stub_incus 6.30 yes)"
-  out="$(cd "$(a_project)" && env PATH="$stub:$PATH" "$PARA" doctor 2>&1)" || true
+  out="$(cd "$(a_project)" && env -u PARA_PROJECT_DIR PATH="$stub:$PATH" "$PARA" doctor 2>&1)" || true
   assert_not_contains "$out" "6.30 is older than"          "a current incus does not warn" || return 1
   assert_not_contains "$out" "cannot select device columns" "…nor fail"
 }
+test_init_refuses_to_clobber_an_existing_project() {
+  # The guard between `para init` and a user's own Parafile and hooks. Untested,
+  # it can be deleted outright and the whole tier stays green — while the first
+  # command a new user runs eats their work.
+  local d out; d="$(scratch)"
+  mkdir -p "$d/.paraspace/hooks"
+  printf 'MINE=yes\n'  > "$d/.paraspace/Parafile"
+  printf '# my hook\n' > "$d/.paraspace/hooks/provision"
+
+  out="$(cd "$d" && env -u PARA_PROJECT_DIR -u PARA_PROJECT "$PARA" init void-minimal 2>&1)"
+  assert_eq "MINE=yes"  "$(cat "$d/.paraspace/Parafile")"        "the Parafile was left alone" || return 1
+  assert_eq "# my hook" "$(cat "$d/.paraspace/hooks/provision")" "the hook was left alone"     || return 1
+  assert_contains "$out" "skip (exists)" "it says what it skipped" || return 1
+
+  # …and --force is how you say you meant it.
+  ( cd "$d" && env -u PARA_PROJECT_DIR -u PARA_PROJECT "$PARA" init void-minimal --force >/dev/null 2>&1 )
+  assert_not_contains "$(cat "$d/.paraspace/Parafile")" "MINE=yes" "--force overwrites"
+}
+
+test_up_allocates_an_ip_that_is_not_already_taken() {
+  # The highest-consequence silent failure in the engine: a mis-parse here hands
+  # a new workspace an address a LIVE one already holds. incus annotates the
+  # runtime column as "10.9.9.200 (eth0)" and fills the device column only for
+  # instances para pinned — so an address held by a RUNNING container para did
+  # NOT create appears in the annotated form and nowhere else. That is the shape
+  # this pins: .200 is such a container, .201 a stopped para workspace. Driven through `para up` with a stub incus that fails at
+  # launch, so nothing is created and the requested address is still observable.
+  local d; d="$(scratch)"
+  cat > "$d/incus" <<STUB
+#!/bin/sh
+case "\$*" in
+  "info")                 exit 0 ;;   # daemon reachable
+  info\ *)                exit 1 ;;   # …but this instance does not exist
+  *--all-projects*)       printf '%s\\n' '"10.9.9.200 (eth0)",' ',10.9.9.201'; exit 0 ;;
+  "network get "*)        echo 10.9.9.1/24; exit 0 ;;
+  "image info "*)         exit 0 ;;
+  "storage volume show "*) exit 0 ;;
+  launch\ *)              echo "\$*" > "$d/launch-args"; exit 1 ;;
+  *)                      exit 0 ;;
+esac
+STUB
+  chmod +x "$d/incus"
+  ( cd "$(a_project 'PARA_ROUTES="8080"')" \
+      && env -u PARA_PROJECT_DIR PATH="$d:$PATH" "$PARA" up ws >/dev/null 2>&1 ) || true
+  [ -f "$d/launch-args" ] || { echo "  para never reached 'incus launch'" >&2; return 1; }
+  assert_contains "$(cat "$d/launch-args")" "ipv4.address=10.9.9.202" \
+    "skipped the running .200 and the stopped .201"
+}
+
 test_refuses_a_contract_version_mismatch() {
   # A project pins the contract its hooks target; para refuses rather than
   # running them under a seam that has changed underneath.

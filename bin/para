@@ -240,10 +240,14 @@ stamp_ct() { # stamp_ct <ct>
     "user.para.routes=$PARA_ROUTES"
 }
 
+# NOTE, and it applies to every helper reached from inside a $( ): bash strips
+# `set -e` there, so a `die` in one of them kills only the substitution and the
+# caller sails on with an empty value. Such helpers RETURN non-zero and the
+# caller checks — see alloc_ip.
 bridge_prefix() { # "192.168.100.1/24" -> "192.168.100"
   local addr
-  addr="$(incus network get "$PARA_BRIDGE" ipv4.address 2>/dev/null)" \
-    || die "cannot read $PARA_BRIDGE ipv4.address — is the bridge up? ('para doctor')"
+  addr="$(incus network get "$PARA_BRIDGE" ipv4.address 2>/dev/null)" || return 1
+  [ -n "$addr" ] || return 1
   addr="${addr%/*}"
   printf '%s' "${addr%.*}"
 }
@@ -253,7 +257,8 @@ bridge_prefix() { # "192.168.100.1/24" -> "192.168.100"
 # bridge is machine-global, so anything else fails open onto a live container.
 alloc_ip() {
   local prefix used n
-  prefix="$(bridge_prefix)"
+  prefix="$(bridge_prefix)" \
+    || die "cannot read $PARA_BRIDGE ipv4.address — is the bridge up? ('para doctor')"
   # Two sources, because neither is complete: the runtime address (empty while an
   # instance is stopped) and the pinned device address (absent on instances para
   # did not create). Reduced to bare addresses — incus annotates the runtime
@@ -350,7 +355,12 @@ EOF
 # One site per route, for every para workspace on this machine — each served by
 # ITS OWN recorded domain and routes, so one Caddy is correct across projects.
 caddy_sites() {
-  local name state project domain ip routes route ws
+  local rows name state project domain ip routes route ws
+  # Captured, not piped in from a process substitution: a failed query there is
+  # indistinguishable from "no workspaces", and the config that gets written is
+  # a valid one with every route on the machine missing.
+  rows="$(ws_list)" \
+    || die "cannot read the workspace list from incus — refusing to write a Caddyfile that would drop every route."
   while IFS=, read -r name state project domain ip routes; do
     ws="${name#"$CT_PREFIX"}"
     routes="$(normalize_routes "$routes")"
@@ -361,7 +371,7 @@ caddy_sites() {
       printf 'https://%s%s {\n\treverse_proxy %s:%s\n\ttls internal\n}\n\n' \
         "$(route_host "$route" "$ws" "$domain")" "$(url_port)" "$ip" "${route##*:}"
     done
-  done < <(ws_list)
+  done <<<"$rows"
 }
 
 # Regenerate the Caddyfile from incus and make Caddy adopt it — starting Caddy
@@ -371,7 +381,10 @@ caddy_sites() {
 caddy_sync() {
   need caddy
   mkdir -p "$PARA_STATE_DIR"
-  { caddy_globals; caddy_workcopy; caddy_sites; } > "$CADDYFILE"
+  # Into place only once it is complete: `>` truncates on open, so generating
+  # straight into $CADDYFILE would leave a gutted one behind on any failure.
+  { caddy_globals; caddy_workcopy; caddy_sites; } > "$CADDYFILE.new"
+  mv "$CADDYFILE.new" "$CADDYFILE"
   caddy_run validate --config "$CADDYFILE" --adapter caddyfile \
     || die "the generated Caddyfile is invalid (above) — check PARA_ROUTES and PARA_DOMAIN. It is at $CADDYFILE."
   if caddy_running; then
@@ -422,7 +435,13 @@ push_project() { # push_project <name>
   local ct="$CT_PREFIX$1" home="/home/$PARA_USER"
   incus exec "$ct" -- rm -rf "$home/.paraspace"
   incus_q file push -r "$PARA_PROJECT_DIR/.paraspace" "$ct$home/"
-  para_env | incus_q file push --mode 0600 - "$ct$home/.paraspace/env"
+  # para_env is the host's view; two corrections make it true in here. The
+  # sharp one is PARA_HOST_ENV: it names a file on the HOST, while the copy the
+  # hooks read is the one pushed just below.
+  { para_env
+    printf 'export PARA_HOST_ENV=%q\n' "$home/.paraspace/host.env"
+    printf 'unset PARA_BIN PARA_PROJECT_DIR PARA_CONFIG PARA_CONFIG_DIR PARA_STATE_DIR\n'
+  } | incus_q file push --mode 0600 - "$ct$home/.paraspace/env"
   if [ -f "$PARA_HOST_ENV" ]; then
     incus_q file push --mode 0600 "$PARA_HOST_ENV" "$ct$home/.paraspace/host.env"
   fi
@@ -473,10 +492,16 @@ cmd_up() {
   trap 'up_hint $?' EXIT
 
   local ct="$CT_PREFIX$name" ip
-  ensure_volume
   if instance_exists "$ct"; then
-    log "Workspace '$name' exists — restarting and reconverging…"
-    incus start "$ct" 2>/dev/null || true
+    # Only start it when it isn't running: a blanket `|| true` here would also
+    # swallow the real reason a stopped workspace refuses to come up, and the
+    # next thing the user sees is a 120s wait_ready timeout blaming guest DNS.
+    if [ "${ws_state:-}" = RUNNING ]; then
+      log "Workspace '$name' is running — reconverging…"
+    else
+      log "Workspace '$name' exists — starting it…"
+      incus start "$ct"
+    fi
   else
     incus image info "$PARA_IMAGE" >/dev/null 2>&1 \
       || die "no image '$PARA_IMAGE' — build it first with 'para image build'."
@@ -485,6 +510,7 @@ cmd_up() {
     incus launch "$PARA_IMAGE" "$ct" --storage "$PARA_POOL" \
       -c security.nesting=true -d eth0,ipv4.address="$ip"
   fi
+  ensure_volume
   attach_volume "$ct"
   stamp_ct "$ct"
   wait_ready "$ct"
@@ -527,6 +553,12 @@ cmd_rm() {
   validate_name "$name"
   require_incus
   local ct="$CT_PREFIX$name"
+  # Names are machine-global and `para ls` is project-scoped, so without this a
+  # workspace you cannot even see is one typo away from being destroyed. `up`
+  # refuses the same way; this is the destructive half of the pair.
+  if ws_load "$name" && [ "$ws_project" != "$PARA_PROJECT" ]; then
+    die "workspace '$name' belongs to project '$ws_project' — remove it from there, or: PARA_PROJECT=$ws_project para rm $name"
+  fi
   # Converging on "gone", so an already-absent workspace is a no-op — teardown
   # scripts rely on that, and it is still said out loud in case of a typo.
   if ! instance_exists "$ct"; then
@@ -657,7 +689,8 @@ config_template() {
 	# belong in the project's .paraspace/Parafile. Nothing enforces that; `para
 	# doctor` will tell you when a value here looks project-shaped.
 	EOF
-  for key in PARA_DOMAIN PARA_HTTPS_PORT PARA_POOL PARA_BRIDGE PARA_IP_LO PARA_IP_HI; do
+  for key in PARA_DOMAIN PARA_HTTPS_PORT PARA_CADDY_ADMIN PARA_POOL PARA_BRIDGE \
+            PARA_IP_LO PARA_IP_HI PARA_WORKCOPY_HOST PARA_WORKCOPY_PORT; do
     # shellcheck disable=SC2016  # the := idiom is the literal being written
     printf '# : "${%s:=%s}"\n' "$key" "${!key}"
   done
@@ -688,7 +721,7 @@ image_src_sha() {
 sha256_of() {
   if command -v sha256sum >/dev/null 2>&1; then sha256sum
   elif command -v shasum >/dev/null 2>&1; then shasum -a 256
-  else die "need sha256sum or shasum to hash the image source"; fi | awk '{print $1}'
+  else return 1; fi | awk '{print $1}'
 }
 
 cmd_image_build() {
@@ -716,7 +749,7 @@ cmd_image_build() {
   fi
 
   # Script scope, not local: the EXIT trap fires after this function unwinds.
-  builder=para-image-build
+  builder="para-image-build-$PARA_PROJECT"
   tmp_alias="para-image-tmp-$PARA_PROJECT"
   published=0
   trap image_cleanup EXIT
@@ -759,8 +792,11 @@ image_publish() {
   incus_q publish "$builder/publish" --reuse --alias "$tmp_alias"
   published=1
   incus image delete "$PARA_IMAGE" >/dev/null 2>&1 || true
-  incus image alias rename "$tmp_alias" "$PARA_IMAGE"
-  incus image set-property "$PARA_IMAGE" user.para.src_sha "$(image_src_sha)"
+  incus image alias rename "$tmp_alias" "$PARA_IMAGE" \
+    || die "the new image is published as '$tmp_alias' but could not be renamed — recover with: incus image alias rename $tmp_alias $PARA_IMAGE"
+  local sha
+  sha="$(image_src_sha)" || die "need sha256sum or shasum to stamp the image's provenance."
+  incus image set-property "$PARA_IMAGE" user.para.src_sha "$sha"
 }
 
 # Never delete the temp alias once it holds the only copy of the image.
@@ -879,6 +915,7 @@ run_project_command() {
   if [ -z "$PARA_PROJECT_DIR" ] || [ ! -f "$script" ]; then
     die "unknown command '$verb' — see 'para --help'."
   fi
+  require_project   # commands are part of the contract, so honour the pin
   export "${!PARA_@}"
   exec "$script" "$@"
 }
@@ -1041,7 +1078,7 @@ doctor_project() {
 # ---- help ------------------------------------------------------------------
 is_engine_verb() {
   case "$1" in
-    up|down|rm|ls|sh|caddy|config|image|init|doctor|commands|completions|help) return 0 ;;
+    up|down|rm|ls|sh|caddy|config|image|init|doctor|commands|completions|help|exec) return 0 ;;
     *) return 1 ;;
   esac
 }

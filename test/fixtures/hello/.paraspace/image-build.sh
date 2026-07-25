@@ -18,7 +18,7 @@ set -euo pipefail
 #   busybox-extras  — /usr/sbin/httpd, the "app" hooks/boot starts on :8080
 #
 # Idempotent (guarded user create, `apk add` is a no-op when present), so
-# `para image-build -i` works here too.
+# `para image build -i` works here too.
 
 PARA_USER="${PARA_USER:-app}"
 PARA_UID="${PARA_UID:-1000}"

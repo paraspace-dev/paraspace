@@ -27,8 +27,8 @@ void-docker-gh/
 ## Try it
 
 ```sh
-# install para once (from a paraspace checkout), if you haven't
-bin/para install                        # -> ~/.local/bin/para
+# install para once, if you haven't
+npm i -g paraspace                      # or run it from a checkout: bin/para
 
 # from a copy of this .paraspace/ (or after `para init`) — needs incus + caddy;
 # see the ParaSpace README for one-time host setup

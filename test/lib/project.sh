@@ -17,20 +17,25 @@
 #      and starts a Caddy on the unsandboxable admin port :2019. Tests must never
 #      depend on para "probably" dying before it gets there.
 
-# Temp dirs to remove when the current test finishes. The harness runs each test
-# in a subshell and calls scratch_cleanup on the way out, so this is per-test.
-declare -a _scratch_dirs=()
+# Where the current test's throwaway dirs are recorded, so the harness can
+# remove them when it ends — on the failure path too. See scratch(), below.
+_SCRATCH_LIST="$(mktemp "${TMPDIR:-/tmp}/para-scratch.XXXXXX")"
 
+# Every caller uses `d="$(scratch)"`, which runs this in a command-substitution
+# SUBSHELL — so an array appended to here would be discarded, and the cleanup
+# below would silently never remove anything (it didn't, for a long time; the
+# machine had a thousand leaked dirs). A file survives the subshell.
 scratch() { # scratch — a throwaway dir, auto-removed at end of test
   local d; d="$(mktemp -d "${TMPDIR:-/tmp}/para-t.XXXXXX")"
-  _scratch_dirs+=("$d")
+  printf '%s\n' "$d" >> "$_SCRATCH_LIST"
   printf '%s\n' "$d"
 }
 
 scratch_cleanup() {
   local d
-  for d in ${_scratch_dirs[@]+"${_scratch_dirs[@]}"}; do rm -rf "$d"; done
-  _scratch_dirs=()
+  [ -f "$_SCRATCH_LIST" ] || return 0
+  while IFS= read -r d; do [ -n "$d" ] && rm -rf "$d"; done < "$_SCRATCH_LIST"
+  : > "$_SCRATCH_LIST"
 }
 
 # a_project [PARAFILE_LINE]... — a throwaway project whose Parafile declares the

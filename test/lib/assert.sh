@@ -76,9 +76,12 @@ eventually() {
 # curl a workspace URL through the run's para Caddy, hermetically (--resolve, so
 # it never depends on public DNS for *.paraspace.dev) and without cert fussing
 # (-k, para's internal CA). Echoes the body; non-zero on transport failure.
-http_get() { # http_get <workspace>
-  local ws="$1" host
+# A second argument addresses a SUBDOMAIN route (`api` -> api.<ws>.<domain>),
+# which is otherwise never requested by anything and so goes untested.
+http_get() { # http_get <workspace> [<sub>]
+  local ws="$1" sub="${2:-}" host
   host="$ws.${PARA_DOMAIN:-paraspace.dev}"
+  [ -z "$sub" ] || host="$sub.$host"
   curl -sk --max-time 10 --resolve "$host:$PARA_HTTPS_PORT:127.0.0.1" \
     "https://$host:$PARA_HTTPS_PORT/"
 }
@@ -87,11 +90,20 @@ http_get() { # http_get <workspace>
 # Caddy with the fixture's sentinel. Routing is asynchronous (Caddy reloads on
 # every `up`), so this always retries rather than asking once — reach for it
 # instead of a bare http_get whenever the request follows a state change.
-assert_serves() {
-  local ws="$1" timeout="${2:-30}"
-  eventually "$timeout" _serves_once "$ws" \
-    || { echo "  assert_serves: '$ws' never served the sentinel within ${timeout}s" >&2; return 1; }
+assert_serves() { # assert_serves <workspace> [timeout-s] [<sub>]
+  local ws="$1" timeout="${2:-30}" sub="${3:-}"
+  eventually "$timeout" _serves_once "$ws" "$sub" \
+    || { echo "  assert_serves: '${sub:+$sub.}$ws' never served the sentinel within ${timeout}s" >&2; return 1; }
 }
+
+# assert_stops_serving <workspace> [timeout-s] — the inverse, for after a `rm`:
+# the site must go away, not merely the registry row.
+assert_stops_serving() {
+  local ws="$1" timeout="${2:-30}"
+  eventually "$timeout" _serves_never "$ws" \
+    || { echo "  assert_stops_serving: '$ws' was still served after ${timeout}s" >&2; return 1; }
+}
+_serves_never() { ! _serves_once "$1"; }
 
 # One shot of the above. Split out so `eventually` can re-invoke it as a command
 # (no `sh -c` string, so the workspace name is never re-parsed by a shell).
@@ -105,7 +117,7 @@ assert_serves() {
 # by ANY of them: a route that pointed this workspace's host at another
 # workspace's httpd would still pass. Binding to the name makes this an assertion
 # about routing, not just about something being alive.
-_serves_once() {
-  local body; body="$(http_get "$1")" || return 1
+_serves_once() { # _serves_once <workspace> [<sub>]
+  local body; body="$(http_get "$1" "${2:-}")" || return 1
   case "$body" in *"para-e2e-ok $1"*) return 0 ;; *) return 1 ;; esac
 }

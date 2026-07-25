@@ -15,7 +15,8 @@ info()  { printf '    %s\n'        "$*"               >&2; }  # indented detail
 warn()  { printf '%swarn:%s %s\n'  "$_wn" "$_off" "$*" >&2; }
 die()   { printf '%serror:%s %s\n' "$_er" "$_off" "$*" >&2; exit 1; }
 
-# Is there a human to prompt? (para sets PARA_NONINTERACTIVE in CI/cron.)
+# Is there a human to prompt? (Set PARA_NONINTERACTIVE=1 in CI/cron; para
+# reads it too, and gives a hook no tty when it is set.)
 interactive() { [ -z "${PARA_NONINTERACTIVE:-}" ] && [ -t 0 ]; }
 
 # Print a prompt and wait for Enter — only when someone can answer.

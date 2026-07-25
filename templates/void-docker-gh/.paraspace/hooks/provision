@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
-# para provision hook — runs INSIDE the workspace, in $HOME, before boot.
+# para provision hook — runs INSIDE the workspace before boot (in the clone if it
+# already exists, else $HOME — so use absolute paths).
 #
 # Owns everything the project needs before its stack comes up:
 #   1. seed the shared volume once (dotfiles, gitconfig, ssh key)

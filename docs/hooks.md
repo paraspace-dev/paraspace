@@ -1,9 +1,13 @@
 # Hooks
 
 Hooks are where all the provisioning lives. `para` runs them **inside the
-workspace, in `$HOME`**, as the workspace user (`$PARA_USER`, uid `$PARA_UID` —
-`app`/`1000` by default). Everything domain-specific — git, `gh`, dotfiles,
-`.env`, booting the stack — belongs here, never in `para`.
+workspace**, as the workspace user (`$PARA_USER`, uid `$PARA_UID` — `app`/`1000`
+by default). Everything domain-specific — git, `gh`, dotfiles, `.env`, booting
+the stack — belongs here, never in `para`.
+
+The working directory is `~/$PARA_CLONE_DIR` when it exists and `$HOME`
+otherwise — so a provision hook starts in `$HOME` on the first `up` and in the
+clone on every one after. Use absolute paths rather than relying on it.
 
 ## The two hooks
 
@@ -51,7 +55,9 @@ project's `.paraspace/` directory. Same name on both sides:
 | `~/.paraspace/host.env` | `$PARA_HOST_ENV` from the host, if that file exists |
 | `~/.paraspace/commands/` | synced along, but these run on the *host* — see [Commands](./commands.md#project-commands) |
 
-The `Parafile` and `image-build.sh` stay host-side; para reads those itself.
+para reads the `Parafile` and `image-build.sh` itself, on the host. Like
+`commands/`, they are synced into the guest as well, but nothing in the
+workspace runs them — so don't put a host-only secret in a `Parafile`.
 
 Files come from your **host checkout**, not the clone, and are pushed fresh on
 every `up` — so editing a hook takes effect on the next `para up` without

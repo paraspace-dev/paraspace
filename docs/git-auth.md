@@ -1,8 +1,9 @@
 # Git authentication
 
-Workspaces clone and push over SSH, so the git host must trust this machine's
-key. `para` uses **one `para` key per machine** (`para-<hostname>`), individually
-revocable — never your host keys.
+Workspaces clone and push over SSH, so the git host has to trust a key. The
+templates' provision hook generates **one key per project**, on that project's
+shared volume and labelled `para-<hostname>` — individually revocable, and
+never your host keys.
 
 ## First run
 
@@ -17,8 +18,8 @@ authorize it:
 `para up` is idempotent, so if a first clone fails with
 `Permission denied (publickey)`, authorize the key and re-run.
 
-The templates ship a [project command](./commands.md#project-commands) that
-re-prints the key any time:
+`void-docker-gh` and `void-jchook` ship a
+[project command](./commands.md#project-commands) that re-prints it any time:
 
 ```sh
 para key
@@ -32,7 +33,7 @@ repos.
 
 Because the key lives on the
 [shared volume](./internals.md#the-shared-home-volume), every
-workspace of the project inherits it — you authorize once per machine, not per
+workspace of the project inherits it — you authorize once per project, not per
 workspace.
 
 That cuts both ways: anything running in

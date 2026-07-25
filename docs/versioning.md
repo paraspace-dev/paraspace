@@ -52,8 +52,8 @@ into a scratch directory to diff against a current template. Otherwise:
 | image stamped uid/user/contract/incremental | only `user.para.src_sha` |
 | `para start` / `para stop` | `para caddy start\|stop\|status` |
 | `para config-set KEY VALUE` | `para config edit` — the file is hand-edited now |
-| `para run`, `claude`, `web`, `key`, `config-sync` | project commands in `.paraspace/commands/` |
-| `para reconcile`, `para install`, `para image-build` | deleted |
+| `para run`, `claude`, `web`, `key` | project commands in `.paraspace/commands/` |
+| `para reconcile`, `install`, `image-build`, `config-import`, `config-sync` | deleted — `up` now re-pushes `.paraspace/` every time |
 
 New since then: `PARA_READY_HOST` (wait for guest DNS to
 resolve a host your hooks need), `.paraspace/commands/` (your own `para` verbs),

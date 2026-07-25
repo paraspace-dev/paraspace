@@ -27,7 +27,7 @@ Then `para doctor` tells you if the machine is ready.
 
 ```sh
 cd <your project>  # a repo with a .paraspace/ dir — see below
-para image build   # once per machine — build the project's base image
+para image build   # build the project's base image — once per project, per arch
 para up ws1        # launch an isolated workspace
 para sh ws1        # shell into the clone
 ```

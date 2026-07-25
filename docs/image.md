@@ -14,10 +14,10 @@ para's own mechanism needs very little:
   `image-build.sh` creates **must** match. It gets all three in its
   environment;
 - **bash** — para invokes hooks and shells via `su -s /bin/bash`;
-- **util-linux `su`** for interactive shells. `para sh` uses `su --pty` so
-  SIGWINCH reaches the child; busybox's `su` has no `--pty`, so on a plain
-  Alpine image an interactive `para sh` fails loudly. Non-interactive
-  `para sh -c …` is unaffected;
+- **util-linux `su`**, if you run `para sh <ws> -c '<cmd>'` from a terminal —
+  that path uses `su --pty` so SIGWINCH reaches the child. busybox's `su` has no
+  `--pty` and fails loudly. A bare `para sh`, and `-c` with its output piped or
+  redirected, both use plain `su -` and work on a busybox image;
 - **git**, if your hooks clone. para itself never runs git.
 
 Everything else is your project's choice. If your stack is Docker Compose — as
@@ -43,8 +43,8 @@ The command is base-agnostic plumbing:
    interrupted build leaves the existing image untouched.
 
 Both keys live in the
-[Parafile](./parafile.md#para_base_image-and-para_image_bootstrap), which is
-also where the per-distro bootstrap examples are.
+[Parafile](./parafile.md), which is also where the per-distro bootstrap
+examples are.
 
 Two caveats:
 

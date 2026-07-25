@@ -37,7 +37,7 @@ features:
       height: 32
       wrap: true
     title: Authenticate once
-    details: Credentials live on a shared per-project volume. Run gh auth login in one workspace and the whole project is authed — one revocable key per machine, never your host keys.
+    details: Credentials live on a shared per-project volume. Run gh auth login in one workspace and the whole project is authed — one revocable key per project, never your host keys.
   - icon:
       light: /icons/console-light.svg
       dark: /icons/console-dark.svg
@@ -78,7 +78,7 @@ own docs. Full prerequisites: [Getting started](/docs/getting-started).
 
 ```sh
 cd your-project   # a repo set up for para
-para image build  # once per machine — build the project's base image
+para image build  # build the project's base image — once per project, per arch
 para up ws1       # launch an isolated workspace
 para sh ws1       # shell into the clone
 ```

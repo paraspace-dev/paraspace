@@ -73,8 +73,8 @@ misbehaving if the interface changed — see
 
 Anything your team types often can become a `para` verb: drop an executable in
 `.paraspace/commands/` and `para <name>` runs it on the host with every `PARA_*`
-exported. The templates ship a few (`web`, `key`, and in `void-jchook`,
-`claude` and `run`) as examples to keep or delete. See
+exported. `void-docker-gh` ships `web` and `key` as examples to keep or delete
+(`void-jchook` adds `claude` and `run`; `void-minimal` ships none). See
 [Commands](./commands.md#project-commands).
 
 ## Templates

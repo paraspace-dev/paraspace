@@ -128,9 +128,9 @@ case "$driver" in
 esac
 
 # Pre-pull the stack's images so `para up` boots without hitting the network in
-# every workspace. The tag list arrives via PARA_PREPULL_IMAGES (set by `para
-# image-build`, extracted host-side from the compose file). A failed pull is
-# non-fatal — that workspace just pulls it on first boot.
+# every workspace. PARA_PREPULL_IMAGES is this project's own key — declare the
+# tags in .paraspace/Parafile and para forwards it here like any other PARA_*.
+# A failed pull is non-fatal — that workspace just pulls it on first boot.
 if [ -n "${PARA_PREPULL_IMAGES:-}" ]; then
   echo "==> Pre-pulling stack image(s) into the base image"
   for img in $PARA_PREPULL_IMAGES; do

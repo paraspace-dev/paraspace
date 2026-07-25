@@ -28,7 +28,7 @@ If the repo already has a `.paraspace/` directory, you're three commands from a
 running workspace:
 
 ```sh
-para image build  # build the project's base image — once per machine
+para image build  # build the project's base image — once per project, per arch
 para up ws1       # launch an isolated workspace
 para sh ws1       # shell into the clone
 ```

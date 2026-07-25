@@ -21,7 +21,7 @@ yours to decide:
 | Key | Default | What it does |
 |---|---|---|
 | `PARA_CONTRACT` | — | the [contract](./versioning.md) your `.paraspace/` targets. para refuses on a mismatch |
-| `PARA_PROJECT` | the directory's name | project identity: workspace ownership, `para ls` scoping, the shared-volume name |
+| `PARA_PROJECT` | the directory name, slugified (`My.App` → `my-app`) | project identity: workspace ownership, `para ls` scoping, the shared-volume name |
 | `PARA_IMAGE` | `$PARA_PROJECT` | the image `para up` launches and `para image build` publishes |
 | `PARA_BASE_IMAGE` | — | the Incus image `para image build` builds *from* |
 | `PARA_IMAGE_BOOTSTRAP` | — | one `sh -c` line run in the builder before your payload |
@@ -57,9 +57,9 @@ Commas, spaces, tabs and newlines all separate entries, so a long list can go
 one route per line. [Hooks](./hooks.md#the-environment-para-injects) see one
 normalized space-separated list.
 
-para does **not** validate routes — [`caddy validate`](./urls.md) does, before
-every reload, and it names the site it rejected. A bad port or two workspaces
-claiming one hostname fails loudly, with nothing written.
+para does **not** validate routes — `caddy validate` does, before every reload,
+and it names the site it rejected. A bad port or two workspaces claiming one
+hostname fails loudly, with nothing written.
 
 Empty means "this workspace serves no HTTP" — a worker, a bare box. `para ls`
 shows no URL, `$PARA_URL` is empty in your hooks, and `para doctor` mentions it
@@ -109,7 +109,8 @@ where you set them.
 
 Any `PARA_FOO` you set reaches your hooks, project commands and image build
 untouched — that's how a project declares its own knobs (`PARA_GH_AUTH` in the
-default template, a `PARA_PREPULL` your `image-build.sh` reads). See
+default template, the `PARA_PREPULL_IMAGES` the templates' `image-build.sh`
+reads). See
 [Hooks](./hooks.md#the-environment-para-injects).
 
 ## Precedence

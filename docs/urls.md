@@ -46,8 +46,7 @@ is the most common reason a workspace comes up but its URL doesn't load.
 ## Trusting the certificate
 
 `para` Caddy serves the wildcard with its own internal CA, so browsers distrust
-it until that root is installed — para reminds you the first time it starts
-Caddy:
+it until that root is installed — para says so every time it starts Caddy:
 
 ```sh
 caddy trust    # one-time per machine

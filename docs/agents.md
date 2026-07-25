@@ -29,7 +29,7 @@ Two things are *not* isolated:
 - **the network** — workspaces have ordinary outbound access. para does no
   egress filtering; that's an Incus network ACL if you want it.
 - **the git key** — the [shared volume](./internals.md#the-shared-home-volume)
-  holds one key per machine, so an agent can push to whatever that key is
+  holds the project's key, so an agent can push to whatever that key is
   authorized for. Scope it narrowly if that matters; see
   [Git authentication](./git-auth.md).
 

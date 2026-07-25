@@ -33,9 +33,8 @@
 : "${PARA_IMAGE_BOOTSTRAP:=xbps-install -Syu xbps bash}"
 
 # HTTP routes para publishes through its Caddy — one TLS site per "[sub:]port",
-# comma-separated. This box boots nothing, so it declares NO routes: an empty
-# value is the explicit "this workspace serves no HTTP" (para refuses an *unset*
-# PARA_ROUTES, so a project can't lose its URL to a typo). `para up` still gives
+# comma-separated. This box boots nothing, so it declares NO routes — spelled
+# out rather than left off, so it reads as a decision. `para up` still gives
 # you a full box and `para sh <name>`; it just publishes no site, and `para ls`
 # shows no URL. Once you run something, list its port here — a bare port is the
 # workspace apex:

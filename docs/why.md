@@ -44,9 +44,9 @@ para inverts it. The workspace is a container on your own box:
 para sh my-feature        # a real pty in the clone
 ```
 
-That's `su --pty` inside the container, with SIGWINCH forwarded and a `$TERM`
-the container has terminfo for — so tmux, Neovim and Claude Code behave the way
-they do in any terminal, because they are in one. Your dotfiles get there
+That's a real pty into the container, with a `$TERM` it has terminfo for — so
+tmux, Neovim and Claude Code behave the way they do in any terminal, because
+they are in one. Your dotfiles get there
 through a `skel/` directory your own hooks copy in.
 
 So parallel work becomes a window-manager problem rather than a tab-management
@@ -97,7 +97,7 @@ https://my-feature.paraspace.dev  →  10.x.x.201:3000
 Nothing is remapped or path-rewritten, and there's no `X-Forwarded-Prefix` your
 app has to learn about — which is why WebSockets and hot reload work without
 anyone configuring them, and why most stacks boot unchanged on the first
-attempt. Routes are one line of your [`Parafile`](./parafile.md#para_routes).
+attempt. Routes are one line of your [`Parafile`](./parafile.md).
 
 ### A thin engine your project takes over
 

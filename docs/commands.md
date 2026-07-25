@@ -16,7 +16,7 @@ which is how you *create* one — works from anywhere.
 | `para down <name>` | stop the container. Data is kept; `para up` resumes it |
 | `para rm <name>` | delete the workspace. The shared volume is untouched |
 | `para ls [-a\|--all] [--names]` | list this project's workspaces; `--all` spans every project, `--names` prints bare names (this is what completion reads) |
-| `para sh <name> [-c <command>]` | a shell in the clone, or [one command in it](#running-one-command-with--c) |
+| `para sh <name> [-c <command>]` | a shell in the clone, or [one command in it](#running-one-command) |
 
 `up`, `down` and `rm` converge: they warn and succeed when the world is already
 in the state you asked for, so teardown scripts and retries stay simple.
@@ -28,7 +28,7 @@ fix-login            RUNNING   10.62.14.201     myapp          https://fix-login
 dark-mode            STOPPED   10.62.14.202     myapp          https://dark-mode.paraspace.dev:8443
 ```
 
-### Running one command with `-c`
+### Running one command
 
 `para sh <name> -c '<command>'` runs one command in the clone and exits with its
 status, so it composes with your host shell:
@@ -72,7 +72,7 @@ it (`--force` overwrites); `path` prints its location — both for scripting.
 
 | Command | What it does |
 |---|---|
-| `para init [<template>] [--list] [-f\|--force] [--full]` | scaffold `.paraspace/` from a bundled template (default `void-docker-gh`), skipping files that already exist; `--full` copies the whole template tree |
+| `para init [<template>] [--list] [-f\|--force] [--full]` | scaffold `.paraspace/` from a bundled template (default `void-docker-gh`), skipping files that already exist; `--full` copies the whole template tree, not just `.paraspace/` |
 | `para image build [-i\|--from-current]` | build and publish the project's base image; `-i` layers onto the current one for fast iteration — see [The image contract](./image.md) |
 | `para image status` | when `$PARA_IMAGE` was built, and whether its source has drifted since |
 | `para image rm` | delete `$PARA_IMAGE`. Running workspaces are clones and keep running |
@@ -83,7 +83,6 @@ it (`--force` overwrites); `path` prints its location — both for scripting.
 source <(para completions bash)   # ~/.bashrc
 source <(para completions zsh)    # ~/.zshrc
 ```
-
 
 ## Project commands
 
@@ -106,7 +105,7 @@ works. Two variables exist for exactly this: **`PARA_BIN`** (the path to this
 `para`, so a command can call back without relying on `$PATH`) and
 **`PARA_PROJECT_DIR`**.
 
-Because [`para sh`](#running-one-command-with--c) owns all the terminal
+Because [`para sh`](#running-one-command) owns all the terminal
 handling, commands that drive something inside a workspace stay one-liners:
 
 ```sh

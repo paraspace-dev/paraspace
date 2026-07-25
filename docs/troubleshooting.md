@@ -45,7 +45,7 @@ whenever a setting doesn't seem to be taking effect.
 ### Your Incus is too old
 
 > ✗ incus 6.2 cannot select device columns, which is how para reads workspace
-> state — upgrade to 6.22 or newer
+> state — upgrade to 6.22 or newer (Ubuntu's repos ship 6.2)
 
 para has no registry: it asks Incus for each workspace's project, routes and IP
 as query columns, which needs **Incus ≥ 6.22**. Distro repos lag (Ubuntu ships
@@ -91,7 +91,8 @@ Then set `PARA_POOL` in your [user config](./parafile.md#user-config-not-parafil
 
 ### The workspace is up but the URL doesn't load
 
-> ✗ *.paraspace.dev does not resolve to 127.0.0.1
+> ✗ *.paraspace.dev does not resolve to 127.0.0.1 — workspace URLs will not
+> load (docs/urls.md)
 
 The wildcard has to point at your machine. The default `paraspace.dev` already
 does; a custom `PARA_DOMAIN` needs a wildcard record of your own — see
@@ -146,11 +147,12 @@ para sh <name> -c 'ss -ltnp'
 A globally-updated `para` met a project pinned to an older contract, and refused
 rather than misbehaving. See [Contract versioning](./versioning.md).
 
-### An interactive `para sh` fails on a minimal image
+### `para sh -c` fails on a minimal image
 
-`para sh` uses `su --pty`, which is util-linux. A busybox `su` (plain Alpine)
-doesn't have it. That's an [image requirement](./image.md#what-the-image-must-have);
-non-interactive `para sh -c …` still works.
+Running `para sh <ws> -c '<cmd>'` from a terminal uses `su --pty`, which is
+util-linux; busybox's `su` (plain Alpine) doesn't have it. That's an
+[image requirement](./image.md#what-the-image-must-have). A bare `para sh`, and
+`-c` with its output piped or redirected, use plain `su -` and work anywhere.
 
 ## Still stuck
 

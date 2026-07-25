@@ -1,11 +1,11 @@
 # The docs rewrite: make the case, then get out of the way
 
-Status: **approved, in progress** — decisions taken below. Companion to
-[`minimal-engine.md`](./minimal-engine.md) — its step 3 ("docs pass"), scoped up
-from "update the stale bits" to the same kind of rewrite the engine got.
-Contract 2 **has shipped**: `bin/para` is the 1,079-line rewrite, the templates
-are migrated, `.paraspace/commands/` exists. The docs are the last thing left
-describing contract 1.
+Status: **done.** Companion to [`minimal-engine.md`](./minimal-engine.md) — its
+step 3 ("docs pass"), scoped up from "update the stale bits" to the same kind
+of rewrite the engine got. Landed in two commits: the argument pages
+(`why`/`agents`/`how-it-works`/`troubleshooting`/`commands`, the lander, the
+router) and the reference rewrite. See "As built" at the bottom for what
+changed against the plan.
 
 ## The goal
 
@@ -386,6 +386,50 @@ left column.
    `how-it-works.md`, the lander and `docs/README.md` are argument rather than
    contract, so they go first and carry most of the value. The reference pages
    follow, graded against the shipped engine with the truth checklist below.
+
+## As built
+
+| Page | before | planned | actual |
+|---|--:|--:|--:|
+| `README.md` (Overview) | 57 | 45 | 50 |
+| `why.md` **new** | — | 120 | 155 |
+| `getting-started.md` | 58 | 65 | 71 |
+| `how-it-works.md` | 89 | 60 | 77 |
+| `agents.md` **new** | — | 110 | 122 |
+| `project-setup.md` | 68 | 70 | 92 |
+| `urls.md` | 65 | 60 | 72 |
+| `git-auth.md` | 29 | 30 | 41 |
+| `troubleshooting.md` **new** | — | 110 | 159 |
+| `commands.md` | 93 | 120 | 140 |
+| `parafile.md` | 308 | 140 | 159 |
+| `hooks.md` | 77 | 85 | 110 |
+| `image.md` | 114 | 95 | 92 |
+| `versioning.md` | 135 | 45 | 63 |
+| `internals.md` | 73 | 50 | 78 |
+| **total** | **1166** | **~1205** | **1481** |
+
+What writing it settled, beyond the plan:
+
+- **The 150-line gate is right for prose and wrong for reference.** `why.md`
+  (155), `parafile.md` (159) and `troubleshooting.md` (159) all sit just over
+  it, and in each case splitting would fragment the reader's actual question
+  ("what do I set", "what's broken"). Treat the gate as a prompt to re-read a
+  page rather than a hard limit — it did its job on `parafile.md`, which came
+  in at 175 before a real trimming pass.
+- **The docs found an engine behavior change the plan had wrong.** `PARA_ROUTES`
+  unset is no longer refused in contract 2 — unset resolves to empty, and
+  `para doctor` mentions it. The "empty is a decision, unset is an oversight"
+  paragraph is gone rather than rewritten.
+- **Grading against the running binary beat grading against the source.**
+  `para --help` and `para doctor` were both run and their real output pasted;
+  that caught an incus `>= 6.22` check added after the plan was written, which
+  is a likely first-run failure (Ubuntu ships 6.2) and got its own
+  troubleshooting section.
+- **`npm run site:build` is the dead-link gate**, since VitePress fails the
+  build on one. Worth running on any docs change, not just structural ones.
+- **`para config-sync` didn't survive** into any template, so the offloaded-verb
+  list in `commands.md` is `key`/`web` (`void-docker-gh`) and
+  `claude`/`key`/`run`/`web` (`void-jchook`).
 
 ## Risks
 

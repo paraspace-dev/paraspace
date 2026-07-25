@@ -23,9 +23,9 @@ in the state you asked for, so teardown scripts and retries stay simple.
 
 ```
 $ para ls
-NAME       STATE     IP               PROJECT        URL
-fix-login  RUNNING   10.62.14.201     myapp          https://fix-login.paraspace.dev:8443
-dark-mode  STOPPED   10.62.14.202     myapp          https://dark-mode.paraspace.dev:8443
+NAME                 STATE     IP               PROJECT        URL
+fix-login            RUNNING   10.62.14.201     myapp          https://fix-login.paraspace.dev:8443
+dark-mode            STOPPED   10.62.14.202     myapp          https://dark-mode.paraspace.dev:8443
 ```
 
 ### Running one command with `-c`

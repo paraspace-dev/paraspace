@@ -84,9 +84,9 @@ para ls
 ```
 
 ```
-NAME       STATE     IP               PROJECT        URL
-fix-login  RUNNING   10.62.14.201     myapp          https://fix-login.paraspace.dev:8443
-dark-mode  RUNNING   10.62.14.202     myapp          https://dark-mode.paraspace.dev:8443
+NAME                 STATE     IP               PROJECT        URL
+fix-login            RUNNING   10.62.14.201     myapp          https://fix-login.paraspace.dev:8443
+dark-mode            RUNNING   10.62.14.202     myapp          https://dark-mode.paraspace.dev:8443
 ```
 
 One workspace per window-manager desktop works well: each desktop holds that

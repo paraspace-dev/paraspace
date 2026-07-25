@@ -113,19 +113,17 @@ sandbox_teardown() {
   for ws in "${SANDBOX_WORKSPACES[@]:-}"; do
     [ -n "$ws" ] || continue
     "$PARA" rm "$ws" >/dev/null 2>&1 || true
-    # Backstop straight to incus. `para rm` resolves the container through the
-    # registry, so a run that died before registering (or with a clobbered
-    # registry) would leak the instance despite the line above. The name is
+    # Backstop straight to incus: `para rm` refuses a workspace owned by another
+    # project, and a run that died mid-launch may have left one unstamped, so
+    # the line above is not guaranteed to have removed it. The name is
     # ct_name's `para-<ws>` on a run-unique <ws>, so this can only ever hit
     # something this run launched.
     incus delete -f "para-$ws" >/dev/null 2>&1 || true
   done
-  # The shared volume para lazily created for this project. Which pool it landed
-  # on is not knowable from here: para picks between para-dir (the nested-Docker
-  # default) and default at runtime, PARA_POOL can override that, and para records
-  # its choice in the sandboxed config file rather than back into our environment.
-  # So sweep EVERY pool instead of guessing a list — a hardcoded para-dir/default
-  # pair leaked the volume on every run for anyone using a custom pool.
+  # The shared volume para lazily created for this project. Sweep EVERY pool
+  # rather than guessing: PARA_POOL is inherited from the developer's
+  # environment, so a hardcoded default/para-dir pair leaked the volume on every
+  # run for anyone using a custom pool.
   # The sweep is safe only because it stays GUARDED to our run-unique name pattern
   # (sandbox_e2e sets para-home-paratest-$$): teardown must NEVER delete a volume
   # it didn't create, even if PARA_VOLUME somehow carried in from the environment.
@@ -147,4 +145,7 @@ sandbox_teardown() {
     if [ -n "$pid" ]; then kill "$pid" 2>/dev/null || true; fi
   fi
   [ -n "$SANDBOX_ROOT" ] && rm -rf "$SANDBOX_ROOT"
+  # project.sh's own bookkeeping file lives in $TMPDIR, not under
+  # $SANDBOX_ROOT, so it needs removing explicitly.
+  rm -f "${_SCRATCH_LIST:-}"
 }

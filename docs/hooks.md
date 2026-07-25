@@ -51,7 +51,7 @@ project's `.paraspace/` directory. Same name on both sides:
 |---|---|
 | `~/.paraspace/hooks/` | your hooks, plus anything they source |
 | `~/.paraspace/skel/` | your seed files (dotfiles etc.), for a hook to copy or link |
-| `~/.paraspace/env` | para's context — every `PARA_*`, as export lines |
+| `~/.paraspace/env` | para's context as export lines. Every `PARA_*` except the handful that name paths on the *host* (`PARA_BIN`, `PARA_PROJECT_DIR`, `PARA_CONFIG`, `PARA_CONFIG_DIR`, `PARA_STATE_DIR`), which are unset here rather than pointing at files that don't exist; `PARA_HOST_ENV` names the copy in this directory |
 | `~/.paraspace/host.env` | `$PARA_HOST_ENV` from the host, if that file exists |
 | `~/.paraspace/commands/` | synced along, but these run on the *host* — see [Commands](./commands.md#project-commands) |
 

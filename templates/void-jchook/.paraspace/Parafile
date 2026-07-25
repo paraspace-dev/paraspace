@@ -36,8 +36,8 @@
 # A Parafile sitting at its own repo's toplevel can derive it instead.
 # $PARA_PROJECT_DIR is the project root — the directory holding this
 # .paraspace/ — and para sets it before sourcing this file:
-#   : "${PARA_ORIGIN:=$(git -C "$PARA_PROJECT_DIR" remote get-url origin)}" Out of
-# the box: the same tiny public demo void-docker-gh uses (one Caddy service :8080).
+#   : "${PARA_ORIGIN:=$(git -C "$PARA_PROJECT_DIR" remote get-url origin)}"
+# Out of the box: the same tiny public demo void-docker-gh uses (Caddy on :8080).
 : "${PARA_ORIGIN:=git@github.com:jchook/docker-caddy.git}"
 
 # A hostname the guest must resolve before para runs any hook in it. Guest DNS

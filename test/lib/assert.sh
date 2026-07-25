@@ -108,8 +108,7 @@ _serves_never() { ! _serves_once "$1"; }
 # One shot of the above. Split out so `eventually` can re-invoke it as a command
 # (no `sh -c` string, so the workspace name is never re-parsed by a shell).
 # `case`, NOT `curl | grep -q`: the suite runs under pipefail, where grep -q's
-# early exit can SIGPIPE curl and turn a served page into a false negative —
-# the same trap bin/para's instance_running documents.
+# early exit can SIGPIPE curl and turn a served page into a false negative.
 #
 # Matches the sentinel WITH the workspace name ("para-e2e-ok <name>", written by
 # the fixture's boot hook from $PARA_NAME) — not the bare "para-e2e-ok" prefix.

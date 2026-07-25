@@ -171,7 +171,8 @@ test/
   run                 entrypoint (tier selection, sandbox, discovery)
   lib/harness.sh      test_* autodiscovery + pass/fail reporting
   lib/assert.sh       assert_*, eventually(), http_get(), assert_serves()
-  lib/sandbox.sh      XDG sandbox, free-IP-band picker, teardown
+  lib/sandbox.sh      XDG sandbox (dirs, Caddy port + admin endpoint), teardown
+  lib/project.sh      throwaway projects, project commands, stub backends
   cli/                CLI-tier tests (no incus)
   e2e/                e2e-tier tests (incus)
   fixtures/hello/     the Alpine HTTP fixture + its image builder

@@ -213,8 +213,9 @@ ws_list() { # ws_list [<project>] — CSV: name,state,project,domain,ip,routes
 # Load workspace <name> into ws_state/ws_project/ws_domain/ws_ip/ws_routes.
 # Non-zero if there is no such workspace.
 ws_load() {
-  local row
-  row="$(ws_list | awk -F, -v ct="$CT_PREFIX$1" '$1 == ct')"
+  local rows row
+  rows="$(ws_list)" || die "cannot read the workspace list from incus — refusing to guess whether '$1' exists."
+  row="$(awk -F, -v ct="$CT_PREFIX$1" '$1 == ct' <<<"$rows")"
   [ -n "$row" ] || return 1
   # shellcheck disable=SC2034  # a row reader exposes the whole row, used or not
   IFS=, read -r _ ws_state ws_project ws_domain ws_ip ws_routes <<<"$row"
@@ -268,7 +269,7 @@ alloc_ip() {
   for n in $(seq "$PARA_IP_LO" "$PARA_IP_HI"); do
     if ! grep -qxF "$prefix.$n" <<<"$used"; then printf '%s' "$prefix.$n"; return; fi
   done
-  die "no free IP in $prefix.$PARA_IP_LO-$PARA_IP_HI — remove a workspace, or widen PARA_IP_LO/HI."
+  return 1   # the caller dies; a die here is inside a $( ) — see bridge_prefix
 }
 
 # The shared home volume: one authenticated home per project, attached to every
@@ -384,9 +385,9 @@ caddy_sync() {
   # Into place only once it is complete: `>` truncates on open, so generating
   # straight into $CADDYFILE would leave a gutted one behind on any failure.
   { caddy_globals; caddy_workcopy; caddy_sites; } > "$CADDYFILE.new"
+  caddy_run validate --config "$CADDYFILE.new" --adapter caddyfile \
+    || die "the generated Caddyfile is invalid (above) — check PARA_ROUTES and PARA_DOMAIN. It is at $CADDYFILE.new."
   mv "$CADDYFILE.new" "$CADDYFILE"
-  caddy_run validate --config "$CADDYFILE" --adapter caddyfile \
-    || die "the generated Caddyfile is invalid (above) — check PARA_ROUTES and PARA_DOMAIN. It is at $CADDYFILE."
   if caddy_running; then
     caddy_run reload --config "$CADDYFILE" --adapter caddyfile \
       || die "caddy refused the new config (above); the full log is $CADDY_LOG."
@@ -486,7 +487,9 @@ cmd_up() {
   require_project
   require_incus
   # Container names are machine-global, so refuse to adopt another project's.
-  if ws_load "$name" && [ "$ws_project" != "$PARA_PROJECT" ]; then
+  # An unstamped container has no owner (a launch that failed before stamp_ct,
+  # or one made by hand), so it is adoptable — only a DIFFERENT owner refuses.
+  if ws_load "$name" && [ -n "$ws_project" ] && [ "$ws_project" != "$PARA_PROJECT" ]; then
     die "workspace '$name' belongs to project '$ws_project' — names are unique per machine, pick another."
   fi
   trap 'up_hint $?' EXIT
@@ -505,10 +508,15 @@ cmd_up() {
   else
     incus image info "$PARA_IMAGE" >/dev/null 2>&1 \
       || die "no image '$PARA_IMAGE' — build it first with 'para image build'."
-    ip="$(alloc_ip)"
+    ip="$(alloc_ip)" \
+      || die "no free IP in the .$PARA_IP_LO-.$PARA_IP_HI band on $PARA_BRIDGE — remove a workspace, or widen PARA_IP_LO/HI."
     log "Launching $ct at $ip…"
     incus launch "$PARA_IMAGE" "$ct" --storage "$PARA_POOL" \
       -c security.nesting=true -d eth0,ipv4.address="$ip"
+    # Immediately, before anything that can fail: an unstamped container has no
+    # owner, and everything downstream (ls, the up/rm guards) works off the
+    # stamp. Refreshed below on the reconverge path.
+    stamp_ct "$ct"
   fi
   ensure_volume
   attach_volume "$ct"
@@ -539,6 +547,9 @@ cmd_down() {
   [ -n "$name" ] || die "usage: para down <name>"
   require_incus
   ws_load "$name" || die "no such workspace '$name' (see: para ls)"
+  if [ -n "$ws_project" ] && [ "$ws_project" != "$PARA_PROJECT" ]; then
+    die "workspace '$name' belongs to project '$ws_project' — stop it from there, or: PARA_PROJECT=$ws_project para down $name"
+  fi
   if [ "$ws_state" != RUNNING ]; then
     warn "workspace '$name' is already stopped"
     return
@@ -556,7 +567,10 @@ cmd_rm() {
   # Names are machine-global and `para ls` is project-scoped, so without this a
   # workspace you cannot even see is one typo away from being destroyed. `up`
   # refuses the same way; this is the destructive half of the pair.
-  if ws_load "$name" && [ "$ws_project" != "$PARA_PROJECT" ]; then
+  # Same as `up`: only a different OWNER refuses. An unstamped container must
+  # stay removable, or a workspace whose launch died before stamp_ct could never
+  # be cleaned up with para at all.
+  if ws_load "$name" && [ -n "$ws_project" ] && [ "$ws_project" != "$PARA_PROJECT" ]; then
     die "workspace '$name' belongs to project '$ws_project' — remove it from there, or: PARA_PROJECT=$ws_project para rm $name"
   fi
   # Converging on "gone", so an already-absent workspace is a no-op — teardown
@@ -567,7 +581,9 @@ cmd_rm() {
   fi
   log "Deleting $ct…"
   incus delete -f "$ct"
-  caddy_sync
+  # Only if it is already up: starting Caddy is `up`'s job, and a `rm` should
+  # neither resurrect one you stopped nor fail on a host without caddy at all.
+  if caddy_running; then caddy_sync; fi
   log "Removed workspace '$name'. The shared volume is untouched."
 }
 
@@ -586,7 +602,8 @@ cmd_ls() {
   local scope="$PARA_PROJECT"
   [ "$all" -eq 0 ] || scope=""
 
-  local name state project domain ip routes ws
+  local rows name state project domain ip routes ws
+  rows="$(ws_list "$scope")" || die "cannot read the workspace list from incus."
   [ "$names" -eq 1 ] || printf '%-20s %-9s %-16s %-14s %s\n' NAME STATE IP PROJECT URL
   while IFS=, read -r name state project domain ip routes; do
     [ -n "$project" ] || continue
@@ -597,7 +614,7 @@ cmd_ls() {
       printf '%-20s %-9s %-16s %-14s %s\n' "$ws" "$state" "$ip" "$project" \
         "$(ws_url "$ws" "$domain" "$(normalize_routes "$routes")")"
     fi
-  done < <(ws_list "$scope")
+  done <<<"$rows"
 }
 
 cmd_sh() {
@@ -711,9 +728,12 @@ cmd_image() {
 # The reproducibility surface of a build, hashed: the payload, the bootstrap
 # line, and the base it layers on. `image status` compares it against the hash
 # stamped at publish time to say whether a rebuild would produce something else.
-image_src_sha() {
+image_src_sha() { # image_src_sha [<was-incremental>]
   {
-    printf '%s\n%s\n' "$PARA_BASE_IMAGE" "$PARA_IMAGE_BOOTSTRAP"
+    # The mode is part of the identity: `-i` layers onto the existing image and
+    # skips the bootstrap, so an image built that way is NOT what a clean
+    # rebuild produces — and `image status` should report exactly that.
+    printf '%s\n%s\n%s\n' "${1:-0}" "$PARA_BASE_IMAGE" "$PARA_IMAGE_BOOTSTRAP"
     cat "$PARA_PROJECT_DIR/.paraspace/image-build.sh"
   } | sha256_of
 }
@@ -795,7 +815,7 @@ image_publish() {
   incus image alias rename "$tmp_alias" "$PARA_IMAGE" \
     || die "the new image is published as '$tmp_alias' but could not be renamed — recover with: incus image alias rename $tmp_alias $PARA_IMAGE"
   local sha
-  sha="$(image_src_sha)" || die "need sha256sum or shasum to stamp the image's provenance."
+  sha="$(image_src_sha "$from_current")" || die "need sha256sum or shasum to stamp the image's provenance."
   incus image set-property "$PARA_IMAGE" user.para.src_sha "$sha"
 }
 
@@ -814,8 +834,11 @@ cmd_image_status() {
   local built sha source
   built="$(awk -F'Uploaded: *' '/Uploaded:/{print $2; exit}' <<<"$info")"
   sha="$(incus image get-property "$PARA_IMAGE" user.para.src_sha 2>/dev/null || true)"
+  local current=""
+  current="$(image_src_sha)" || true
   if [ -z "$sha" ]; then source="unknown — this image predates provenance stamping"
-  elif [ "$sha" = "$(image_src_sha)" ]; then source="up to date"
+  elif [ -z "$current" ]; then source="cannot tell — the image inputs could not be hashed (see above)"
+  elif [ "$sha" = "$current" ]; then source="up to date"
   else source="drifted — the image inputs changed since this build"; fi
   printf '  image    %s\n  built    %s\n  base     %s\n  source   %s\n' \
     "$PARA_IMAGE" "${built:-unknown}" "${PARA_BASE_IMAGE:-<unset>}" "$source"
@@ -912,6 +935,8 @@ command_summary() { sed -n '1,5s/^# summary: *//p' "$1"; }
 run_project_command() {
   local verb="$1" script="$PARA_PROJECT_DIR/.paraspace/commands/$1"
   shift
+  # A verb names a file in commands/, never a path out of it.
+  case "$verb" in */*|.|..) die "unknown command '$verb' — see 'para --help'." ;; esac
   if [ -z "$PARA_PROJECT_DIR" ] || [ ! -f "$script" ]; then
     die "unknown command '$verb' — see 'para --help'."
   fi
@@ -951,11 +976,11 @@ doctor_config() {
   printf '    state         %s\n' "$PARA_STATE_DIR"
   printf '    project dir   %s\n' "${PARA_PROJECT_DIR:-<none>}"
   printf '    PARA_PROJECT  %s\n' "${PARA_PROJECT:-<none>}"
-  printf '    PARA_IMAGE    %s\n' "$PARA_IMAGE"
+  printf '    PARA_IMAGE    %s\n' "${PARA_IMAGE:-<none>}"
   printf '    PARA_DOMAIN   %s\n' "$PARA_DOMAIN"
   printf '    PARA_ROUTES   %s\n' "${PARA_ROUTES:-<none>}"
   printf '    PARA_POOL     %s\n' "$PARA_POOL"
-  printf '    PARA_VOLUME   %s\n' "$PARA_VOLUME"
+  printf '    PARA_VOLUME   %s\n' "${PARA_PROJECT:+$PARA_VOLUME}"
   printf '    Caddy port    %s\n' "$PARA_HTTPS_PORT"
   # Caddy site addresses are whitespace-separated, so a domain with a space in
   # it becomes TWO addresses and `caddy validate` accepts the result happily —
@@ -1078,7 +1103,7 @@ doctor_project() {
 # ---- help ------------------------------------------------------------------
 is_engine_verb() {
   case "$1" in
-    up|down|rm|ls|sh|caddy|config|image|init|doctor|commands|completions|help|exec) return 0 ;;
+    up|down|rm|ls|sh|caddy|config|image|init|doctor|commands|completions|help|exec|--version) return 0 ;;
     *) return 1 ;;
   esac
 }
@@ -1105,6 +1130,7 @@ usage() {
 	  image <build|status|rm>   the base image workspaces launch from
 	  commands                  list this project's own commands
 	  completions <bash|zsh>    source <(para completions bash)
+	  --version                 the installed paraspace version
 	EOF
   usage_project_commands
   cat <<-EOF

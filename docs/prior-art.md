@@ -1,13 +1,14 @@
 # Prior art
 
-Isolated-workspace-per-task is a crowded idea. This page is where `para` sits
-among the alternatives, and — more usefully — which of them you should pick
-instead.
+Isolated-workspace-per-task is a crowded idea, and it got more crowded during
+2026. This page is where `para` sits among the alternatives, and — more
+usefully — which of them you should pick instead.
 
-> This is a categorisation, not a feature audit. The space moves fast and these
-> tools change; check current docs before deciding on the strength of a row.
+> Descriptions here come from each project's own docs at the time of writing.
+> This is a categorisation, not a feature audit: the space moves fast, so check
+> current docs before deciding on the strength of a row.
 
-## The approaches
+## The general approaches
 
 ### A worktree per task
 
@@ -17,10 +18,6 @@ Free, instant, and the right answer when your work is *only* editing files. It
 doesn't carry `.gitignore`d state, so each worktree needs its `.env` and its
 data recreated; running stacks still collide on ports and databases; and
 whatever runs there runs as you, on your host, with your keys in reach.
-
-The tell is that people who use worktrees for agent work end up stacking
-something else on top — [Mike McQuaid's setup][mikemcquaid] is worktrees plus a
-macOS sandbox plus an orchestrator.
 
 ### Port offsets and compose overrides
 
@@ -34,10 +31,9 @@ understand — plus it solves nothing about isolation.
 repo, and every major editor speaks the format. Reach for one if a consistent
 toolchain is the problem you actually have.
 
-Spawning them per branch — which is exactly what parallel agent work needs — is
+Spawning them per branch — which is what parallel agent work needs — is
 [where they get awkward][perevillega]: the spec is built around one container
-per repo, not N live at once, and Docker's shared-kernel isolation is weaker
-than it looks when the point is to let something untrusted run wild.
+per repo, not N live at once.
 
 ### A VM per task
 
@@ -70,39 +66,81 @@ The right tool when the *agent* is the product — when code runs on behalf of
 your users and has to be someone else's liability. Overkill when the agent is
 just you, working on your own repo, on hardware you already own.
 
+## Tools that combine checkout and runtime isolation
+
+This is `para`'s actual peer group: local tools that give each task both its own
+files and its own place to run them.
+
+- **[Container Use](https://github.com/dagger/container-use)** (Dagger) —
+  "containerized environments for coding agents". A fresh container per agent on
+  its own git branch, driven as an MCP server plus a CLI, with terminal attach
+  into any environment. Agent-driven by design, and built on application
+  containers rather than system containers.
+- **[Sculptor](https://github.com/imbue-ai/sculptor)** (Imbue) — isolated
+  worktrees with a Docker container backend, a workspace terminal, multi-agent
+  management and diff/PR review. A desktop application rather than a
+  terminal-first substrate; its own docs call it an experimental research
+  preview.
+- **[Agent of Empires](https://github.com/agent-of-empires/agent-of-empires)** —
+  parallel agents in git worktrees with per-agent Docker, Podman or Apple
+  Container sandboxing, shared authentication volumes, project hooks, custom
+  launchers, and TUI and web dashboards. The closest in feature surface to the
+  list below.
+- **[Code on Incus](https://github.com/mensfeld/code-on-incus)** — the closest
+  technically: an Incus **system** container per agent with root, systemd and
+  Docker, and host credentials kept out unless explicitly mounted. It mounts
+  your project directory from the host rather than cloning inside, publishes
+  services to `localhost:<port>` rather than routing hostnames, and is oriented
+  around agent security (it ships active threat detection, which `para` does
+  not).
+- **[Coasts](https://github.com/jsx-tool/coasts)** — worktree-aware local
+  environments, each with an isolated runtime and its own Docker daemon, letting
+  an existing Compose stack run unchanged. It normally shares the worktree
+  filesystem from the host and expects the agent to run on the host, so it
+  isolates the *application* runtime more than it isolates the agent.
+
+Two personal setups arrived at similar designs and are worth reading:
+**[sandbox-claude][perevillega]** (Incus system containers, per-container deploy
+keys, network egress filtering — which `para` doesn't do) and
+**[Sandvault + Superset][mikemcquaid]** (an unprivileged macOS user account per
+agent, over git worktrees, with an orchestrator on top).
+
 ## Where para sits
 
-| | Runs on | Isolation | Interface | URL per workspace | Recurring cost |
-|---|---|---|---|---|---|
-| Worktrees | your machine | none | native | no | none |
-| Devcontainer per branch | your machine | OCI container | editor-attached | manual | none |
-| VM per task | your machine | full VM | native | manual | none |
-| Cloud dev environments | vendor or your servers | container or VM | browser / remote IDE | yes | per hour |
-| Agent sandbox services | vendor cloud | container or microVM | SDK / API | varies | per second |
-| **para** | your machine | unprivileged system container | **native terminal** | **yes, automatic** | none |
+| | Isolation unit | Workspace files | Interface | Per-workspace URL |
+|---|---|---|---|---|
+| Container Use | app container | branch per env | MCP + CLI | not by hostname |
+| Sculptor | Docker container | worktree | desktop app | in-app |
+| Agent of Empires | Docker / Podman / Apple Container | worktree | TUI + web | in-app |
+| Code on Incus | **system container** | host bind mount | CLI | `localhost:<port>` |
+| Coasts | runtime + own Docker daemon | host worktree | CLI | per-env ports |
+| **para** | **system container** | **clone inside** | **native terminal** | **stable hostname** |
 
-The row that isn't in the table is the one that motivated `para`: a **system**
-container is a middle point most of these skip. It behaves like a VM — its own
-init, its own network stack, nested Docker works — without reserving fixed
-memory, so a dozen at once is unremarkable on a laptop. See
-[How it works](./how-it-works.md).
+## What's actually distinct
 
-## Closest in spirit
+No single row above is unique to `para`. The combination is unusual:
 
-Two personal setups arrived at nearly the same design independently, and both
-are worth reading:
+- local and terminal-first, with no bundled agent UI;
+- a complete clone **inside** an unprivileged system container;
+- no project or home-directory bind mount from the host;
+- nested Docker and Compose work unchanged;
+- ordinary port numbers — 3000 is 3000 in every workspace;
+- automatic per-workspace hostname routing through Caddy;
+- persistent, project-scoped shared credentials;
+- provisioning, boot and new `para` verbs all owned by files in your repo;
+- no prescribed git workflow.
 
-- **[sandbox-claude][perevillega]** — Incus system containers, per-container
-  deploy keys, network egress filtering, tmux for parallelism. The nearest
-  neighbour to `para`, and it does egress filtering, which `para` doesn't.
-- **[Sandvault + Superset][mikemcquaid]** — the macOS answer: an unprivileged
-  user account per agent, over git worktrees, with an orchestrator on top.
+If what you want is an agent harness with a UI and a review flow, several of
+the tools above will suit you better. `para` is the isolated machine, and
+leaves the workflow to you.
 
 ## When not to use para
 
 - **You need a browser to reach it.** para deliberately has no web UI. If
   you're working from an iPad, use a cloud dev environment.
 - **You need team governance.** No control plane, no roles, no audit log.
+- **You want the agent workflow bundled.** Review UI, diff view, PR
+  orchestration — Sculptor and Agent of Empires ship that; para doesn't.
 - **You're running genuinely hostile code.** An unprivileged container is a
   strong boundary against mistakes, not a claim that escape is impossible. Use
   a VM or a vendor's microVM sandbox.

@@ -137,6 +137,34 @@ test_config_init_seeds_a_user_config_and_path_finds_it() {
   esac
 }
 
+test_config_edit_opens_the_file_and_seeds_it_first() {
+  # `para config edit` is meant to be the only one of these anyone learns, so
+  # it seeds the file on first use rather than opening nothing. $EDITOR is
+  # word-split on purpose — people set it with flags — which is the half of
+  # this that quoting would silently break.
+  local d path; d="$(scratch)"
+  printf '#!/bin/sh\nprintf "%%s\\n" "$@" > %s/argv\n' "$d" > "$d/fake-editor"
+  chmod +x "$d/fake-editor"
+  path="$("$PARA" config path)"
+  rm -f "$path"
+
+  EDITOR="$d/fake-editor --wait" "$PARA" config edit \
+    || { echo "  config edit failed" >&2; return 1; }
+  local argv; argv="$(cat "$d/argv")"
+  assert_contains "$argv" "--wait" "the editor's own flags survived" || return 1
+  assert_contains "$argv" "$path"  "the editor was given the config path" || return 1
+  [ -f "$path" ] || { echo "  config edit did not seed the file" >&2; return 1; }
+  assert_contains "$(cat "$path")" "PARA_DOMAIN" "the seeded file is the template" || return 1
+
+  # VISUAL wins over EDITOR, the usual convention.
+  printf '#!/bin/sh\nprintf visual > %s/who\n' "$d" > "$d/fake-visual"
+  chmod +x "$d/fake-visual"
+  VISUAL="$d/fake-visual" EDITOR="$d/fake-editor" "$PARA" config edit
+  local who; who="$(cat "$d/who")"
+  rm -f "$path"
+  assert_eq "visual" "$who" "VISUAL took precedence over EDITOR"
+}
+
 test_config_init_refuses_to_clobber() {
   local path rc=0
   path="$("$PARA" config path)"

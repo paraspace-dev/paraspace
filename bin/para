@@ -597,6 +597,17 @@ cmd_caddy() {
 cmd_config() {
   case "${1:-}" in
     path) printf '%s\n' "$PARA_CONFIG" ;;
+    edit)
+      # Seeded on first use, so this is the only one of these anyone has to
+      # know. $EDITOR is split deliberately: people set it with flags
+      # ("code -w", "emacsclient -nw"), and quoting it would break them.
+      if [ ! -f "$PARA_CONFIG" ]; then
+        mkdir -p "$PARA_CONFIG_DIR"
+        config_template > "$PARA_CONFIG"
+      fi
+      # shellcheck disable=SC2086  # see above
+      exec ${VISUAL:-${EDITOR:-vi}} "$PARA_CONFIG"
+      ;;
     init)
       if [ -f "$PARA_CONFIG" ] && [ "${2:-}" != --force ]; then
         die "$PARA_CONFIG already exists — edit it, or 'para config init --force' to replace it."
@@ -605,7 +616,7 @@ cmd_config() {
       config_template > "$PARA_CONFIG"
       log "Wrote $PARA_CONFIG — every line is commented out; uncomment what you want to change."
       ;;
-    *) die "usage: para config <init [--force]|path>" ;;
+    *) die "usage: para config <edit|init [--force]|path>" ;;
   esac
 }
 
@@ -1020,7 +1031,8 @@ usage() {
 	HOST
 	  caddy <start|stop|status> the para Caddy that serves *.$PARA_DOMAIN
 	  doctor                    check this machine, and print the resolved config
-	  config <init|path>        the user config: seed it, or say where it is
+	  config <edit|init|path>   the user config: open it in \$EDITOR (seeding it
+	                            on first use), or seed it, or say where it is
 
 	PROJECT
 	  init [<template>]         scaffold .paraspace/ into the current directory
@@ -1067,7 +1079,7 @@ cmd_completions() {
 	  fi
 	  case "$cmd" in
 	    caddy)       COMPREPLY=( $(compgen -W "start stop status" -- "$cur") ) ;;
-	    config)      COMPREPLY=( $(compgen -W "init path" -- "$cur") ) ;;
+	    config)      COMPREPLY=( $(compgen -W "edit init path" -- "$cur") ) ;;
 	    image)       COMPREPLY=( $(compgen -W "build status rm" -- "$cur") ) ;;
 	    completions) COMPREPLY=( $(compgen -W "bash zsh" -- "$cur") ) ;;
 	    init)        COMPREPLY=( $(compgen -W "--list --full --force" -- "$cur") ) ;;

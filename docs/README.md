@@ -22,10 +22,10 @@ workspace · [How it works](./how-it-works.md) is the mental model.
 what it does and doesn't isolate, and the review loop.
 
 **I want to add para to my repo.**
-[Project setup](./project-setup.md) — `para init`, then the four files that
-make a project para-enabled: the [Parafile](./parafile.md), the
-[hooks](./hooks.md), the [image](./image.md), and any
-[commands](./commands.md#project-commands) you want to add.
+[Project setup](./project-setup.md) — `para init`, then the pieces that make a
+project para-enabled: the [Parafile](./parafile.md), the [hooks](./hooks.md),
+the [image](./image.md), and any [commands](./commands.md#project-commands) you
+want to add.
 
 **Something is broken.**
 [Troubleshooting](./troubleshooting.md) — `para doctor` and what its checks
@@ -42,9 +42,9 @@ mean.
   `para image build` builds one.
 - [Workspace URLs](./urls.md) — dropping the `:8443`, using your own domain,
   and trusting the local CA.
-- [Git authentication](./git-auth.md) — authorizing a machine's key so
-  workspaces can clone and push.
+- [Git authentication](./git-auth.md) — authorizing the key your workspaces
+  clone and push with.
 - [Contract versioning](./versioning.md) — how the `para`↔project interface is
   versioned, and what breaks on a bump.
-- [Internals](./internals.md) — self-describing workspaces, machine-global
-  names, project discovery, where state lives.
+- [Internals](./internals.md) — self-describing workspaces, the shared volume,
+  machine-global names, where state lives.

@@ -61,6 +61,8 @@ There is no `para exec` — this is it.
 | `para doctor` | check this machine and print the resolved config — see [Troubleshooting](./troubleshooting.md) |
 | `para config <edit\|init\|path>` | open, seed, or locate the [user config](./parafile.md#user-config-not-parafile) |
 
+The user config is hand-edited, so `config` just gets you to it:
+
 ```sh
 para config edit    # opens it in $VISUAL/$EDITOR, creating it first if needed
 ```
@@ -105,8 +107,8 @@ works. Two variables exist for exactly this: **`PARA_BIN`** (the path to this
 `para`, so a command can call back without relying on `$PATH`) and
 **`PARA_PROJECT_DIR`**.
 
-Because [`para sh`](#running-one-command) owns all the terminal
-handling, commands that drive something inside a workspace stay one-liners:
+Because [`para sh`](#running-one-command) owns all the terminal handling,
+commands that drive something inside a workspace stay one-liners:
 
 ```sh
 #!/usr/bin/env bash

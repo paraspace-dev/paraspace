@@ -44,10 +44,9 @@ para inverts it. The workspace is a container on your own box:
 para sh my-feature        # a real pty in the clone
 ```
 
-That's a real pty into the container, with a `$TERM` it has terminfo for — so
-tmux, Neovim and Claude Code behave the way they do in any terminal, because
-they are in one. Your dotfiles get there
-through a `skel/` directory your own hooks copy in.
+It comes with a `$TERM` the container has terminfo for, so tmux, Neovim and
+Claude Code behave the way they do in any terminal — because they are in one.
+Your dotfiles get there through a `skel/` directory your own hooks copy in.
 
 So parallel work becomes a window-manager problem rather than a tab-management
 one: one workspace per desktop, navigated with the keybindings you already have.

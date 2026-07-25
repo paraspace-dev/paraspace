@@ -48,10 +48,9 @@ whenever a setting doesn't seem to be taking effect.
 > state — upgrade to 6.22 or newer (Ubuntu's repos ship 6.2)
 
 para has no registry: it asks Incus for each workspace's project, routes and IP
-as query columns, which needs **Incus ≥ 6.22**. Distro repos lag (Ubuntu ships
-6.2), so install from
-[the Incus package repositories](https://linuxcontainers.org/incus/docs/main/installing/)
-or from Zabbly.
+as query columns, which needs **Incus ≥ 6.22**. Distro repos lag, so install
+from [the Incus package
+repositories](https://linuxcontainers.org/incus/docs/main/installing/).
 
 ### Containers won't start at all
 

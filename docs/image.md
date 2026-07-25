@@ -23,9 +23,9 @@ para's own mechanism needs very little:
 Everything else is your project's choice. If your stack is Docker Compose — as
 the bundled templates' is — the image also needs **docker**, that workspace user
 in the `docker` group, and nesting that resolves to **overlayfs** — on a btrfs
-or ZFS pool it [falls back to the very slow `vfs`
-driver](./troubleshooting.md#everything-inside-the-workspace-is-slow), silently.
-para doesn't check that; the templates' `image-build.sh` does.
+or ZFS pool it silently [falls back to the very slow `vfs`
+driver](./troubleshooting.md#everything-inside-the-workspace-is-slow). para
+doesn't check that; the templates' `image-build.sh` does.
 
 For full ergonomics also include `tmux`, a login shell like `zsh`, and whatever
 agent CLI you use — para degrades rather than breaks without them.
@@ -42,9 +42,8 @@ The command is base-agnostic plumbing:
    the image can tell you later whether its source has changed. A failed or
    interrupted build leaves the existing image untouched.
 
-Both keys live in the
-[Parafile](./parafile.md), which is also where the per-distro bootstrap
-examples are.
+Both keys live in the [Parafile](./parafile.md), which is also where the
+per-distro bootstrap examples are.
 
 Two caveats:
 

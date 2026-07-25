@@ -109,5 +109,7 @@ para rm fix-login
 
 The shared volume — and with it your authentication — survives.
 
+## When something's wrong
+
 When an `up` fails for reasons that don't look like your project's, run
 `para doctor` — see [Troubleshooting](./troubleshooting.md).

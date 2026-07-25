@@ -66,8 +66,8 @@ container IPs through the VM's network (Colima's `--network-address`). The
 
 ## Going deeper
 
-- [Internals](./internals.md) — self-describing workspaces, machine-global
-  names, project discovery, where state lives.
+- [Internals](./internals.md) — self-describing workspaces, the shared volume,
+  machine-global names, where state lives.
 - [Commands](./commands.md) — the full surface, and how a project adds verbs
   of its own.
 

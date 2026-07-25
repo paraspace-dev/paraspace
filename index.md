@@ -70,9 +70,9 @@ features:
 npm i -g paraspace
 ```
 
-`para` drives [Incus](https://linuxcontainers.org/incus/) and Caddy on the host
-— `brew install caddy colima incus` on macOS; Linux installs both from their
-own docs. Full prerequisites: [Getting started](/docs/getting-started).
+`para` drives [Incus](https://linuxcontainers.org/incus/) and Caddy on the
+host — `brew install caddy colima incus` on macOS, or install both from their
+own docs on Linux. Full prerequisites: [Getting started](/docs/getting-started).
 
 ## Quick start
 

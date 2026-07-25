@@ -14,8 +14,15 @@ authorize it:
    [github.com/settings/keys](https://github.com/settings/keys)).
 2. Press Enter to let the clone proceed.
 
-`para key` re-prints it any time. `para up` is idempotent, so if a first clone
-fails with `Permission denied (publickey)`, authorize the key and re-run.
+`para up` is idempotent, so if a first clone fails with
+`Permission denied (publickey)`, authorize the key and re-run.
+
+The templates ship a [project command](./commands.md#project-commands) that
+re-prints the key any time:
+
+```sh
+para key
+```
 
 ## Letting `gh` do it
 
@@ -27,3 +34,8 @@ Because the key lives on the
 [shared volume](./internals.md#the-shared-home-volume), every
 workspace of the project inherits it — you authorize once per machine, not per
 workspace.
+
+That cuts both ways, and it's worth deciding deliberately: anything running in
+a workspace, [an agent included](./agents.md#let-the-agent-off-the-leash), can
+push wherever this key is authorized. A deploy key scoped to the one repository
+is the tighter choice; an account-wide key is the convenient one.

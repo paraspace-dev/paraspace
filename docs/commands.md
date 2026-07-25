@@ -82,8 +82,8 @@ $EDITOR "$(para config path)"     # edit it
 | `para completions <bash\|zsh>` | print a completion script |
 
 ```sh
-# ~/.bashrc                    # ~/.zshrc
-source <(para completions bash) # source <(para completions zsh)
+source <(para completions bash)   # ~/.bashrc
+source <(para completions zsh)    # ~/.zshrc
 ```
 
 Completion offers workspace names at position 2 for any verb that isn't an

@@ -1,11 +1,13 @@
 # ParaSpace
 
-`para` runs any number of full, isolated copies of your project side by side
-on your local machine.
+`para` runs any number of full, isolated copies of your project side by side on
+your own machine. Each workspace is an unprivileged [Incus] system container
+with its own clone, its own stack, and its own `https://<name>.<domain>` URL —
+so several coding agents (or you) can build, run and break things in parallel
+without colliding.
 
-Each workspace is a full, isolated copy of your project — its own clone, its
-own stack, its own `https://<name>.<domain>` URL — so several agents
-(or you) can build, run, and break things side by side without colliding.
+📖 **[Documentation](https://paraspace.dev)** · [Why
+ParaSpace](./docs/why.md) · [Getting started](./docs/getting-started.md)
 
 ## Install
 
@@ -13,63 +15,53 @@ own stack, its own `https://<name>.<domain>` URL — so several agents
 npm i -g paraspace
 ```
 
-### Prerequisites
+`para` drives [Incus] and Caddy on the host:
 
-ParaSpace uses [Incus] and Caddy on the host to enable workspace isolation and
-a comfortable developer experience.
+- **macOS** — `brew install caddy colima incus`
+- **Linux** — [install Caddy](https://caddyserver.com/docs/install) and
+  [install Incus](https://linuxcontainers.org/incus/docs/main/tutorial/first_steps/)
 
-**macOS**
-
-```sh
-brew install caddy colima incus
-```
-
-**Linux**
-
-* [Install Caddy](https://caddyserver.com/docs/install)
-* [Install Incus](https://linuxcontainers.org/incus/docs/main/tutorial/first_steps/)
+Then `para doctor` tells you if the machine is ready.
 
 ## Quick start
 
 ```sh
-cd <your project> # a repo set up for para — see below
-para image build  # once per machine — build the project's base image
-para up ws1       # launch an isolated workspace
-para sh ws1       # shell into the clone
+cd <your project>  # a repo with a .paraspace/ dir — see below
+para image build   # once per machine — build the project's base image
+para up ws1        # launch an isolated workspace
+para sh ws1        # shell into the clone
 ```
-
-The full command surface (`down`, `rm`, `run`, `web`, …) is in
-[Commands](./docs/commands.md).
 
 ## Set up your project
 
-`para` needs one thing from a project: a `.paraspace/` dir at the repo root — a
-`Parafile` (config) and `hooks/` (provision + boot). Scaffold it from a
-working template:
+`para` needs one thing from a project: a `.paraspace/` dir at the repo root —
+a `Parafile` (config), `hooks/` (provision + boot), an `image-build.sh`, and
+optionally `commands/` (your own `para` verbs). Scaffold it from a working
+template:
 
 ```sh
-para init         # from your project root
+para init          # from your project root
 ```
 
 Then point `PARA_ORIGIN` at your repo, list your `PARA_ROUTES`, and adapt the
-hooks to your stack. The scaffolded files are commented and carry working
-defaults; the walkthrough is [Project setup](./docs/project-setup.md).
+hooks to your stack. The walkthrough is
+[Project setup](./docs/project-setup.md).
 
 ## Documentation
 
-Full documentation lives in [`docs/`](./docs/README.md):
+Full docs at **[paraspace.dev](https://paraspace.dev)**, and in
+[`docs/`](./docs/README.md):
 
-- [How it works](./docs/how-it-works.md) — the architecture at a glance, and
-  how macOS differs.
+- [Why ParaSpace](./docs/why.md) — the case, and what it costs.
+- [Getting started](./docs/getting-started.md) · [How it
+  works](./docs/how-it-works.md) · [Running coding
+  agents](./docs/agents.md)
 - [Project setup](./docs/project-setup.md) — adapting `para` to your project.
-- [Commands](./docs/commands.md) — the full CLI surface + shell completion.
-- [The Parafile](./docs/parafile.md) · [Hooks](./docs/hooks.md) ·
-  [The image contract](./docs/image.md) ·
-  [Contract versioning](./docs/versioning.md) — the `para`↔project contract.
-
-Workspace URLs default to `https://<name>.paraspace.dev:8443` — dropping the
-`:8443`, using your own domain, and browser certificate trust are all covered
-in [Workspace URLs](./docs/urls.md).
+- [Commands](./docs/commands.md) · [The Parafile](./docs/parafile.md) ·
+  [Hooks](./docs/hooks.md) · [The image contract](./docs/image.md) ·
+  [Contract versioning](./docs/versioning.md)
+- [Troubleshooting](./docs/troubleshooting.md) — `para doctor` and what its
+  checks mean.
 
 ## Templates
 
@@ -91,6 +83,9 @@ Two gates, both run on every push/PR:
   drives a real Incus workspace off a tiny Alpine fixture and is **Linux-only,
   not run in CI** — run it locally before you merge anything touching the
   `up`/route/lifecycle mechanism. See [`test/README.md`](./test/README.md).
+
+The docs site is [VitePress](https://vitepress.dev): `npm run site` to preview,
+`npm run site:build` to check for dead links.
 
 ## License
 

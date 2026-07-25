@@ -16,8 +16,9 @@ monorepo — its own `package.json`, `LICENSE`, and `.github/workflows/lint.yml`
 README is the funnel (install, quick start, pointers); `docs/` is the
 authoritative spec — the `Parafile` schema (`docs/parafile.md`), the hook +
 image contracts (`docs/hooks.md`, `docs/image.md`), the command surface
-(`docs/commands.md`), and the design rationale (`docs/how-it-works.md`). Don't
-duplicate any of that here or in commit messages; link to it.
+(`docs/commands.md`), the architecture (`docs/how-it-works.md`), and the case
+para makes for itself (`docs/why.md`). Don't duplicate any of that here or in
+commit messages; link to it.
 
 ## The generic-mechanism boundary (the one rule that matters)
 

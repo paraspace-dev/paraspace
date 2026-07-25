@@ -26,12 +26,12 @@ host
   ✓ *.paraspace.dev resolves to 127.0.0.1
 
 incus
-  ✓ incus reachable
+  ✓ incus 6.22
   ✓ pool 'default' (dir)
   ✓ bridge 'incusbr0' up
 
 project
-  ✓ Parafile targets contract 2 (this para provides 2)
+  ✓ Parafile targets contract 2
   ✓ routes: 8080
   ✓ image 'myapp' exists
 ```
@@ -41,6 +41,17 @@ project
 worth checking whenever a setting doesn't seem to be taking effect.
 
 ## The host
+
+### Your Incus is too old
+
+> ✗ incus 6.2 cannot select device columns, which is how para reads workspace
+> state — upgrade to 6.22 or newer
+
+para has no registry: it asks Incus for each workspace's project, routes and IP
+as query columns, which needs **Incus ≥ 6.22**. Distro repos lag (Ubuntu ships
+6.2), so install from
+[the Incus package repositories](https://linuxcontainers.org/incus/docs/main/installing/)
+or from Zabbly.
 
 ### Containers won't start at all
 

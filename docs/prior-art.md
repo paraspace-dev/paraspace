@@ -107,14 +107,36 @@ agent, over git worktrees, with an orchestrator on top).
 
 ## Where para sits
 
-| | Isolation unit | Workspace files | Interface | Per-workspace URL |
-|---|---|---|---|---|
-| Container Use | app container | branch per env | MCP + CLI | not by hostname |
-| Sculptor | Docker container | worktree | desktop app | in-app |
-| Agent of Empires | Docker / Podman / Apple Container | worktree | TUI + web | in-app |
-| Code on Incus | **system container** | host bind mount | CLI | `localhost:<port>` |
-| Coasts | runtime + own Docker daemon | host worktree | CLI | per-env ports |
-| **para** | **system container** | **clone inside** | **native terminal** | **stable hostname** |
+| | Isolation unit | Workspace files | Nested Docker | Interface | Per-workspace URL |
+|---|---|---|---|---|---|
+| Container Use | app container | branch per env | not documented | MCP + CLI | not by hostname |
+| Sculptor | container backend | worktree | not documented | desktop app | in-app |
+| Agent of Empires | Docker / Podman / Apple Container | worktree | not documented | TUI + web | in-app |
+| Code on Incus | **system container** | host bind mount | yes | CLI | `localhost:<port>` |
+| Coasts | runtime + own Docker daemon | host worktree | yes, per env | CLI | per-env ports |
+| **para** | **system container** | **clone inside** | **yes, unprivileged** | **native terminal** | **stable hostname** |
+
+### On nested Docker
+
+Running your Compose stack *inside* the isolated workspace is the thing most of
+these have to solve, and how they solve it matters more than whether they do.
+There are three routes:
+
+1. **Mount the host's Docker socket.** Easy, and it hands whatever is in the
+   container control of the *host* daemon — which can start a privileged
+   container mounting `/`. Convenient for a devcontainer you trust; not a
+   boundary you'd let an agent run wild behind.
+2. **A privileged container running its own daemon.** Real nesting, but
+   `--privileged` gives up most of what the container was doing for you.
+3. **A runtime built for nesting.** Sysbox (which Daytona uses), a VM, or an
+   **unprivileged system container** — the Incus route `para` and Code on Incus
+   take.
+
+`para` launches each workspace with `security.nesting=true` on an unprivileged
+container: no host socket, no `--privileged`, and a real Docker daemon inside.
+That's why a Compose file written for your laptop boots unchanged, and why the
+storage-driver question in [Troubleshooting](./troubleshooting.md#everything-inside-the-workspace-is-slow)
+exists at all — nesting is doing real work.
 
 ## What's actually distinct
 
@@ -123,7 +145,8 @@ No single row above is unique to `para`. The combination is unusual:
 - local and terminal-first, with no bundled agent UI;
 - a complete clone **inside** an unprivileged system container;
 - no project or home-directory bind mount from the host;
-- nested Docker and Compose work unchanged;
+- nested Docker and Compose work unchanged, without a host socket or
+  `--privileged`;
 - ordinary port numbers — 3000 is 3000 in every workspace;
 - automatic per-workspace hostname routing through Caddy;
 - persistent, project-scoped shared credentials;

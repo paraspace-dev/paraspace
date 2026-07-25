@@ -85,8 +85,9 @@ https://my-feature.paraspace.dev  →  10.x.x.201:3000
 
 Nothing is remapped or path-rewritten, and there's no `X-Forwarded-Prefix` your
 app has to learn about — which is why WebSockets and hot reload work without
-anyone configuring them, and why most stacks boot unchanged on the first
-attempt. Routes are one line of your [`Parafile`](./parafile.md).
+anyone configuring them. Your Compose stack runs *inside* the workspace,
+unchanged, on the ports it already uses. Routes are one line of your
+[`Parafile`](./parafile.md).
 
 ### A thin engine your project takes over
 

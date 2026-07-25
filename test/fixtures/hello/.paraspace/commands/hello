@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+# summary: the fixture's demo verb — proves project commands run and can call back
+set -euo pipefail
+# A project command runs on the HOST, with every PARA_* exported and its
+# arguments passed through verbatim. With no argument it reports the context it
+# was handed; with a workspace name it calls back into para to run inside it.
+if [ "$#" -eq 0 ]; then
+  printf 'project-command-ok project=%s contract=%s\n' "$PARA_PROJECT" "$PARA_CONTRACT"
+  exit 0
+fi
+exec "$PARA_BIN" sh "$1" -c 'echo project-command-in-workspace-ok'

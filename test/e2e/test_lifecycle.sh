@@ -5,7 +5,7 @@
 
 # The STATE cell for a specific workspace's `para ls` row (or empty). Binds an
 # assertion to THIS workspace's row rather than "does the word appear anywhere".
-_ls_state() { "$PARA" ls 2>/dev/null | awk -v n="$1" '$1==n{print $3}'; }
+_ls_state() { "$PARA" ls 2>/dev/null | awk -v n="$1" '$1==n{print $2}'; }
 
 test_down_up_resume_and_rm() {
   local ws="$PARA_WS2"

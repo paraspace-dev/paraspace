@@ -73,12 +73,10 @@ the existence check.
 Every run is sandboxed so it never touches your real para state:
 
 - throwaway `XDG_STATE_HOME`/`XDG_CONFIG_HOME`/… under a temp dir — its own
-  registry, Caddyfile, pidfile and user config;
-- a non-default Caddy port (`9443`), so its Caddy can't collide with a real one;
-- an IP band carved from the addresses **actually free** on the incus bridge —
-  across every incus project, since the bridge is machine-global while the
-  sandboxed registry is empty. This is what stops a run from allocating straight
-  into a live workspace;
+  Caddyfile, pidfile and user config;
+- a non-default Caddy port (`9443`), so its Caddy can't collide with a real one,
+  and its own Caddy **admin** endpoint (`PARA_CADDY_ADMIN`, `:19443`) so a
+  `caddy reload` from the run can never land on your real para Caddy;
 - a throwaway `PARA_PROJECT`/volume, and fixed pre-tracked workspace names so
   teardown reclaims everything even if a test aborts;
 - **the para identity and image keys inherited from your shell are unset**
@@ -99,49 +97,29 @@ it all for inspection), `--failfast` (stop at the first failure).
 The isolation is strong but not absolute — a few things are outside what a
 throwaway XDG tree can fence off:
 
-- **Caddy's admin port (`:2019`) is not sandboxable.** para's generated Caddyfile
-  sets no `admin` directive, so its Caddy binds the default admin endpoint — and
-  Caddy binds it with `SO_REUSEPORT`, so a sandbox Caddy and a real para Caddy
-  would *both* hold `:2019` and para's admin calls (`caddy reload`/`stop`) would
-  be load-balanced across them — an `up` in the test run could reload, or a stop
-  could kill, your real Caddy. So `sandbox_e2e` refuses to run while another Caddy
-  owns `:2019` and tells you to `para stop` first. Teardown kills the run's own
-  Caddy by its pidfile pid (never via the shared admin API). A proper fix (a
-  configurable admin endpoint) belongs in para itself.
-- **IP allocation is a setup-time snapshot.** The band is carved from what's free
-  on the bridge when the run starts (including stopped workspaces' reservations).
-  para's own `alloc_ip` never re-consults incus, so starting a *real* `para up` in
-  another terminal mid-run can still collide. Don't do that while an e2e run is in
-  flight.
+- **The Caddyfile is machine-wide.** para reads the workspace list from incus
+  rather than from a registry of its own, so the run's Caddyfile also carries
+  *your* workspaces' hostnames. Harmless — they are served on the run's own port
+  and admin endpoint — but don't write a test that asserts the Caddyfile contains
+  nothing else.
 - **Storage pools are shared with your real para, deliberately.** The sandbox
-  does *not* pin `PARA_POOL` at a throwaway pool, because `ensure_pool` is the
-  most environment-sensitive logic para has — the btrfs/zfs-driver → `para-dir`
-  switch, the `pool_backing_fs` see-through for a dir pool whose *source* sits on
-  btrfs/zfs, and the ZFS<2.2 idmapped-mount preflight — and the e2e tier is the
-  only place it runs. Pinning a pool would walk past all of it, the same way a
-  cached image walks past `para image build`. Sharing is safe because isolation here
-  is by *name*, not by pool: containers are `para-<run-unique>` and the volume is
-  `para-home-paratest-$$`, teardown is guarded to those, and para has no
-  pool-level destructive operation (it never runs `incus storage delete`).
-  Two consequences worth knowing:
-  - **A run can create a pool, and teardown will not remove it.** On a btrfs/zfs
-    host with no `para-dir`, `ensure_pool` creates one. Teardown deliberately
-    leaves it: `para-dir` is para's own default choice, so your real workspaces
-    very likely live there too, and deleting it could take real storage with it.
-  - **`PARA_POOL` is inherited from your environment** (`bin/para` defaults it to
-    `default`), unlike the identity and image keys the sandbox unsets. That is on
-    purpose — it means an e2e run exercises the pool you actually use — and it is
-    harmless because nothing the run creates is named predictably enough to
-    collide with real state.
-- **`para up` requires outbound DNS.** para gates readiness on resolving
-  `github.com` inside the guest, so the e2e tier needs working outbound DNS (the
-  image build needs the network anyway — the tier isn't offline-capable).
+  does *not* pin `PARA_POOL`, so a run exercises the pool you actually use.
+  That is safe because isolation here is by *name*: containers are
+  `para-<run-unique>`, the volume is `para-home-paratest-$$`, teardown is guarded
+  to those, and para has no pool-level destructive operation. `PARA_POOL` is
+  inherited from your environment, unlike the identity and image keys the sandbox
+  unsets.
+- **`para up` requires outbound DNS**, because the fixture declares
+  `PARA_READY_HOST` and its image build installs from the network. The tier isn't
+  offline-capable.
 - **The e2e tier is Linux / native-incus only.** It reads the incus bridge
-  (`incusbr0`) directly and carves a machine-global IP band, which assumes a
-  native Linux incus. para also supports macOS (incus in a colima VM), but the
-  e2e tier does not run there — use the CLI tier on macOS. (The image build
-  itself is host-agnostic; it builds a Linux container through whatever incus
-  the CLI reaches.)
+  (`incusbr0`) directly, which assumes a native Linux incus. para also supports
+  macOS (incus in a colima VM), but the e2e tier does not run there — use the CLI
+  tier on macOS. (The image build itself is host-agnostic; it builds a Linux
+  container through whatever incus the CLI reaches.)
+- **Interactive `para sh` is not covered.** A pty path needs util-linux `su
+  --pty`, and the Alpine fixture ships busybox. Exercise it by hand against a
+  real template.
 
 ## Writing a test
 

@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+# summary: run Claude Code in the workspace clone
+set -euo pipefail
+# `para sh` owns the terminal handling — a pty only when both ends are
+# terminals, su --pty so SIGWINCH reaches the child, and a TERM the container
+# has terminfo for — so a command like this stays a one-liner.
+[ "$#" -ge 1 ] || { echo "usage: para claude <workspace>" >&2; exit 1; }
+ws="$1"; shift
+
+# --name labels the session, which Claude Code puts in the terminal title, so a
+# full-screen claude stays identifiable as this workspace.
+exec "$PARA_BIN" sh "$ws" -c "exec claude --name $ws $*"

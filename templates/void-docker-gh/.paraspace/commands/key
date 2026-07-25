@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+# summary: print this machine's para ssh key, to authorize on your git host
+set -euo pipefail
+# The key lives on the shared volume, which every workspace of this project
+# mounts — so any running one is a door to it. The path is this template's
+# choice (its provision hook created the key), which is exactly why this is a
+# project command and not an engine verb.
+ws="${1:-$("$PARA_BIN" ls --names | head -1)}"
+[ -n "$ws" ] || { echo "no workspace to read the key from — 'para up <name>' first" >&2; exit 1; }
+
+exec "$PARA_BIN" sh "$ws" -c "cat $PARA_SHARED/ssh/id_ed25519.pub"

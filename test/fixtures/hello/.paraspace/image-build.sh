@@ -4,10 +4,10 @@ set -euo pipefail
 # Guest provisioning for the e2e fixture's base image. Runs as root inside a
 # fresh $PARA_BASE_IMAGE container — `images:alpine/edge` per the Parafile,
 # bootstrapped with `apk add --no-cache bash` (Alpine ships no bash, and para
-# runs this payload with `bash -s`) — invoked by `para image-build`.
+# runs this payload with `bash -s`) — invoked by `para image build`.
 #
 # Deliberately NOT Void and NOT Docker: this is the second consumer that proves
-# `para image-build` is generic. It's also what keeps the e2e tier cheap — the
+# `para image build` is generic. It's also what keeps the e2e tier cheap — the
 # published image is ~5.5 MB and boots in a second, where a Docker-capable box
 # is minutes and gigabytes.
 #

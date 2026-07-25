@@ -11,7 +11,7 @@ set -euo pipefail
 
 . "$(dirname "$0")/helpers"
 
-skel="$HOME/.para/skel"
+skel="$HOME/.paraspace/skel"
 shared="$PARA_SHARED"
 
 # ---- 1. seed the shared volume (once) --------------------------------------

@@ -39,15 +39,27 @@ scratch_cleanup() {
 # project dir.
 #
 #   p="$(a_project PARA_ROUTES='"3000"' PARA_BASE_IMAGE=images:alpine/edge)"
+#
+# Note the spelling: these are PLAIN assignments, which under para's precedence
+# model means "the project insists". A test about the environment winning must
+# pass the `: "${KEY:=value}"` form instead — see test_cli.sh.
 a_project() {
   local d line; d="$(scratch)"
   mkdir -p "$d/.paraspace"
   {
-    printf 'PARA_VERSION=1\n'
+    printf 'PARA_VERSION=2\n'
     printf 'PARA_PROJECT=fixture\n'
     for line in "$@"; do printf '%s\n' "$line"; done
   } > "$d/.paraspace/Parafile"
   printf '%s\n' "$d"
+}
+
+# a_project_command <project> <verb> <body> — drop an executable into the
+# project's .paraspace/commands/, which is how a project extends para.
+a_project_command() {
+  mkdir -p "$1/.paraspace/commands"
+  printf '%s\n' "$3" > "$1/.paraspace/commands/$2"
+  chmod +x "$1/.paraspace/commands/$2"
 }
 
 # a_scaffolded_project [<template>] — what `para init` actually produces, for
@@ -109,19 +121,28 @@ assert_refuses() {
   assert_contains "$PARA_OUT" "$needle" "the refusal explains why"
 }
 
-# assert_allows <project> [args...] — para must get PAST configuration validation.
-# It still fails on the fenced backend, so this asserts the absence of a
-# configuration refusal rather than overall success.
-assert_allows() {
-  local proj="$1"; shift
-  [ "$#" -gt 0 ] || set -- up ws
-  para_in "$proj" "$@"
-  case "$PARA_OUT" in
-    *"PARA_ROUTES"*|*"PARA_DOMAIN"*|*"not inside a para project"*)
-      echo "  unexpected configuration refusal from 'para $*':" >&2
-      printf '    %s\n' "$PARA_OUT" >&2
-      return 1 ;;
-  esac
+# a_stub_incus <version> <yes|no device columns> — a PATH dir with an `incus`
+# that answers the two questions `para doctor` asks about the daemon: what
+# version it is, and whether it can select device columns (which is how para
+# reads workspace state). Everything else fails, which doctor reports as its own
+# check. Echoes the dir.
+a_stub_incus() {
+  local d; d="$(scratch)"
+  {
+    printf '#!/bin/sh\n'
+    printf 'version=%s\n' "$1"
+    printf 'devices=%s\n' "$2"
+    cat <<'STUB'
+case "$1" in
+  version) printf 'Client version: %s\nServer version: %s\n' "$version" "$version"; exit 0 ;;
+  info)    exit 0 ;;
+  list)    case "$*" in *devices:*) [ "$devices" = yes ] || exit 1 ;; esac; exit 0 ;;
+esac
+exit 1
+STUB
+  } > "$d/incus"
+  chmod +x "$d/incus"
+  printf '%s\n' "$d"
 }
 
 # assert_backend_untouched — no fenced command was executed. Pairs with the
@@ -133,21 +154,4 @@ assert_backend_untouched() {
     sed 's/^/    /' "$PARA_FENCE/calls" >&2
     return 1
   fi
-}
-
-# a_registry_row <name> <ip> <routes> <domain> <project> — seed one workspace row
-# into the sandboxed registry, for the readers (`ls`, `web`) that consume it
-# without needing a live workspace. Rows are removed with the sandbox.
-a_registry_row() {
-  local reg="$XDG_STATE_HOME/para/workspaces"
-  mkdir -p "$(dirname "$reg")"
-  printf '%s %s %s %s %s\n' "$1" "$2" "$3" "$4" "$5" >> "$reg"
-}
-
-# forget_registry_row <name> — drop it again, so a test that seeds a row leaves
-# the shared registry as it found it even on the failure path.
-forget_registry_row() {
-  local reg="$XDG_STATE_HOME/para/workspaces" tmp
-  [ -f "$reg" ] || return 0
-  tmp="$(mktemp)"; grep -v "^$1 " "$reg" > "$tmp" 2>/dev/null || true; mv "$tmp" "$reg"
 }

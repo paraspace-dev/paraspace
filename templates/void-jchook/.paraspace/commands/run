@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+# summary: attach a tmux session — claude in one window, a shell in another
+set -euo pipefail
+[ "$#" -eq 1 ] || { echo "usage: para run <workspace>" >&2; exit 1; }
+ws="$1"
+
+# Re-running attaches the existing session rather than stacking duplicates. The
+# workspace name is the session name, so it shows in tmux's status line and the
+# outer terminal title even when claude is full-screen.
+exec "$PARA_BIN" sh "$ws" -c "
+  tmux has-session -t $ws 2>/dev/null && exec tmux attach -t $ws
+  tmux new-session -d -s $ws -n claude \"claude --name $ws\"
+  tmux new-window  -t $ws: -n sh
+  tmux select-window -t $ws:1
+  exec tmux attach -t $ws
+"

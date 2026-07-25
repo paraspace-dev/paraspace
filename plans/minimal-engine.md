@@ -1,10 +1,18 @@
 # The minimal engine: a total rewrite of `bin/para`
 
-Status: planned. **Supersedes** `plans/cut-and-harden.md` (PR #11),
-`plans/ts-port.md` (PR #10), and `plans/go-rewrite.md`. Decisions, made:
-**bash**, rewritten from an empty file; **`PARA_CONTRACT` 2**, redesigned
-freely (pre-launch — madi, the templates and the fixtures migrate in the same
-pass); **no compatibility with contract 1 at all**.
+Status: **engine landed.** `bin/para` *is* the rewrite (1,080 lines, from
+2,244); the old script is gone from the tree and lives on in git history. The
+bundled templates and the e2e fixture are on contract 2, both test tiers are
+green (32 tests), and `bin/lint` is clean. **Remaining: the docs** — every page
+under `docs/` still describes contract 1 (`para stop`, `config-set`, `web`,
+`key`, `reconcile`, the registry, `~/.para`), which is step 3 below and the
+subject of `plans/docs-rewrite.md`.
+
+**Supersedes** `plans/cut-and-harden.md` (PR #11), `plans/ts-port.md` (PR #10),
+and `plans/go-rewrite.md`. Decisions, made: **bash**, rewritten from an empty
+file; **`PARA_CONTRACT` 2**, redesigned freely (pre-launch — the templates and
+the fixture migrated in the same pass); **no compatibility with contract 1 at
+all**.
 
 ## The goal
 
@@ -391,15 +399,76 @@ A section over budget is the review signal that policy is creeping back.
   either way. Say no and they stay as engine verbs (~15 lines each, now that
   there are no route sentinels to interrogate).
 
+## As built
+
+What writing it settled, beyond the design above:
+
+- **`PARA_READY_HOST`** (new, optional Parafile key). The old engine blocked on
+  `getent hosts github.com` before every hook — a hardcoded external host, i.e.
+  project policy in the engine. Now `up` waits for the incus agent, and waits
+  for DNS only if the project names a host it depends on. The clone-based
+  templates declare `github.com`; the Alpine fixture declares its package
+  mirror.
+- **`PARA_CADDY_ADMIN`** (new, optional). Caddy's default admin endpoint
+  (`localhost:2019`) is shared by every Caddy on the box via `SO_REUSEPORT`, so
+  a `caddy reload` could land on someone else's server. Setting this emits an
+  `admin` directive in the generated Caddyfile. The e2e sandbox uses it, which
+  deleted its "refuse to run while another Caddy owns :2019" preflight — the
+  tier now runs happily beside a real para Caddy.
+- **`caddy stop` is a `kill` on the pidfile**, not an admin-API call, for the
+  same ambiguity reason. SIGTERM is a graceful shutdown for Caddy.
+- **`MIN_INCUS` + a capability probe in `doctor`.** para needs config keys and
+  device keys as `incus list` columns; an incus too old rejects the column
+  (exit 1, independent of how many instances exist), so the probe decides and
+  the version only shapes the message — a distro may backport, and the number
+  alone would then lie in both directions. No semver parser: `version_ge` is
+  `sort -V`, which is also the only thing that gets `6.9 < 6.22` right.
+- **`doctor` does not inherit `set -e`.** Every check reads something that may
+  be missing, so a failed probe used to abort the report at the first bad line —
+  exactly when the rest of it matters most. One `set +e` in `cmd_doctor`.
+- **`rm` and `down` converge instead of erroring.** `rm` of an absent workspace
+  warns and succeeds (teardown scripts depend on it); `down` of a stopped one
+  warns and succeeds. `up` was already convergent.
+- **`ls` columns are NAME STATE IP PROJECT URL** — state second, since it's what
+  you scan for.
+- **`image build` lost `-q`/`-v`** (it auto-quiets when stderr isn't a TTY, the
+  only case that mattered) and lost the `user.para.uid`/`user`/`contract`/
+  `incremental` stamps with the `up`-time drift refusal built on them.
+  `-i/--from-current` and the `user.para.src_sha` drift report stay. Its config
+  checks now run before it touches the daemon.
+- **Templates ship the offloaded verbs**: `void-docker-gh` and `void-jchook`
+  carry `commands/web` and `commands/key`; `void-jchook` adds `commands/claude`
+  and `commands/run`. All four are one-liners over `para sh`, because that is
+  where the terminal handling lives. Templates no longer bake `PARA_PROJECT` —
+  the engine derives it from the directory name.
+- **The Caddyfile is machine-wide by construction.** It's generated from incus,
+  so it lists every para workspace on the box regardless of which project (or
+  which sandbox) generated it. Recorded in `test/README.md`.
+- **Interactive `para sh` is not e2e-coverable** and never was: `su --pty` is
+  util-linux, the Alpine fixture has busybox. Unchanged from the old engine —
+  same flags, same limitation — now documented rather than incidental.
+
+### Bugs the rewrite's own test runs caught
+
+Worth keeping as evidence that the e2e tier earns its keep: the image builder
+leaked after a *successful* build (the EXIT trap was cleared before the delete);
+`alloc_ip` compared whole lines against an incus column that annotates addresses
+as `10.0.0.5 (eth0)`, so it would have handed a live workspace's IP to a new
+one; `<<-EOF` silently flattened the generated Caddyfile; and route
+canonicalization left the fixture's multi-line value as `"   8080   api:8080 "`.
+
 ## Migration (one branch, staged, suite-green at the end)
 
-1. **Write the engine** as `bin/para2` beside the old one, against the e2e
-   fixture (`test/run` takes `PARA=` — make its assignment `: "${PARA:=…}"`).
-   The fixture gains a `.paraspace/commands/` verb so dispatch is exercised from
-   day one. CLI tier rewritten against the new surface; e2e tier adapted as the
-   rewrite proceeds. **No unit tier** — a reversal of the earlier plan: the CLI
-   tier already runs the real binary, and a source guard plus a third tier is
-   machinery this engine doesn't need.
+1. ~~**Write the engine**~~ **done.** `bin/para2` beside the old one, driven by
+   `PARA=bin/para2 test/run --e2e`. The fixture gained
+   `.paraspace/commands/hello` (asserted by `test_project_commands_extend_para`)
+   and moved to contract 2, so the *old* `bin/para` now refuses it — which is
+   the version handshake working as designed. **No unit tier** — a reversal of
+   the earlier plan: the CLI tier already runs the real binary, and a source
+   guard plus a third tier is machinery this engine doesn't need.
+   *Next:* the CLI tier still targets the old surface (route/domain validation,
+   `config-set`, `web`, registry readers) and needs its rewrite — roughly half
+   of its 371 lines test behavior contract 2 deliberately deletes.
 2. **Migrate the bundled templates**: `commands/` files, `hooks/helpers` loses
    `parse_routes`/`route_ports`, `~/.para` → `~/.paraspace`, `PARA_VERSION=2`.
 3. **Docs pass**: `parafile.md` (precedence section shrinks to a paragraph),

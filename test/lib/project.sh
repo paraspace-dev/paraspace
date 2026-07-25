@@ -34,7 +34,7 @@ scratch_cleanup() {
 }
 
 # a_project [PARAFILE_LINE]... — a throwaway project whose Parafile declares the
-# given lines. PARA_VERSION and PARA_PROJECT are supplied first, so a caller can
+# given lines. PARA_CONTRACT and PARA_PROJECT are supplied first, so a caller can
 # override either by passing its own (plain assignments: last wins). Echoes the
 # project dir.
 #
@@ -47,7 +47,7 @@ a_project() {
   local d line; d="$(scratch)"
   mkdir -p "$d/.paraspace"
   {
-    printf 'PARA_VERSION=2\n'
+    printf 'PARA_CONTRACT=1\n'
     printf 'PARA_PROJECT=fixture\n'
     for line in "$@"; do printf '%s\n' "$line"; done
   } > "$d/.paraspace/Parafile"

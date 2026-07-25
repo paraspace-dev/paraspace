@@ -230,7 +230,7 @@ test_doctor_checks_incus_can_do_what_para_needs() {
 test_refuses_a_contract_version_mismatch() {
   # A project pins the contract its hooks target; para refuses rather than
   # running them under a seam that has changed underneath.
-  local p; p="$(a_project PARA_VERSION=999)"
+  local p; p="$(a_project PARA_CONTRACT=999)"
   assert_refuses "$p" "contract" || return 1
   assert_backend_untouched
 }

@@ -59,10 +59,10 @@ loop.
 
 ## Pin the contract
 
-Set `PARA_VERSION` in the `Parafile` to the contract your `.paraspace/` targets:
+Set `PARA_CONTRACT` in the `Parafile` to the contract your `.paraspace/` targets:
 
 ```sh
-: "${PARA_VERSION:=2}"
+: "${PARA_CONTRACT:=1}"
 ```
 
 A globally-updated `para` then refuses with a clear error rather than silently

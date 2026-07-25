@@ -37,12 +37,13 @@ Everything project-specific lives in a consumer's `.paraspace/` dir (`Parafile` 
 
 ## Contract version
 
-The para↔project interface is versioned (`PARA_CONTRACT`, currently **2**) — the
+The para↔project interface is versioned (`PARA_CONTRACT`, currently **1**) — the
 `.paraspace/` dir a project ships: its `Parafile`, its `hooks/`, and its
 `commands/` (host-side verbs that become `para <verb>`). A **breaking** change to
 injected env, the hook names/semantics, the `~/.paraspace` layout in the guest,
 or the `Parafile` keys must bump `PARA_CONTRACT`; additive changes don't.
-A consumer pins `PARA_VERSION` and para refuses on mismatch. If you change the
+A project pins the contract it targets with the same key in its `Parafile`, and
+para refuses on mismatch. If you change the
 seam, decide breaking-vs-additive deliberately and update both the constant and
 [`docs/versioning.md`](./docs/versioning.md).
 

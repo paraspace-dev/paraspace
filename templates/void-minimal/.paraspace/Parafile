@@ -13,7 +13,7 @@
 # Full schema: the ParaSpace docs — docs/parafile.md in the package.
 
 # para contract version these hooks target. para refuses (clearly) on a mismatch.
-: "${PARA_VERSION:=2}"
+: "${PARA_CONTRACT:=1}"
 
 # Project identity — the key para uses for ownership, `para ls` scoping, and the
 # shared-volume name (para-home-<PARA_PROJECT>). It DEFAULTS to this directory's

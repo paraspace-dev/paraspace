@@ -31,7 +31,7 @@ incus
   ✓ bridge 'incusbr0' up
 
 project
-  ✓ Parafile targets contract 2
+  ✓ Parafile targets contract 1
   ✓ routes: 8080
   ✓ image 'myapp' exists
 ```

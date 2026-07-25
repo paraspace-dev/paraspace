@@ -71,7 +71,7 @@ test_project_commands_extend_para() {
   out="$("$PARA" hello 2>/dev/null)"
   assert_contains "$out" "project-command-ok"      "the project's verb ran"        || return 1
   assert_contains "$out" "project=$PARA_PROJECT"   "para's context reached it"     || return 1
-  assert_contains "$out" "contract=2"              "including the contract version" || return 1
+  assert_contains "$out" "contract=1"              "including the contract version" || return 1
 
   # $PARA_BIN is how a command calls back into the same para that ran it.
   out="$("$PARA" hello "$PARA_WS" 2>/dev/null)"

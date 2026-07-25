@@ -74,6 +74,11 @@ load_config() {
   if [ -f "$PARA_CONFIG" ]; then . "$PARA_CONFIG"; fi
   # shellcheck source=/dev/null
   if [ -f "$PARA_PROJECT_DIR/.paraspace/Parafile" ]; then . "$PARA_PROJECT_DIR/.paraspace/Parafile"; fi
+  # A project declares the contract its .paraspace/ targets as PARA_CONTRACT.
+  # Keep what it asked for: the name below is overwritten with the contract para
+  # actually provides, so a hook always reads ours. Deliberately not PARA_*, so
+  # it does not ride the forwarder into hooks as a second, confusing answer.
+  PROJECT_CONTRACT="${PARA_CONTRACT:-}"
 
   : "${PARA_DOMAIN:=paraspace.dev}"
   : "${PARA_HTTPS_PORT:=8443}"
@@ -105,8 +110,10 @@ load_config() {
   : "${PARA_HOST_ENV:=$PARA_PROJECT_DIR/.env}"
   PARA_ROUTES="$(normalize_routes "${PARA_ROUTES:-}")"
   PARA_SHARED=/para/shared
-  # Set last, so neither file can claim a contract para doesn't provide.
-  PARA_CONTRACT=2
+  # The contract this para provides, set last so neither file can claim one it
+  # doesn't. A breaking change to the injected env, the hook names, the
+  # ~/.paraspace layout or the Parafile keys bumps it; additive changes don't.
+  PARA_CONTRACT=1
 }
 
 find_project_root() {
@@ -137,8 +144,8 @@ normalize_routes() {
 require_project() {
   [ -n "$PARA_PROJECT_DIR" ] \
     || die "not inside a para project — no .paraspace/ directory from \$PWD upward. cd into one, or set PARA_PROJECT_DIR."
-  if [ -n "${PARA_VERSION:-}" ] && [ "$PARA_VERSION" != "$PARA_CONTRACT" ]; then
-    die "this project targets para contract $PARA_VERSION, but this para provides $PARA_CONTRACT — see docs/versioning.md."
+  if [ -n "$PROJECT_CONTRACT" ] && [ "$PROJECT_CONTRACT" != "$PARA_CONTRACT" ]; then
+    die "this project targets para contract $PROJECT_CONTRACT, but this para provides $PARA_CONTRACT — see docs/versioning.md."
   fi
 }
 
@@ -992,12 +999,12 @@ version_ge() { [ "$1" = "$2" ] || [ "$(printf '%s\n%s\n' "$1" "$2" | sort -V | t
 
 doctor_project() {
   if [ -z "$PARA_PROJECT_DIR" ]; then d_warn "not inside a para project"; return; fi
-  if [ -z "${PARA_VERSION:-}" ]; then
-    d_warn "the Parafile declares no PARA_VERSION — add : \"\${PARA_VERSION:=$PARA_CONTRACT}\" so a breaking para change fails loudly"
-  elif [ "$PARA_VERSION" = "$PARA_CONTRACT" ]; then
-    d_ok "Parafile targets contract $PARA_VERSION"
+  if [ -z "$PROJECT_CONTRACT" ]; then
+    d_warn "the Parafile declares no PARA_CONTRACT — add : \"\${PARA_CONTRACT:=$PARA_CONTRACT}\" so a breaking para change fails loudly"
+  elif [ "$PROJECT_CONTRACT" = "$PARA_CONTRACT" ]; then
+    d_ok "Parafile targets contract $PROJECT_CONTRACT"
   else
-    d_bad "this project targets contract $PARA_VERSION, but this para provides $PARA_CONTRACT — see docs/versioning.md"
+    d_bad "this project targets contract $PROJECT_CONTRACT, but this para provides $PARA_CONTRACT — see docs/versioning.md"
   fi
   if [ -n "$PARA_ROUTES" ]; then d_ok "routes: $PARA_ROUTES"; else d_warn "no PARA_ROUTES — this project publishes no HTTP"; fi
   if incus image info "$PARA_IMAGE" >/dev/null 2>&1; then d_ok "image '$PARA_IMAGE' exists"

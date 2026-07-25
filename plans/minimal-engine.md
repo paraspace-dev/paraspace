@@ -2,17 +2,17 @@
 
 Status: **engine landed.** `bin/para` *is* the rewrite (1,080 lines, from
 2,244); the old script is gone from the tree and lives on in git history. The
-bundled templates and the e2e fixture are on contract 2, both test tiers are
+bundled templates and the e2e fixture are on contract 1, both test tiers are
 green (32 tests), and `bin/lint` is clean. **Remaining: the docs** — every page
-under `docs/` still describes contract 1 (`para stop`, `config-set`, `web`,
-`key`, `reconcile`, the registry, `~/.para`), which is step 3 below and the
+under `docs/` still describes the pre-rewrite interface (`para stop`,
+`config-set`, `web`, `key`, `reconcile`, the registry, `~/.para`), which is step 3 below and the
 subject of `plans/docs-rewrite.md`.
 
 **Supersedes** `plans/cut-and-harden.md` (PR #11), `plans/ts-port.md` (PR #10),
 and `plans/go-rewrite.md`. Decisions, made: **bash**, rewritten from an empty
-file; **`PARA_CONTRACT` 2**, redesigned freely (pre-launch — the templates and
-the fixture migrated in the same pass); **no compatibility with contract 1 at
-all**.
+file; **the contract redesigned freely** and left at `PARA_CONTRACT` **1**,
+since nothing is released yet — a pre-release iteration doesn't earn a version
+number; **no compatibility with what came before**.
 
 ## The goal
 
@@ -295,7 +295,7 @@ and **`boot`** (readiness contract). Simplifications:
 Everything else about hooks is deleted *from the engine* rather than changed:
 there is no third hook class. Host-side behavior is a project command.
 
-## The command surface (contract 2)
+## The command surface
 
 **Engine keeps** — mechanism only:
 
@@ -346,9 +346,10 @@ you find it and start it — not to write it for you.
 `para doctor` prints the resolved values and the path, so the two commands
 compose with the one place that diagnoses.
 
-**Kept from contract 1** because they're proven: the Parafile as sourced bash;
+**Kept from the old interface** because they're proven: the Parafile as sourced bash;
 blanket `PARA_*` forwarding; `/para/shared` and the `security.shifted` volume;
-container stamps; `PARA_VERSION` pinning (a v1 project gets a clear refusal).
+container stamps; contract pinning (a project targeting another one gets a
+clear refusal).
 
 **Image-build details that survive verbatim** — the domain knowledge, not the
 prose: force-stop before publish (init-agnostic), publish from a **snapshot**
@@ -462,15 +463,15 @@ canonicalization left the fixture's multi-line value as `"   8080   api:8080 "`.
 1. ~~**Write the engine**~~ **done.** `bin/para2` beside the old one, driven by
    `PARA=bin/para2 test/run --e2e`. The fixture gained
    `.paraspace/commands/hello` (asserted by `test_project_commands_extend_para`)
-   and moved to contract 2, so the *old* `bin/para` now refuses it — which is
+   and moved to the new contract, so the *old* `bin/para` refused it — which was
    the version handshake working as designed. **No unit tier** — a reversal of
    the earlier plan: the CLI tier already runs the real binary, and a source
    guard plus a third tier is machinery this engine doesn't need.
    *Next:* the CLI tier still targets the old surface (route/domain validation,
    `config-set`, `web`, registry readers) and needs its rewrite — roughly half
-   of its 371 lines test behavior contract 2 deliberately deletes.
+   of its 371 lines test behavior the rewrite deliberately deletes.
 2. **Migrate the bundled templates**: `commands/` files, `hooks/helpers` loses
-   `parse_routes`/`route_ports`, `~/.para` → `~/.paraspace`, `PARA_VERSION=2`.
+   `parse_routes`/`route_ports`, `~/.para` → `~/.paraspace`, `PARA_CONTRACT=1`.
 3. **Docs pass**: `parafile.md` (precedence section shrinks to a paragraph),
    `hooks.md`, new `commands.md` section for project commands, `image.md` (the
    `su --pty` image requirement), `versioning.md`'s contract-2 entry with the
@@ -487,8 +488,9 @@ boot before the swap.
 
 ## Risks
 
-- **Contract 2 is a hard break** — mitigated by owning every consumer and
-  shipping the migration in the same PR set. `PARA_VERSION=1` fails loudly.
+- **The contract break is total** — mitigated by owning every consumer and
+  migrating them in the same change. Nothing is released, so `PARA_CONTRACT`
+  stays at 1; a project targeting a different one fails loudly.
 - **A rewrite can drop invisible behavior** — mitigated by treating the old
   file's domain comments as the checklist (they are the spec of the invisible
   behavior), and by the "terminal semantics" and "image-build details" tables

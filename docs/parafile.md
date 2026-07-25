@@ -20,7 +20,7 @@ para itself never reads it. A project whose hooks don't clone omits it.
 
 | Key | Default | What it does |
 |---|---|---|
-| `PARA_VERSION` | — | the [contract](./versioning.md) your `.paraspace/` targets. para refuses on a mismatch |
+| `PARA_CONTRACT` | — | the [contract](./versioning.md) your `.paraspace/` targets. para refuses on a mismatch |
 | `PARA_PROJECT` | the directory's name | project identity: workspace ownership, `para ls` scoping, the shared-volume name |
 | `PARA_IMAGE` | `$PARA_PROJECT` | the image `para up` launches and `para image build` publishes |
 | `PARA_BASE_IMAGE` | — | the Incus image `para image build` builds *from* |

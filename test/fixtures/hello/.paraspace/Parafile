@@ -10,7 +10,7 @@
 # workspaces; the defaults here just keep a by-hand `para up` in this dir working.
 
 # Contract version these hooks target — para refuses on a mismatch.
-: "${PARA_VERSION:=2}"
+: "${PARA_CONTRACT:=1}"
 
 # Project identity (ownership, `para ls` scoping, shared-volume suffix). The
 # harness overrides this with a throwaway slug per run.

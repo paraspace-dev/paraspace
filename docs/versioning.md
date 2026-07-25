@@ -9,11 +9,12 @@ The `para`↔project interface is versioned. It covers everything a project's
 - the [`Parafile` keys](./parafile.md),
 - the [project-command](./commands.md#project-commands) mechanism.
 
-`para` provides a contract version (`PARA_CONTRACT`, currently **2**) and
-injects it into hooks. Declare the one you build against in your Parafile:
+`para` provides a contract version (`PARA_CONTRACT`, currently **1**) and
+injects it into hooks. Declare the one you build against in your Parafile,
+using the same key:
 
 ```sh
-: "${PARA_VERSION:=2}"
+: "${PARA_CONTRACT:=1}"
 ```
 
 If they don't match, para **refuses with a clear error** instead of silently
@@ -24,15 +25,16 @@ The rules:
 
 - A **breaking** change to the interface bumps `PARA_CONTRACT`.
 - **Additive** changes (a new variable, a new optional key) don't.
-- A project bumps `PARA_VERSION` when it migrates its own `.paraspace/`.
+- A project bumps its own `PARA_CONTRACT` when it migrates its `.paraspace/`.
 
-## Migrating from contract 1
+## Migrating from the pre-release engine
 
-Contract 2 is a hard break with no compatibility shim. If you have a v1
-project, the fastest path is `para init --force` into a scratch directory to
-diff against a current template. Otherwise:
+Contract 1 is the first published contract, so there is nothing to migrate
+*from* unless you used `para` before it was released — in which case the break
+is total, with no compatibility shim. The fastest path is `para init --force`
+into a scratch directory to diff against a current template. Otherwise:
 
-| Contract 1 | Contract 2 |
+| Before | Now |
 |---|---|
 | guest staging dir `~/.para/` | `~/.paraspace/` — same name as the host directory |
 | `$PARA_ROUTES` comma-separated | space-separated: `for r in $PARA_ROUTES` |
@@ -50,7 +52,7 @@ diff against a current template. Otherwise:
 | `para run`, `claude`, `web`, `key`, `config-sync` | project commands in `.paraspace/commands/` |
 | `para reconcile`, `para install`, `para image-build` | deleted |
 
-New in contract 2 and worth adopting: `PARA_READY_HOST` (wait for guest DNS to
+New, and worth adopting: `PARA_READY_HOST` (wait for guest DNS to
 resolve a host your hooks need), `.paraspace/commands/` (your own `para` verbs),
 and `para doctor`.
 

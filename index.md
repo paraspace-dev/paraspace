@@ -10,8 +10,8 @@ hero:
       text: Get started
       link: /docs/getting-started
     - theme: alt
-      text: View on GitHub
-      link: https://github.com/paraspace-dev/paraspace
+      text: Why ParaSpace
+      link: /docs/why
 
 features:
   - icon:
@@ -28,8 +28,8 @@ features:
       width: 32
       height: 32
       wrap: true
-    title: A subdomain per workspace
-    details: Caddy routes <code>*.name.paraspace.dev</code> to each exposed http(s) service. Same ports in every workspace, no offsets to juggle.
+    title: Caddy at the doorway
+    details: Not in your stack. Each workspace has its own IP, so your app binds its usual ports — nothing remapped, nothing path-rewritten, and WebSockets and hot reload just work.
   - icon:
       light: /icons/key-light.svg
       dark: /icons/key-dark.svg
@@ -45,15 +45,15 @@ features:
       height: 32
       wrap: true
     title: A real terminal
-    details: para sh is a native shell in the container — a real pty, your dotfiles, no web terminal needed. Bring your zsh, tmux, and Neovim config.
+    details: <code>para sh</code> is a native shell in the container — a real pty, your dotfiles, no web terminal. One workspace per desktop, switched with your own window manager.
   - icon:
       light: /icons/rocket-light.svg
       dark: /icons/rocket-dark.svg
       width: 32
       height: 32
       wrap: true
-    title: Bring your own stack
-    details: ParaSpace is a generic mechanism, like docker compose. Your project's <code>.paraspace</code> dir has total control, top to bottom.
+    title: A thin engine
+    details: About a thousand lines of bash over Incus and Caddy. Your project's <code>.paraspace</code> dir owns the image, the provisioning, the boot — and adds <code>para</code> verbs of its own.
   - icon:
       light: /icons/helmet-light.svg
       dark: /icons/helmet-dark.svg
@@ -61,7 +61,7 @@ features:
       height: 32
       wrap: true
     title: Made for agents
-    details: Run several coding agents in parallel, each in its own workspace, without collisions on ports, databases, or checkouts.
+    details: One agent per workspace, a dozen at a time. Every one has its own clone, its own database, and its own URL — and <code>para ls</code> shows you the whole fleet.
 ---
 
 ## Install
@@ -70,9 +70,9 @@ features:
 npm i -g paraspace
 ```
 
-`para` uses [Incus](https://linuxcontainers.org/incus/) and Caddy on the host —
-`brew install caddy colima incus` on macOS; see the
-[README](https://github.com/paraspace-dev/paraspace#install) for Linux.
+`para` drives [Incus](https://linuxcontainers.org/incus/) and Caddy on the host
+— `brew install caddy colima incus` on macOS; Linux installs both from their
+own docs. Full prerequisites: [Getting started](/docs/getting-started).
 
 ## Quick start
 

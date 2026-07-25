@@ -38,6 +38,8 @@ into a scratch directory to diff against a current template. Otherwise:
 | Before | Now |
 |---|---|
 | guest staging dir `~/.para/` | `~/.paraspace/` — same name as the host directory |
+| `PARA_VERSION` (the key a project declared) | `PARA_CONTRACT` — the same name para uses for its own |
+| `$PROJECT_ROOT` while the `Parafile` is sourced | `$PARA_PROJECT_DIR` — same value, and it reaches hooks too |
 | `$PARA_ROUTES` comma-separated | space-separated: `for r in $PARA_ROUTES` |
 | `parse_routes` / `route_ports` helpers | delete them; `${r##*:}` is the port |
 | hooks run as `bash <path>` | run by path — the shebang decides, so keep it executable |

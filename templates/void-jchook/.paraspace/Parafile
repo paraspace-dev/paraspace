@@ -32,7 +32,11 @@
 : "${PARA_BASE_IMAGE:=images:voidlinux}"
 : "${PARA_IMAGE_BOOTSTRAP:=xbps-install -Syu xbps bash}"
 
-# Git URL para clones into each workspace. Change it to your project's repo. Out of
+# Git URL para clones into each workspace. Change it to your project's repo.
+# A Parafile sitting at its own repo's toplevel can derive it instead.
+# $PARA_PROJECT_DIR is the project root — the directory holding this
+# .paraspace/ — and para sets it before sourcing this file:
+#   : "${PARA_ORIGIN:=$(git -C "$PARA_PROJECT_DIR" remote get-url origin)}" Out of
 # the box: the same tiny public demo void-docker-gh uses (one Caddy service :8080).
 : "${PARA_ORIGIN:=git@github.com:jchook/docker-caddy.git}"
 

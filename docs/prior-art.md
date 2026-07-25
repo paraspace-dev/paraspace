@@ -1,7 +1,7 @@
 # Prior art
 
 Isolated-workspace-per-task is a crowded idea, and it got more crowded during
-2026. This page is where `para` sits among the alternatives, and — more
+2026. This page is where ParaSpace sits among the alternatives, and — more
 usefully — which of them you should pick instead.
 
 > Descriptions here come from each project's own docs at the time of writing.
@@ -50,8 +50,8 @@ Codespaces](https://github.com/features/codespaces) (hosted). Built for teams:
 central policy, provisioned identically for everyone, reachable from a
 Chromebook.
 
-If you need governance across an organisation, use one of these — `para` has no
-control plane and no notion of a team. What you pay is a bill that runs while
+If you need governance across an organisation, use one of these — ParaSpace has
+no control plane and no notion of a team. What you pay is a bill that runs while
 your own machine idles, and an interface mediated by a browser or a remote-IDE
 tunnel.
 
@@ -68,8 +68,8 @@ just you, working on your own repo, on hardware you already own.
 
 ## Tools that combine checkout and runtime isolation
 
-This is `para`'s actual peer group: local tools that give each task both its own
-files and its own place to run them.
+This is ParaSpace's actual peer group: local tools that give each task both its
+own files and its own place to run them.
 
 - **[Container Use](https://github.com/dagger/container-use)** (Dagger) —
   "containerized environments for coding agents". A fresh container per agent on
@@ -91,7 +91,7 @@ files and its own place to run them.
   Docker, and host credentials kept out unless explicitly mounted. It mounts
   your project directory from the host rather than cloning inside, publishes
   services to `localhost:<port>` rather than routing hostnames, and is oriented
-  around agent security (it ships active threat detection, which `para` does
+  around agent security (it ships active threat detection, which ParaSpace does
   not).
 - **[Coasts](https://github.com/jsx-tool/coasts)** — worktree-aware local
   environments, each with an isolated runtime and its own Docker daemon, letting
@@ -101,22 +101,27 @@ files and its own place to run them.
 
 Two personal setups arrived at similar designs and are worth reading:
 **[sandbox-claude][perevillega]** (Incus system containers, per-container deploy
-keys, network egress filtering — which `para` doesn't do) and
+keys, network egress filtering — which ParaSpace doesn't do) and
 **[Sandvault + Superset][mikemcquaid]** (an unprivileged macOS user account per
 agent, over git worktrees, with an orchestrator on top).
 
-## Where para sits
+## Where ParaSpace sits
 
-| | Isolation unit | Workspace files | Nested Docker | Interface | Per-workspace URL |
+✅ yes · ⚠️ partial, or with caveats · ❌ no · ❓ not documented
+
+| | Isolation unit | Workspace files | Supports nested containers | Interface | Per-workspace URL |
 |---|---|---|---|---|---|
-| Container Use | app container | branch per env | not documented | MCP + CLI | not by hostname |
-| Sculptor | container backend | worktree | not documented | desktop app | in-app |
-| Agent of Empires | Docker / Podman / Apple Container | worktree | not documented | TUI + web | in-app |
-| Code on Incus | **system container** | host bind mount | yes | CLI | `localhost:<port>` |
-| Coasts | runtime + own Docker daemon | host worktree | yes, per env | CLI | per-env ports |
-| **para** | **system container** | **clone inside** | **yes, unprivileged** | **native terminal** | **stable hostname** |
+| Container Use | app container | branch per env | ❓ | MCP + CLI | ❌ |
+| Sculptor | container backend | worktree | ❓ | desktop app | ⚠️ in-app |
+| Agent of Empires | Docker / Podman / Apple Container | worktree | ❓ | TUI + web | ⚠️ in-app |
+| Code on Incus | system container | host bind mount | ✅ | CLI | ⚠️ `localhost:<port>` |
+| Coasts | runtime + own Docker daemon | host worktree | ✅ per env | CLI | ⚠️ per-env ports |
+| **ParaSpace** | system container | clone inside | ✅ unprivileged | native terminal | ✅ stable hostname |
 
-### On nested Docker
+The emoji columns are the ones with a real yes/no. The rest describe *how*, and
+the "how" is usually what decides it.
+
+### On nested containers
 
 Running your Compose stack *inside* the isolated workspace is the thing most of
 these have to solve, and how they solve it matters more than whether they do.
@@ -129,18 +134,18 @@ There are three routes:
 2. **A privileged container running its own daemon.** Real nesting, but
    `--privileged` gives up most of what the container was doing for you.
 3. **A runtime built for nesting.** Sysbox (which Daytona uses), a VM, or an
-   **unprivileged system container** — the Incus route `para` and Code on Incus
-   take.
+   **unprivileged system container** — the Incus route ParaSpace and Code on
+   Incus take.
 
-`para` launches each workspace with `security.nesting=true` on an unprivileged
-container: no host socket, no `--privileged`, and a real Docker daemon inside.
+`para up` launches each workspace with `security.nesting=true` on an
+unprivileged container: no host socket, no `--privileged`, and a real Docker daemon inside.
 That's why a Compose file written for your laptop boots unchanged, and why the
 storage-driver question in [Troubleshooting](./troubleshooting.md#everything-inside-the-workspace-is-slow)
 exists at all — nesting is doing real work.
 
 ## What's actually distinct
 
-No single row above is unique to `para`. The combination is unusual:
+No single row above is unique to ParaSpace. The combination is unusual:
 
 - local and terminal-first, with no bundled agent UI;
 - a complete clone **inside** an unprivileged system container;
@@ -154,16 +159,16 @@ No single row above is unique to `para`. The combination is unusual:
 - no prescribed git workflow.
 
 If what you want is an agent harness with a UI and a review flow, several of
-the tools above will suit you better. `para` is the isolated machine, and
+the tools above will suit you better. ParaSpace is the isolated machine, and
 leaves the workflow to you.
 
-## When not to use para
+## When not to use ParaSpace
 
-- **You need a browser to reach it.** para deliberately has no web UI. If
+- **You need a browser to reach it.** ParaSpace deliberately has no web UI. If
   you're working from an iPad, use a cloud dev environment.
 - **You need team governance.** No control plane, no roles, no audit log.
 - **You want the agent workflow bundled.** Review UI, diff view, PR
-  orchestration — Sculptor and Agent of Empires ship that; para doesn't.
+  orchestration — Sculptor and Agent of Empires ship that; ParaSpace doesn't.
 - **You're running genuinely hostile code.** An unprivileged container is a
   strong boundary against mistakes, not a claim that escape is impossible. Use
   a VM or a vendor's microVM sandbox.

@@ -123,7 +123,7 @@ So the answer to "can para do X for my project" is that your project can.
 - **A git workflow.** Each workspace gets its own clone; branching, review and
   merge stay exactly what they were.
 
-[Prior art](./prior-art.md#when-not-to-use-para) has the fuller version,
+[Prior art](./prior-art.md#when-not-to-use-paraspace) has the fuller version,
 including which alternative to reach for instead.
 
 ## Next

@@ -4,8 +4,7 @@ Out of the box, a workspace named `my-feature` is served at
 `https://my-feature.paraspace.dev:8443` — no DNS setup, no privileged ports, no
 configuration. Three things you may want to change:
 
-- the certificate has to be [trusted once](#trusting-the-certificate) — the one
-  step everybody hits;
+- the certificate has to be [trusted once](#trusting-the-certificate),
 - the **`:8443`** can [go away](#removing-the-port);
 - **`paraspace.dev`** can be [your own domain](#using-your-own-domain).
 

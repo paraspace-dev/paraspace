@@ -19,20 +19,6 @@ busy or not. Cloud sandboxes bill by the second while your own machine idles.
 [Prior art](./prior-art.md) covers each properly, including when you should
 pick one over `para`.
 
-The tell is that these concerns have to be solved together.
-[Mike McQuaid's 2026 setup][mikemcquaid], for example, combines Superset
-worktrees with Sandvault's macOS sandboxing. Newer tools such as Container Use,
-Sculptor and Agent of Empires now package checkout and runtime isolation too,
-so `para` is not alone in joining those halves.
-
-The distinction is in what kind of workspace they produce. `para` gives each
-task a local, unprivileged [Incus] **system** container holding its own clone,
-its own full userspace, and its own network identity. Docker stacks still run
-inside it, nothing from the host is mounted, and the workspace stays reachable
-through an ordinary terminal and a stable hostname. It puts an isolated machine
-around the tools you already use, rather than replacing them with an agent UI
-or an agent-specific workflow.
-
 ## What you get
 
 ### It runs on your machine, in a real terminal
@@ -146,6 +132,4 @@ including which alternative to reach for instead.
 [Running coding agents](./agents.md) for the practice ·
 [Prior art](./prior-art.md) for the alternatives.
 
-[Incus]: https://linuxcontainers.org/incus/
-[mikemcquaid]: https://mikemcquaid.com/sandboxed-agent-worktrees-my-coding-and-ai-setup-in-2026/
 [hn]: https://news.ycombinator.com/item?id=48892468

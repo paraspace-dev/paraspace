@@ -45,7 +45,8 @@ else
 fi
 
 # --- browser -----------------------------------------------------------------
-# No browser inside the container: point $BROWSER at a helper (seeded by bin/para
+# No browser inside the container: point $BROWSER at a helper (seeded by this
+# template's hooks/provision
 # onto the shared volume) so tools that try to "open" a URL (notably
 # `gh auth login`'s device flow, `gh ... --web`) succeed and print the URL with
 # guidance instead of erroring with "xdg-open … not found in $PATH". Open the URL
@@ -79,7 +80,8 @@ alias .....='cd ../../../..'
 alias ......='cd ../../../../..'
 alias .......='cd ../../../../../..'
 
-# git — `gu`/`gg`/`ggg` map to git aliases seeded in the para gitconfig (bin/para)
+# git — `gu`/`gg`/`ggg` map to git aliases seeded in the gitconfig this
+# template's hooks/provision writes
 alias g='git'
 alias ga='git add'
 alias gc='git commit'

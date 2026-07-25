@@ -10,7 +10,7 @@
 # workspaces; the defaults here just keep a by-hand `para up` in this dir working.
 
 # Contract version these hooks target — para refuses on a mismatch.
-: "${PARA_VERSION:=1}"
+: "${PARA_CONTRACT:=1}"
 
 # Project identity (ownership, `para ls` scoping, shared-volume suffix). The
 # harness overrides this with a throwaway slug per run.
@@ -28,6 +28,11 @@
 : "${PARA_BASE_IMAGE:=images:alpine/edge}"
 : "${PARA_IMAGE_BOOTSTRAP:=apk add --no-cache bash}"
 
+# A hostname the guest must resolve before para runs anything in it. Guest DNS
+# comes up a beat after the container does, and the bootstrap above installs
+# from the network, so without this a build can start too early and fail.
+: "${PARA_READY_HOST:=dl-cdn.alpinelinux.org}"
+
 # Wildcard domain; `*.paraspace.dev` already resolves to 127.0.0.1.
 : "${PARA_DOMAIN:=paraspace.dev}"
 
@@ -44,7 +49,7 @@
 # "keep only the first" produce the identical canonical string, which is how a
 # parser that dropped every route after the first once passed the whole suite.
 # Multi-line, because test_routes_reach_the_provision_hook reads back what the hook
-# actually received and asserts it equals "8080,api:8080" — pinning the separator
+# actually received and asserts it equals "8080 api:8080" — pinning the separator
 # and the entry count, and proving the canonicalization end to end through the hook
 # forwarder. Both point at the same httpd: what is under test is the routing table,
 # not the app.

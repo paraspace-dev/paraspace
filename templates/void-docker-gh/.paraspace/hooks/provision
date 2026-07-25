@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
-# para provision hook — runs INSIDE the workspace, in $HOME, before boot.
+# para provision hook — runs INSIDE the workspace before boot (in the clone if it
+# already exists, else $HOME — so use absolute paths).
 #
 # Owns everything the project needs before its stack comes up:
 #   1. seed the shared volume once (dotfiles, gitconfig, ssh key)
@@ -13,7 +14,7 @@ set -euo pipefail
 
 . "$(dirname "$0")/helpers"
 
-skel="$HOME/.para/skel"
+skel="$HOME/.paraspace/skel"
 shared="$PARA_SHARED"
 
 # ---- 1. seed the shared volume (once) --------------------------------------
@@ -78,10 +79,10 @@ if ! clone; then
 fi
 
 # ---- 4. .env ---------------------------------------------------------------
-# para seeds the project's own .env (if it has one) to ~/.para/host.env; copy it
+# para seeds the project's own .env (if it has one) to ~/.paraspace/host.env; copy it
 # into the clone. Nothing there means nothing to do.
 cd "$HOME/$PARA_CLONE_DIR"
-if [ -f "$HOME/.para/host.env" ]; then
-  cp "$HOME/.para/host.env" .env
+if [ -f "$HOME/.paraspace/host.env" ]; then
+  cp "$HOME/.paraspace/host.env" .env
   chmod 600 .env
 fi

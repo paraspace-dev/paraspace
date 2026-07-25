@@ -5,7 +5,7 @@
 
 # The STATE cell for a specific workspace's `para ls` row (or empty). Binds an
 # assertion to THIS workspace's row rather than "does the word appear anywhere".
-_ls_state() { "$PARA" ls 2>/dev/null | awk -v n="$1" '$1==n{print $3}'; }
+_ls_state() { "$PARA" ls 2>/dev/null | awk -v n="$1" '$1==n{print $2}'; }
 
 test_down_up_resume_and_rm() {
   local ws="$PARA_WS2"
@@ -26,11 +26,20 @@ test_down_up_resume_and_rm() {
   assert_eq "RUNNING" "$(_ls_state "$ws")" "row reports RUNNING after resume" || return 1
   assert_serves "$ws" || return 1
 
-  # rm: gone from the registry and from incus.
+  # rm: gone from incus, from `ls`, AND from Caddy. That last one matters most:
+  # a surviving site points at a bridge IP that alloc_ip will hand to the next
+  # workspace, silently routing one workspace's hostname at another's stack.
   para_do rm "$ws" || return 1
   local names; names="$("$PARA" ls --names 2>/dev/null)"
-  assert_not_contains "$names" "$ws" "dropped from the registry after rm" || return 1
+  assert_not_contains "$names" "$ws" "dropped from the listing after rm" || return 1
   assert_fails incus info "para-$ws" || return 1
+  assert_stops_serving "$ws" || return 1
+  # …and the SITE is gone, not merely dead. A stale block still points at a
+  # bridge IP that alloc_ip will hand to the next workspace, which then answers
+  # on this workspace's hostname — and "it stopped serving" cannot see that,
+  # because a deleted container stops answering either way.
+  assert_not_contains "$(cat "$XDG_STATE_HOME/para/Caddyfile")" "$ws.${PARA_DOMAIN:-paraspace.dev}" \
+    "rm regenerated the Caddyfile without the workspace" || return 1
 
   # rm of an already-absent workspace is a forgiving no-op (teardown relies on it).
   para_do rm "$ws"

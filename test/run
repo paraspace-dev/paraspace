@@ -9,9 +9,9 @@ set -euo pipefail
 #           and asserts the whole path (hooks -> boot readiness -> Caddy TLS ->
 #           bridge IP -> the app) through actual para commands. Needs incus.
 #
-# Every run is sandboxed (throwaway XDG dirs + a non-default Caddy port + an
-# IP band carved from what's free on the bridge), so it never touches — or is
-# seen by — your real para workspaces. Teardown removes everything it created.
+# Every run is sandboxed (throwaway XDG dirs + a non-default Caddy port), so it
+# never touches your real para workspaces, and para allocates container IPs from
+# what incus reports as actually free. Teardown removes everything it created.
 #
 #   Usage: test/run [--cli|--e2e|--all] [--keep] [--no-build] [--failfast] [FILTER]
 #     --all       both tiers (default); e2e is skipped with a note if incus is absent
@@ -25,7 +25,10 @@ set -euo pipefail
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
 REPO="$(cd "$HERE/.." && pwd)"
-export PARA="$REPO/bin/para"
+# Overridable, so an engine under development can be driven by the same suite:
+#   PARA=/path/to/para test/run --e2e
+: "${PARA:=$REPO/bin/para}"
+export PARA
 export FIXTURE_DIR="$HERE/fixtures/hello"
 
 tier=all
@@ -67,7 +70,7 @@ case "$tier" in
 esac
 
 # Arm teardown BEFORE any setup that can fail (sandbox_base creates the temp XDG
-# tree on its first line; sandbox_ip_band / the image build can fail after that).
+# tree on its first line; the image build can fail after that).
 # sandbox_teardown is defensive — empty workspace list, unset volume, absent Caddy
 # are all no-ops — so it's safe for the CLI tier too.
 trap sandbox_teardown EXIT
@@ -75,7 +78,7 @@ trap sandbox_teardown EXIT
 # an UNtrapped fatal signal, and Ctrl-C during an e2e run is the likeliest abort
 # there is — it would leak the run's workspaces, volume, Caddy and temp tree.
 # Trapping INT/TERM to an explicit `exit` puts us back on the normal exit path,
-# which then fires the EXIT trap above. Same shape as bin/para's image-build.
+# which then fires the EXIT trap above. Same shape as bin/para's image build.
 trap 'echo >&2; echo "interrupted — tearing down…" >&2; exit 130' INT TERM
 
 if [ "$run_e2e" -eq 1 ]; then

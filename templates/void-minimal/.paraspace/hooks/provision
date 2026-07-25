@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
-# para provision hook — runs INSIDE the workspace, in $HOME, before boot.
+# para provision hook — runs INSIDE the workspace before boot (in the clone if it
+# already exists, else $HOME — so use absolute paths).
 #
 # The barest useful provision: seed the shell rc onto the shared volume and link
 # it in. No clone, no .env, no app — this box runs nothing. The comments at the
@@ -11,7 +12,7 @@ set -euo pipefail
 
 . "$(dirname "$0")/helpers"
 
-skel="$HOME/.para/skel"
+skel="$HOME/.paraspace/skel"
 shared="$PARA_SHARED"
 
 # ---- 1. seed the shared volume (once) --------------------------------------

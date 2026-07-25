@@ -1,6 +1,6 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-settings.json",
-  "//": "User-overridable defaults only. ENFORCED defaults — permissions.defaultMode=acceptEdits (auto-accept edits; other tools still prompt, shift+tab toggles) and includeCoAuthoredBy=false — do NOT belong here: Claude rewrites this user file in place on theme/tui changes and drops keys, and para symlinks it onto the SHARED para-home volume, so anything seeded here gets clobbered for every workspace. They live in /etc/claude-code/managed-settings.json (highest precedence, never rewritten), written by bin/para ensure_claude_policy.",
+  "//": "User-overridable defaults only. ENFORCED defaults — permissions.defaultMode=acceptEdits (auto-accept edits; other tools still prompt, shift+tab toggles) and includeCoAuthoredBy=false — do NOT belong here: Claude rewrites this user file in place on theme/tui changes and drops keys, and para symlinks it onto the SHARED para-home volume, so anything seeded here gets clobbered for every workspace. They live in /etc/claude-code/managed-settings.json (highest precedence, never rewritten), written by this template's .paraspace/hooks/provision — para itself knows nothing about Claude.",
   "cleanupPeriodDays": 30,
   "statusLine": {
     "type": "command",

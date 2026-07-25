@@ -40,7 +40,7 @@ void-jchook/
 ## Try it
 
 ```sh
-bin/para install                        # -> ~/.local/bin/para (once, from a checkout)
+npm i -g paraspace                      # once (or run bin/para from a checkout)
 para image build                        # build the base image (pulls the toolchain)
 para up demo                            # clone + provision + boot a workspace
 para web demo                           # open https://demo.<your PARA_DOMAIN>
@@ -70,8 +70,8 @@ everywhere, and plugins install **once** on first `nvim` launch.
 
 Swap the dotfiles under `skel/` for your own, point `PARA_ORIGIN` at your repo,
 and adapt the hooks to your stack (`hooks/provision` seeds + clones,
-`hooks/boot` brings services up). `para config-sync` pushes `skel/` edits live to
-running workspaces with no image rebuild. Add a language runtime in
+`hooks/boot` brings services up). A `para up` re-pushes `skel/` and re-runs the
+hooks, so dotfile edits go live with no image rebuild. Add a language runtime in
 `image-build.sh` (there's a commented Bun example). Keep the image contract:
 docker→overlayfs, a `$PARA_USER`/`$PARA_UID` user in the `docker` group, bash +
 git.

@@ -22,16 +22,17 @@ SHELLCHECK_IMAGE="koalaman/shellcheck:v0.10.0"
 root="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$root"
 
-# Collect bash scripts by shebang. `-not -path` prunes VCS/dependency dirs; the
-# first-line test picks bash (sh/zsh/non-scripts fall through). bash 3.2-safe
-# (no mapfile), matching para's own portability bar.
+# Collect bash scripts by shebang, over the files git tracks plus the ones you
+# have not added yet — so a brand-new hook is linted before it is committed,
+# while build output and dependencies (which are ignored) are not. A plain
+# `find` walked .vitepress/dist and read fonts looking for shebangs.
+# bash 3.2-safe (no mapfile), matching para's own portability bar.
 files=()
 while IFS= read -r f; do
   case "$(head -n1 "$f" 2>/dev/null)" in
-    '#!'*bash*) files+=("${f#./}") ;;
+    '#!'*bash*) files+=("$f") ;;
   esac
-done < <(find . -type f \
-  -not -path './.git/*' -not -path '*/node_modules/*' | sort)
+done < <(git ls-files --cached --others --exclude-standard | sort)
 
 [ "${#files[@]}" -gt 0 ] || { echo "lint: no bash scripts found" >&2; exit 1; }
 

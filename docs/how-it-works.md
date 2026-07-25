@@ -1,33 +1,17 @@
 # How it works
 
-## The problem
+`para` is glue over two things you can already run: [Incus] for the containers
+and [Caddy] for the URLs. This page is the mental model — what exists on your
+machine once workspaces are up, and which part owns what.
 
-Run two agents in one working copy and they trip over each other: branches
-change underneath, half-finished edits land in each other's context, and the
-mixed diff has to be teased apart into separate PRs afterward.
+For the argument about *why* this shape, see [Why ParaSpace](./why.md).
 
-The usual escapes:
-
-- **A worktree per agent** separates the tracked files — but worktrees don't
-  carry `.gitignore`d state, so each one needs its `.env` and data recreated,
-  and the running stacks still collide on ports and databases.
-- **Port offsets and override tooling** can deconflict the ports — but the
-  agent still runs as you, on your host, with your files and your keys in
-  reach.
-- **A VM per workspace** isolates cleanly but reserves fixed RAM and CPU for
-  each — a laptop affords two or three.
-- **Hosted dev environments** do the isolation in the cloud, and the interface
-  is the price: web terminals, browser IDEs, counter-intuitive routing —
-  metered by the hour while your own machine idles.
-
-`para` runs each workspace as an Incus **system** container: isolated like a
-VM, no fixed reservation, and containers still run *inside* it — a Docker
-stack boots unchanged. Containers all the way down:
+## The shape
 
 ```
        browser                     terminal
-       │  https://ws1.<domain>:8443   │
-       ▼                              │  para sh ws2
+       │  https://ws1.<domain>        │
+       ▼                          para sh ws2
 ┌──────────────────────────────┐      │
 │          host Caddy          │      │
 │  TLS + routes for *.<domain> │      │
@@ -45,45 +29,47 @@ stack boots unchanged. Containers all the way down:
 └──────────────────────────────┘
 ```
 
-Each workspace has its own IP. Whatever the project runs — bare processes or
-nested containers — binds its usual ports on the workspace's own network, so
-workspaces never collide with each other or with the host. Caddy proxies each
-workspace's URL to its IP; nothing gets remapped.
+Each workspace is an unprivileged Incus **system** container with a static IP on
+the Incus bridge. Whatever the project runs inside — bare processes or nested
+containers — binds its usual ports on that IP, so workspaces never collide with
+each other or with the host, and nothing gets remapped.
 
-The isolation cuts both ways: the workspace is also the agent's sandbox. It is
-an unprivileged container with nothing of the host mounted, so an agent can
-install packages, run with permissions wide open, or wreck the place — the
-blast radius ends at the workspace, and `para rm` resets it.
+There are two doors into a workspace: its URL, and `para sh`.
 
-The URL is only one door. `para sh` drops a real shell in a workspace's clone —
-your dotfiles, a real pty, no web terminal — and `para run` opens a tmux
-session there with `claude` already running. Agents work the workspaces the
-same way you do.
+## The pieces
 
 - **One host Caddy** terminates TLS for the `*.<domain>` wildcard and
-  reverse-proxies each workspace's routes to its container IP — see
-  [Workspace URLs](./urls.md).
-- **One Incus container per workspace** (`para-<name>`) holds the clone and
-  runs the project's whole stack inside — nested containers included.
-- **One shared home volume per project**, attached to every workspace at
-  `/para/shared` — authenticate once (git, `gh`, dotfiles) and every workspace
-  inherits it.
-- **The project's hooks** do all provisioning. Everything project-specific
-  lives in the project's `.paraspace/` dir, never in `para` — see the
+  reverse-proxies each workspace's routes to its container IP. It is generated
+  from Incus, so a single Caddy is correct across every project on the machine
+  — see [Workspace URLs](./urls.md).
+- **One Incus container per workspace** (`para-<name>`), holding the clone and
+  running the project's whole stack inside, nested containers included.
+- **One shared home volume per project**, attached to every workspace of that
+  project at `/para/shared`. Authenticate once (git, `gh`, dotfiles) and every
+  workspace of the project inherits it.
+- **The project's hooks do all the provisioning.** Everything project-specific
+  lives in the project's `.paraspace/` directory, never in `para` — see the
   [hook contract](./hooks.md).
 
-Nothing else runs on the host.
+There is no para daemon and no para database: a workspace records its own
+identity on its container, so `incus` is the only thing that has to remember
+anything. `para up` starts what it needs, including Caddy — which, besides the
+Incus daemon, is the only para-related process on your host.
 
 ## macOS: one extra layer
 
-The same stack, one layer down. `para start` boots a
-[Colima](https://github.com/abiosoft/colima) Linux VM with the Incus runtime,
-so Incus — and with it the containers and the volume — lives inside the VM.
-Caddy still runs on the Mac and reaches container IPs through the VM's network
-(Colima's `--network-address`). The `incus` CLI on the host simply points into
-the VM; nothing else changes.
+The same stack, one layer down. Incus runs inside a
+[Colima](https://github.com/abiosoft/colima) Linux VM, so the containers and
+the shared volume live in the VM. Caddy still runs on the Mac and reaches
+container IPs through the VM's network (Colima's `--network-address`). The
+`incus` CLI on the host points into the VM; nothing else changes.
 
 ## Going deeper
 
-The finer mechanics — self-describing workspaces, machine-global names,
-project discovery, where state lives — are in [Internals](./internals.md).
+- [Internals](./internals.md) — self-describing workspaces, the shared volume,
+  machine-global names, where state lives.
+- [Commands](./commands.md) — the full surface, and how a project adds verbs
+  of its own.
+
+[Incus]: https://linuxcontainers.org/incus/
+[Caddy]: https://caddyserver.com/

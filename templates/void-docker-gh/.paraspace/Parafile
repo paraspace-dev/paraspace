@@ -9,13 +9,13 @@
 # Full schema: the ParaSpace docs — docs/parafile.md in the package.
 
 # para contract version these hooks target. para refuses (clearly) on a mismatch.
-: "${PARA_VERSION:=1}"
+: "${PARA_CONTRACT:=1}"
 
-# Project identity — the single key para uses for ownership, `para ls` scoping, and
-# the shared-volume name (para-home-<PARA_PROJECT>). Independent of where this dir
-# lives on disk, so moving/renaming the checkout keeps its workspaces bound to it.
-# A plain slug ([a-z0-9-]). (`para init` sets this to your project's directory name.)
-: "${PARA_PROJECT:=void-docker-gh}"
+# Project identity — the key para uses for ownership, `para ls` scoping, and the
+# shared-volume name (para-home-<PARA_PROJECT>). It DEFAULTS to this directory's
+# name, which is usually what you want, so it is left unset here. Declare it to
+# pin an identity that survives renaming the checkout:
+# : "${PARA_PROJECT:=my-project}"
 
 # What `para image build` builds FROM: the incus image its builder launches, and
 # one `sh -c` line run inside it before .paraspace/image-build.sh. NEITHER has a
@@ -29,7 +29,16 @@
 : "${PARA_IMAGE_BOOTSTRAP:=xbps-install -Syu xbps bash}"
 
 # Git URL para clones into each workspace. Change it to your project's repo.
+# A Parafile sitting at its own repo's toplevel can derive it instead.
+# $PARA_PROJECT_DIR is the project root — the directory holding this
+# .paraspace/ — and para sets it before sourcing this file:
+#   : "${PARA_ORIGIN:=$(git -C "$PARA_PROJECT_DIR" remote get-url origin)}"
 : "${PARA_ORIGIN:=git@github.com:jchook/docker-caddy.git}"
+
+# A hostname the guest must resolve before para runs any hook in it. Guest DNS
+# comes up a beat after the container does, and the provision hook clones over
+# the network, so without this the first clone can race it.
+: "${PARA_READY_HOST:=github.com}"
 
 # HTTP routes para publishes through its Caddy — one TLS site per "[sub:]port".
 # A bare port is the workspace apex; sub:port adds a subdomain (left is where
@@ -72,4 +81,10 @@ PARA_ROUTES="${PARA_ROUTES-8080}"
 
 # para copies the project's own .env into each clone if it has one. Point this at
 # a different base .env to seed instead, or set it empty to seed nothing.
-# : "${PARA_HOST_ENV:=$PROJECT_ROOT/.env}"
+# : "${PARA_HOST_ENV:=$PARA_PROJECT_DIR/.env}"
+
+# Docker images to bake into the base image, so `para up` doesn't pull them in
+# every workspace. This is THIS PROJECT'S key, not one para knows about: para
+# forwards every PARA_* to .paraspace/image-build.sh, which pre-pulls whatever
+# it finds here. Space-separated tags, matching your compose file.
+# : "${PARA_PREPULL_IMAGES:=caddy:2-alpine postgres:17-alpine}"

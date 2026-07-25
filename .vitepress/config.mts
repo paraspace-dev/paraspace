@@ -24,15 +24,25 @@ export default defineConfig({
 
     sidebar: {
       '/docs/': [
-        { text: 'Overview', link: '/docs/' },
+        {
+          text: 'Start here',
+          items: [
+            { text: 'Overview', link: '/docs/' },
+            { text: 'Why ParaSpace', link: '/docs/why' },
+            { text: 'Getting started', link: '/docs/getting-started' },
+            { text: 'How it works', link: '/docs/how-it-works' },
+            { text: 'Prior art', link: '/docs/prior-art' },
+          ],
+        },
         {
           text: 'Guides',
           items: [
-            { text: 'Getting started', link: '/docs/getting-started' },
+            { text: 'Running coding agents', link: '/docs/agents' },
             { text: 'Project setup', link: '/docs/project-setup' },
-            { text: 'How it works', link: '/docs/how-it-works' },
+            { text: 'Cookbook', link: '/docs/cookbook' },
             { text: 'Workspace URLs', link: '/docs/urls' },
-            { text: 'Git authentication', link: '/docs/git-auth' },
+            { text: 'Shared authentication', link: '/docs/shared-auth' },
+            { text: 'Troubleshooting', link: '/docs/troubleshooting' },
           ],
         },
         {

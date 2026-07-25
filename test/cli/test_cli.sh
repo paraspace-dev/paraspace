@@ -1,312 +1,318 @@
 #!/usr/bin/env bash
-# CLI-tier tests — no incus. Argument handling, help text, configuration
-# validation and `para init`. Fast enough to run on every push in CI.
+# CLI-tier tests — no incus. Dispatch, project commands, configuration
+# precedence, `para init`. Fast enough to run on every push in CI.
 #
 # Fixtures come from test/lib/project.sh: `a_project` builds a throwaway project,
-# `assert_refuses`/`assert_allows` run para against it with the backend fenced,
-# and the harness removes everything afterwards. Tests should read as a story —
-# arrange one project, assert one behavior.
+# `para_in`/`assert_refuses` run para against it with the backend fenced, and the
+# harness removes everything afterwards. Tests should read as a story — arrange
+# one project, assert one behavior.
 #
 # Two habits worth keeping, both learned the hard way on this suite:
 #   * assert the RESOLVED VALUE, not just a non-zero exit. Several tests here once
 #     passed while the thing they claimed to check was broken, because something
 #     else in the setup already guaranteed the failure they were asserting.
-#   * never let `para up` reach the backend. `assert_*` fences it; a bare
+#   * never let `para up` reach the backend. `para_in` fences it; a bare
 #     invocation on a developer box creates real storage and starts a real Caddy.
+#
+# `para doctor` is this tier's oracle for resolved configuration: it prints the
+# values para actually resolved, before it goes looking at the host. It exits
+# non-zero against the fence (incus is unreachable there, and doctor's whole job
+# is to say so), so these tests read its OUTPUT and ignore its status.
 
-# ---------------------------------------------------------------- help + usage
+MIN_INCUS_EXPECTED=6.22   # keep in step with bin/para's MIN_INCUS
+
+# ------------------------------------------------------------------ dispatch
 
 test_help_lists_the_command_surface() {
   local out; out="$("$PARA" --help 2>&1)"
   assert_contains "$out" "up"          "help mentions up"          || return 1
-  assert_contains "$out" "image build" "help mentions image build" || return 1
-  assert_contains "$out" "init"        "help mentions init"        || return 1
-}
-
-test_help_reports_the_resolved_config() {
-  # --help doubles as the config table, and bin/para designates it the
-  # authoritative copy of precedence. Outside a project PARA_IMAGE has no real
-  # value, so it must say so rather than print the placeholder literal.
-  local out; out="$(env -u PARA_PROJECT_DIR "$PARA" --help 2>&1)"
-  assert_not_contains "$out" "para-dev" "no placeholder image literal is advertised" || return 1
-  assert_contains "$out" "user config" "precedence names the user config"
+  # "sh", not "sh <name>", would also match the "bash" in `para completions bash`
+  assert_contains "$out" "sh <name>"   "help mentions sh"          || return 1
+  assert_contains "$out" "image"       "help mentions image"       || return 1
+  assert_contains "$out" "caddy"       "help mentions caddy"       || return 1
+  assert_contains "$out" "doctor"      "help mentions doctor"
 }
 
 test_rejects_an_unknown_command() {
-  assert_fails "$PARA" this-is-not-a-command
+  # Outside a project there is nowhere a project command could come from, so an
+  # unknown verb is simply unknown.
+  local out rc=0
+  out="$(env -u PARA_PROJECT_DIR "$PARA" this-is-not-a-command 2>&1)" || rc=$?
+  [ "$rc" -ne 0 ] || { echo "  an unknown command was accepted" >&2; return 1; }
+  assert_contains "$out" "unknown command" "the refusal names the problem"
 }
 
 test_rejects_an_invalid_workspace_name() {
-  # Asserts the MESSAGE, not just non-zero: outside a project `require_project`
-  # would fail this command anyway, so an exit-status-only check would pass even
+  # Asserts the MESSAGE, not just non-zero: a name that reaches the fenced
+  # backend fails there anyway, so an exit-status-only check would pass even
   # with validate_name removed entirely.
-  local p; p="$(a_project PARA_ROUTES='"3000"')"
+  local p; p="$(a_project)"
   para_in "$p" up "Bad_Name"
   [ "$PARA_RC" -ne 0 ] || { echo "  an invalid workspace name was accepted" >&2; return 1; }
-  assert_contains "$PARA_OUT" "invalid name" "the refusal names the rule" || return 1
+  assert_contains "$PARA_OUT" "invalid workspace name" "the refusal names the rule" || return 1
   assert_backend_untouched
 }
 
-# --------------------------------------------------------------------- routes
+# ---------------------------------------------------------- project commands
 
-test_routes_must_be_declared() {
-  # No default port: which port your app listens on is project policy. An UNSET
-  # key is refused; the message must also teach the empty spelling, which is the
-  # entire reason unset and empty are distinguished.
+test_project_commands_extend_the_verb_set() {
+  # The extension seam: an executable in .paraspace/commands/ becomes `para
+  # <verb>`, running on the host with every PARA_* exported and its arguments
+  # passed through untouched.
   local p; p="$(a_project)"
-  para_in "$p" up ws
-  [ "$PARA_RC" -ne 0 ] || { echo "  up succeeded with no PARA_ROUTES" >&2; return 1; }
-  assert_contains "$PARA_OUT" "PARA_ROUTES is not set" "refusal names the missing key" || return 1
-  assert_contains "$PARA_OUT" 'PARA_ROUTES=""'         "refusal shows how to declare none" || return 1
-  assert_backend_untouched
+  # shellcheck disable=SC2016  # the guest script's $vars are literal here
+  a_project_command "$p" greet '#!/bin/sh
+# summary: say hello
+echo "greeted $1 for $PARA_PROJECT via $PARA_BIN"'
+
+  para_in "$p" greet world
+  [ "$PARA_RC" -eq 0 ] || { echo "  the project command failed:" >&2
+                            printf '    %s\n' "$PARA_OUT" >&2; return 1; }
+  assert_contains "$PARA_OUT" "greeted world"    "arguments passed through"  || return 1
+  assert_contains "$PARA_OUT" "for fixture"      "PARA_* reached it"         || return 1
+  assert_contains "$PARA_OUT" "$PARA"            "PARA_BIN points back here"
 }
 
-test_routes_may_be_declared_empty() {
-  # Empty is a DECLARATION ("serves no HTTP"), not an omission. void-minimal ships
-  # it, so this also guards that template being usable at all.
-  assert_allows "$(a_project PARA_ROUTES='""')"
+test_project_commands_are_discoverable() {
+  # Nothing a project adds should run invisibly: it is listed by `para commands`
+  # and in `para --help`, with the summary line if the file carries one.
+  local p; p="$(a_project)"
+  a_project_command "$p" greet '#!/bin/sh
+# summary: say hello
+echo hi'
+  para_in "$p" commands
+  assert_contains "$PARA_OUT" "greet" "para commands lists it" || return 1
+  para_in "$p" --help
+  assert_contains "$PARA_OUT" "PROJECT COMMANDS" "help has a section for them" || return 1
+  assert_contains "$PARA_OUT" "say hello"        "help shows the summary line"
 }
 
-test_routes_accept_flexible_separators() {
-  # Commas, spaces, tabs and newlines all separate entries, so a project with
-  # several routes can lay them out to be read.
-  local p
-  for p in '"3000,api:3001"' '"3000, api:3001, db:8081"' '"3000 api:3001"' '"
-  3000
-  api:3001
-"'; do
-    assert_allows "$(a_project "PARA_ROUTES=$p")" || { echo "  rejected: $p" >&2; return 1; }
+test_engine_verbs_shadow_project_commands() {
+  # A template must not be able to silently replace `para ls` — the engine's
+  # namespace wins, and doctor is where that gets pointed out.
+  local p; p="$(a_project)"
+  a_project_command "$p" ls '#!/bin/sh
+echo SHADOWED-THE-ENGINE'
+  para_in "$p" ls
+  assert_not_contains "$PARA_OUT" "SHADOWED-THE-ENGINE" "the engine verb ran, not the project's" || return 1
+  para_in "$p" doctor
+  assert_contains "$PARA_OUT" "shadowed" "doctor warns about the shadowed command"
+}
+
+# ------------------------------------------------------------- configuration
+
+test_the_environment_overrides_the_parafile() {
+  # The whole precedence model: a Parafile written with the `:=` idiom yields to
+  # a real environment variable. Nothing in para implements this — bash does —
+  # so the test exists to prove the idiom is what the templates should use.
+  local p out
+  # shellcheck disable=SC2016  # a literal Parafile line, not an expansion
+  p="$(a_project ': "${PARA_DOMAIN:=from-parafile}"')"
+  out="$(_para_env "$p" PARA_DOMAIN=from-the-environment doctor)"
+  assert_contains     "$out" "from-the-environment" "the environment won"      || return 1
+  assert_not_contains "$out" "from-parafile"        "the Parafile default lost"
+}
+
+test_a_plain_parafile_assignment_insists() {
+  # The other half of the model, and a deliberate feature: a project that must
+  # pin a value writes a plain assignment, and the environment does not win.
+  local p out; p="$(a_project 'PARA_DOMAIN=insisted.example')"
+  out="$(_para_env "$p" PARA_DOMAIN=from-the-environment doctor)"
+  assert_contains "$out" "insisted.example" "the project's plain assignment held"
+}
+
+test_config_init_seeds_a_user_config_and_path_finds_it() {
+  # `para config init` is the only thing that writes the user config; nothing
+  # else does, so a value there is always something a person put there.
+  local path out
+  path="$("$PARA" config path)"
+  assert_contains "$path" "$XDG_CONFIG_HOME" "path points into the sandboxed XDG dir" || return 1
+  [ ! -f "$path" ] || rm -f "$path"
+  "$PARA" config init >/dev/null 2>&1 || { echo "  config init failed" >&2; return 1; }
+  out="$(cat "$path")"
+  rm -f "$path"
+  assert_contains "$out" 'PARA_DOMAIN' "the seeded file lists the box-level knobs" || return 1
+  # Seeded entirely commented out, so writing one is an explicit act.
+  case "$out" in
+    *$'\n'[!#]*) echo "  the seeded config has an active line" >&2; return 1 ;;
+  esac
+}
+
+test_config_edit_opens_the_file_and_seeds_it_first() {
+  # `para config edit` is meant to be the only one of these anyone learns, so
+  # it seeds the file on first use rather than opening nothing. $EDITOR is
+  # word-split on purpose — people set it with flags — which is the half of
+  # this that quoting would silently break.
+  local d path; d="$(scratch)"
+  printf '#!/bin/sh\nprintf "%%s\\n" "$@" > %s/argv\n' "$d" > "$d/fake-editor"
+  chmod +x "$d/fake-editor"
+  path="$("$PARA" config path)"
+  rm -f "$path"
+
+  EDITOR="$d/fake-editor --wait" "$PARA" config edit \
+    || { echo "  config edit failed" >&2; return 1; }
+  local argv; argv="$(cat "$d/argv")"
+  assert_contains "$argv" "--wait" "the editor's own flags survived" || return 1
+  assert_contains "$argv" "$path"  "the editor was given the config path" || return 1
+  [ -f "$path" ] || { echo "  config edit did not seed the file" >&2; return 1; }
+  assert_contains "$(cat "$path")" "PARA_DOMAIN" "the seeded file is the template" || return 1
+
+  # VISUAL wins over EDITOR, the usual convention.
+  printf '#!/bin/sh\nprintf visual > %s/who\n' "$d" > "$d/fake-visual"
+  chmod +x "$d/fake-visual"
+  VISUAL="$d/fake-visual" EDITOR="$d/fake-editor" "$PARA" config edit
+  local who; who="$(cat "$d/who")"
+  rm -f "$path"
+  assert_eq "visual" "$who" "VISUAL took precedence over EDITOR"
+}
+
+test_config_init_refuses_to_clobber() {
+  local path rc=0
+  path="$("$PARA" config path)"
+  mkdir -p "$(dirname "$path")"
+  printf '# mine\n' > "$path"
+  "$PARA" config init >/dev/null 2>&1 || rc=$?
+  local kept; kept="$(cat "$path")"
+  rm -f "$path"
+  [ "$rc" -ne 0 ] || { echo "  config init overwrote an existing config" >&2; return 1; }
+  assert_eq "# mine" "$kept" "the existing file was left alone"
+}
+
+test_routes_are_canonicalized() {
+  # Commas, spaces, tabs and newlines all separate entries, so a project can lay
+  # several routes out to be read. Whatever the spelling, para resolves ONE
+  # canonical form — space-separated and lowercased — which is what it stamps on
+  # the container and injects into hooks.
+  local spelling out
+  for spelling in '"8080,API:3001"' '"8080, api:3001"' '"8080 api:3001"' '"
+    8080
+    api:3001
+  "'; do
+    out="$(para_in "$(a_project "PARA_ROUTES=$spelling")" doctor; printf '%s' "$PARA_OUT")"
+    assert_contains "$out" "PARA_ROUTES   8080 api:3001" "canonical form from: $spelling" || return 1
   done
-}
-
-test_routes_reject_malformed_entries() {
-  # Entries land in a Caddy site address AND in the registry's space-separated
-  # positional field 3. '3000:app' is sub:port reversed — left is where you
-  # arrive, as in `docker -p`; an all-digit DNS label is legal so the two orders
-  # cannot be told apart, and the reverse is refused rather than guessed.
-  local bad
-  for bad in '3000,,api:3001' '80 90x' 'no-port' '-' '3000:app' '0080'; do
-    assert_refuses "$(a_project "PARA_ROUTES=\"$bad\"")" "PARA_ROUTES" \
-      || { echo "  accepted: $bad" >&2; return 1; }
-  done
-}
-
-test_routes_reject_what_caddy_would_refuse() {
-  # Shape is not enough — these all look like "[sub:]port" but make Caddy reject
-  # the WHOLE config. caddy_reload swallows that error, so para would report the
-  # workspace ready while it served nothing, and the next cold start would fail
-  # for every workspace on the machine.
-  assert_refuses "$(a_project 'PARA_ROUTES="99999"')"          "1-65535"            || return 1
-  assert_refuses "$(a_project 'PARA_ROUTES="0"')"              "1-65535"            || return 1
-  assert_refuses "$(a_project 'PARA_ROUTES="3000,3001"')"      "more than one bare" || return 1
-  assert_refuses "$(a_project 'PARA_ROUTES="api:3000,api:3001"')" "more than once"  || return 1
-  # DNS is case-insensitive: these are ONE host, and Caddy would silently serve
-  # only the first — quieter than the ambiguous-site error, so worth its own case.
-  assert_refuses "$(a_project 'PARA_ROUTES="API:3000,api:3001"')" "more than once"
-}
-
-test_routes_keep_every_entry() {
-  # Guards the founding bug of this key, in the one form the CLI tier can see:
-  # if the parser kept only the first entry, "3000,3000" would collapse to a
-  # single route and be ACCEPTED instead of caught as a duplicate apex.
-  assert_refuses "$(a_project 'PARA_ROUTES="3000,3000"')" "more than one bare"
 }
 
 test_routes_do_not_glob_against_the_cwd() {
-  # The split must be unquoted to divide on IFS, which also exposes it to PATHNAME
-  # expansion — so without `set -f` a value like "30*" resolved against whatever
-  # files sat in $PWD. Asserted on the VALUE echoed back in the error, because the
-  # verdict alone is identical from both directories.
+  # Canonicalization is a string transform, not a word split, so a value like
+  # "30*" cannot expand against whatever files happen to sit in $PWD. This was a
+  # real bug in the predecessor, where the split needed `set -f` to be safe.
   local p g; p="$(a_project 'PARA_ROUTES="30*"')"; g="$(scratch)"
   : > "$g/3000"; : > "$g/3005"
-  PARA_CWD="$g" para_in "$p" up ws
-  assert_contains "$PARA_OUT" "'30*'" "the literal survived, unexpanded by the cwd"
+  PARA_CWD="$g" para_in "$p" doctor
+  assert_contains "$PARA_OUT" "30*" "the literal survived, unexpanded by the cwd"
 }
 
-test_routes_refuse_the_legacy_array_form() {
-  # `$PARA_ROUTES` on an array yields element ZERO, so the pre-scalar spelling
-  # would publish :3000 and drop the rest silently.
-  local d; d="$(scratch)"; mkdir -p "$d/.paraspace"
-  printf 'PARA_VERSION=1\nPARA_PROJECT=arr\nPARA_ROUTES=( "3000" "api:3001" )\n' > "$d/.paraspace/Parafile"
-  assert_refuses "$d" "not an array"
+test_doctor_checks_incus_can_do_what_para_needs() {
+  # para reads every workspace out of incus in one query, using device keys as
+  # `incus list` columns. The CAPABILITY decides, not the version number: a
+  # distro can backport, and the failure this catches is the nasty one — an
+  # incus that can't do it makes para see every workspace as address-less.
+  local stub out
+  stub="$(a_stub_incus 6.2 no)"
+  out="$(cd "$(a_project)" && env -u PARA_PROJECT_DIR PATH="$stub:$PATH" "$PARA" doctor 2>&1)" || true
+  assert_contains "$out" "6.2 cannot select device columns" "an incapable incus is named and failed" || return 1
+  assert_contains "$out" "$MIN_INCUS_EXPECTED" "the message says what to upgrade to" || return 1
+  # And it keeps going. A diagnostic that stops at the first thing it cannot
+  # read is useless exactly when you need it — this reached the later checks.
+  assert_contains "$out" "storage pool" "doctor finished its report after a failed check" || return 1
+
+  # Capable but older than what para is tested against: a warning, not a refusal.
+  stub="$(a_stub_incus 6.14 yes)"
+  out="$(cd "$(a_project)" && env -u PARA_PROJECT_DIR PATH="$stub:$PATH" "$PARA" doctor 2>&1)" || true
+  assert_contains "$out" "6.14 is older than" "an untested-but-capable incus warns" || return 1
+
+  # Current: neither.
+  stub="$(a_stub_incus 6.30 yes)"
+  out="$(cd "$(a_project)" && env -u PARA_PROJECT_DIR PATH="$stub:$PATH" "$PARA" doctor 2>&1)" || true
+  assert_not_contains "$out" "6.30 is older than"          "a current incus does not warn" || return 1
+  assert_not_contains "$out" "cannot select device columns" "…nor fail"
+}
+test_init_refuses_to_clobber_an_existing_project() {
+  # The guard between `para init` and a user's own Parafile and hooks. Untested,
+  # it can be deleted outright and the whole tier stays green — while the first
+  # command a new user runs eats their work.
+  local d out; d="$(scratch)"
+  mkdir -p "$d/.paraspace/hooks"
+  printf 'MINE=yes\n'  > "$d/.paraspace/Parafile"
+  printf '# my hook\n' > "$d/.paraspace/hooks/provision"
+
+  out="$(cd "$d" && env -u PARA_PROJECT_DIR -u PARA_PROJECT "$PARA" init void-minimal 2>&1)"
+  assert_eq "MINE=yes"  "$(cat "$d/.paraspace/Parafile")"        "the Parafile was left alone" || return 1
+  assert_eq "# my hook" "$(cat "$d/.paraspace/hooks/provision")" "the hook was left alone"     || return 1
+  assert_contains "$out" "skip (exists)" "it says what it skipped" || return 1
+
+  # …and --force is how you say you meant it.
+  ( cd "$d" && env -u PARA_PROJECT_DIR -u PARA_PROJECT "$PARA" init void-minimal --force >/dev/null 2>&1 )
+  assert_not_contains "$(cat "$d/.paraspace/Parafile")" "MINE=yes" "--force overwrites"
 }
 
-test_routes_come_from_the_environment() {
-  # A plain scalar follows ordinary precedence, so a one-off override works —
-  # impossible while this was an array. Asserted with a value para MUST reject:
-  # if the scaffolded Parafile's own valid routes won instead, `up` would get past
-  # validation and this would not appear. (A previous version of this test checked
-  # only the exit code, and passed while every template clobbered the environment.)
-  local p out; p="$(a_scaffolded_project)"
-  PARA_FENCE="$(a_fenced_backend)"
-  out="$(env PATH="$PARA_FENCE:$PATH" PARA_PROJECT_DIR="$p" PARA_ROUTES='@@notaroute@@' "$PARA" up ws 2>&1)" || true
-  assert_contains "$out" "@@notaroute@@" "the environment's value is the one para validated"
+test_up_allocates_an_ip_that_is_not_already_taken() {
+  # The highest-consequence silent failure in the engine: a mis-parse here hands
+  # a new workspace an address a LIVE one already holds. incus annotates the
+  # runtime column as "10.9.9.200 (eth0)" and fills the device column only for
+  # instances para pinned — so an address held by a RUNNING container para did
+  # NOT create appears in the annotated form and nowhere else. That is the shape
+  # this pins: .200 is such a container, .201 a stopped para workspace. Driven through `para up` with a stub incus that fails at
+  # launch, so nothing is created and the requested address is still observable.
+  local d; d="$(scratch)"
+  cat > "$d/incus" <<STUB
+#!/bin/sh
+case "\$*" in
+  "info")                 exit 0 ;;   # daemon reachable
+  info\ *)                exit 1 ;;   # …but this instance does not exist
+  *--all-projects*)       printf '%s\\n' '"10.9.9.200 (eth0)",' ',10.9.9.201'; exit 0 ;;
+  "network get "*)        echo 10.9.9.1/24; exit 0 ;;
+  "image info "*)         exit 0 ;;
+  "storage volume show "*) exit 0 ;;
+  launch\ *)              echo "\$*" > "$d/launch-args"; exit 1 ;;
+  *)                      exit 0 ;;
+esac
+STUB
+  chmod +x "$d/incus"
+  ( cd "$(a_project 'PARA_ROUTES="8080"')" \
+      && env -u PARA_PROJECT_DIR PATH="$d:$PATH" "$PARA" up ws >/dev/null 2>&1 ) || true
+  [ -f "$d/launch-args" ] || { echo "  para never reached 'incus launch'" >&2; return 1; }
+  assert_contains "$(cat "$d/launch-args")" "ipv4.address=10.9.9.202" \
+    "skipped the running .200 and the stopped .201"
 }
 
-test_a_bad_parafile_does_not_brick_recovery_commands() {
-  # Route validation runs at `up`, not config load. It used to exit during load,
-  # so one stray character in one project disabled `ls`, `rm`, `reconcile` and
-  # `--help` for every project — including the help documenting the fix.
-  local p; p="$(a_project 'PARA_ROUTES="3000, ,8080"')"
-  para_in "$p" ls    >/dev/null; [ "$PARA_RC" -eq 0 ] || { echo "  'para ls' was bricked" >&2; return 1; }
-  para_in "$p" --help >/dev/null; [ "$PARA_RC" -eq 0 ] || { echo "  'para --help' was bricked" >&2; return 1; }
-  assert_refuses "$p" "PARA_ROUTES"   # …while up, which consumes them, still refuses
-}
-
-# --------------------------------------------------------------------- domain
-
-test_domain_is_validated_on_write_and_at_use() {
-  # PARA_DOMAIN is registry field 4 and a Caddy site address, so a space corrupts
-  # both. It is checked on the way IN and at `up` — never at config load, because
-  # a bad stored value must not disable `config-set` itself, the only way to fix it.
-  local out rc=0
-  out="$("$PARA" config-set PARA_DOMAIN "my dev" 2>&1)" || rc=$?
-  [ "$rc" -ne 0 ] || { "$PARA" config-set PARA_DOMAIN paraspace.dev >/dev/null 2>&1
-                       echo "  config-set accepted a domain with a space" >&2; return 1; }
-  assert_contains "$out" "hostname" "the refusal names the rule" || return 1
-  assert_refuses "$(a_project 'PARA_ROUTES="3000"' 'PARA_DOMAIN="my dev"')" "hostname"
-}
-
-test_a_bad_stored_domain_does_not_brick_recovery_commands() {
-  # The same lockout lesson as routes, for the key that is deliberately settable
-  # box-wide. Seeded directly, since config-set now refuses to write it.
-  local cfg="$XDG_CONFIG_HOME/para/config"
-  mkdir -p "$(dirname "$cfg")"
-  printf 'PARA_DOMAIN=my dev\n' >> "$cfg"
-  local rc=0
-  "$PARA" ls >/dev/null 2>&1 || rc=$?
-  "$PARA" --help >/dev/null 2>&1 || rc=$?
-  _cli_strip_config PARA_DOMAIN
-  [ "$rc" -eq 0 ] || { echo "  a bad stored PARA_DOMAIN bricked ls/--help" >&2; return 1; }
-}
-
-# ------------------------------------------------------------------ registry readers
-
-test_ls_shows_no_url_without_an_apex_route() {
-  # https://<name>.<domain> exists only when a bare port routes the apex. A
-  # route-less workspace and a subdomain-only one both have no apex site.
-  a_registry_row noroutes 10.0.0.31 -         paraspace.dev fixture
-  a_registry_row subonly  10.0.0.32 api:3000  paraspace.dev fixture
-  a_registry_row apexed   10.0.0.33 3000      paraspace.dev fixture
-  local out; out="$("$PARA" ls --all 2>/dev/null)"
-  forget_registry_row noroutes; forget_registry_row subonly; forget_registry_row apexed
-  case "$out" in
-    *"https://noroutes."*) echo "  a route-less workspace advertised a URL" >&2; return 1 ;;
-    *"https://subonly."*)  echo "  a subdomain-only workspace advertised an apex URL" >&2; return 1 ;;
-  esac
-  assert_contains "$out" "https://apexed." "a workspace WITH an apex route still shows its URL"
-}
-
-test_web_refuses_a_workspace_with_no_site_to_open() {
-  a_registry_row noroutes 10.0.0.34 -        paraspace.dev fixture
-  a_registry_row subonly  10.0.0.35 api:3000 paraspace.dev fixture
-  local out1 out2 rc1=0 rc2=0 rc3=0
-  out1="$("$PARA" web noroutes 2>&1)" || rc1=$?
-  out2="$("$PARA" web subonly 2>&1)"  || rc2=$?
-  "$PARA" web nosuchworkspace >/dev/null 2>&1 || rc3=$?
-  forget_registry_row noroutes; forget_registry_row subonly
-  [ "$rc1" -ne 0 ] || { echo "  web opened a route-less workspace" >&2; return 1; }
-  [ "$rc2" -ne 0 ] || { echo "  web opened a subdomain-only workspace's dead apex" >&2; return 1; }
-  [ "$rc3" -ne 0 ] || { echo "  web accepted an unregistered workspace" >&2; return 1; }
-  assert_contains "$out1" "no HTTP routes" "route-less refusal explains why" || return 1
-  assert_contains "$out2" "subdomain-only" "subdomain-only refusal explains why"
-}
-
-test_up_refuses_a_name_owned_by_another_project() {
-  a_registry_row borrowed 10.0.0.9 8080 paraspace.dev someotherproject
-  local p; p="$(a_project 'PARA_ROUTES="3000"' PARA_PROJECT=mine)"
-  para_in "$p" up borrowed
-  forget_registry_row borrowed
-  [ "$PARA_RC" -ne 0 ] || { echo "  up adopted a foreign-owned name" >&2; return 1; }
-  assert_contains "$PARA_OUT" "someotherproject" "refusal names the owning project" || return 1
+test_refuses_a_contract_version_mismatch() {
+  # A project pins the contract its hooks target; para refuses rather than
+  # running them under a seam that has changed underneath.
+  local p; p="$(a_project PARA_CONTRACT=999)"
+  assert_refuses "$p" "contract" || return 1
   assert_backend_untouched
 }
 
-# ----------------------------------------------------------------- user config
-
-test_config_set_refuses_every_per_project_key() {
-  # Table-driven over the whole denylist: covering one key would let the other
-  # eight be dropped without a test failing.
-  local key out
-  for key in PARA_PROJECT PARA_IMAGE PARA_BASE_IMAGE PARA_IMAGE_BOOTSTRAP \
-             PARA_VERSION PARA_ORIGIN PARA_CLONE_DIR PARA_VOLUME PARA_ROUTES; do
-    out="$("$PARA" config-set "$key" somevalue 2>&1)" && {
-      _cli_strip_config "$key"
-      echo "  config-set accepted the per-project key $key" >&2; return 1; }
-    assert_contains "$out" "Parafile" "$key refusal points at the Parafile" || return 1
-  done
-}
-
-test_config_set_persists_other_keys() {
-  # The inverse of the denylist, and asserted on the FILE rather than the exit
-  # status — the namespace staying open is how a project passes its own knobs to
-  # its hooks. (Exit status alone passes even if persist_config does nothing.)
-  local cfg="$XDG_CONFIG_HOME/para/config" out
-  "$PARA" config-set PARA_DEMO_KNOB yes >/dev/null 2>&1 || {
-    echo "  config-set refused a non-project key" >&2; return 1; }
-  out="$(cat "$cfg" 2>/dev/null || true)"
-  _cli_strip_config PARA_DEMO_KNOB
-  assert_contains "$out" "PARA_DEMO_KNOB=yes" "the value reached the config file"
-}
-
-test_user_config_ignores_per_project_keys() {
-  # The denylist where it bites: a stale per-project line must not beat the
-  # Parafile. XDG_CONFIG_HOME is sandboxed, so this never touches a real config.
-  local cfg="$XDG_CONFIG_HOME/para/config"
-  mkdir -p "$(dirname "$cfg")"
-  printf 'PARA_IMAGE=hijacked-image\n' >> "$cfg"
-  local p; p="$(a_project 'PARA_ROUTES="3000"')"
-  para_in "$p" --help
-  _cli_strip_config PARA_IMAGE
-  assert_not_contains "$PARA_OUT" "hijacked-image" "the user-config value did not take effect" || return 1
-  assert_contains "$PARA_OUT" "ignoring PARA_IMAGE" "para says out loud that it ignored it"
-}
-
-# Drop KEY's line from the sandboxed user config. Called before assertions so the
-# shared file is restored on the failure path too.
-_cli_strip_config() {
-  local cfg="$XDG_CONFIG_HOME/para/config" tmp
-  [ -f "$cfg" ] || return 0
-  tmp="$(mktemp)"; grep -v "^$1=" "$cfg" > "$tmp" 2>/dev/null || true; mv "$tmp" "$cfg"
-}
-
-# ------------------------------------------------------------------------ image
+# -------------------------------------------------------------------- image
 
 test_image_defaults_to_the_project_slug() {
   # Incus image aliases are daemon-global, so a fixed default would put two
   # projects that both left the key unset on ONE image.
-  local p; p="$(a_project 'PARA_ROUTES="3000"' PARA_PROJECT=derived-slug)"
-  para_in "$p" --help
-  printf '%s\n' "$PARA_OUT" | grep -qE '^[[:space:]]*PARA_IMAGE[[:space:]]+derived-slug$' || {
-    echo "  PARA_IMAGE did not derive from PARA_PROJECT:" >&2
-    printf '%s\n' "$PARA_OUT" | grep -E 'PARA_IMAGE' >&2; return 1; }
+  local p; p="$(a_project PARA_PROJECT=derived-slug)"
+  para_in "$p" doctor
+  assert_contains "$PARA_OUT" "PARA_IMAGE    derived-slug" "PARA_IMAGE derived from PARA_PROJECT"
 }
 
 test_image_build_refuses_without_a_base_image() {
-  # para never picks your distro, and a para update must not change it under you.
+  # para never picks your distro, and a para update must not change it under
+  # you. Checked before the daemon, so an incomplete Parafile is what you hear
+  # about — which `assert_backend_untouched` is here to pin.
   local p; p="$(a_project)"
+  printf 'true\n' > "$p/.paraspace/image-build.sh"
   assert_refuses "$p" "PARA_BASE_IMAGE" image build || return 1
   assert_backend_untouched
 }
 
-test_image_build_alias_is_still_accepted() {
-  local p; p="$(a_project)"
-  para_in "$p" image-build
-  [ "$PARA_RC" -ne 0 ] || { echo "  the deprecated alias succeeded with no base image" >&2; return 1; }
-  assert_contains "$PARA_OUT" "deprecated"      "alias warns it is deprecated" || return 1
-  assert_contains "$PARA_OUT" "PARA_BASE_IMAGE" "alias still reaches the build refusal"
-}
-
 test_image_rejects_an_unknown_subcommand() {
-  # Asserts the message: `cmd_image_status` would also exit non-zero here (no
-  # project), so an exit-status-only check would pass with the dispatcher broken.
   local p; p="$(a_project)"
   para_in "$p" image not-a-subcommand
   [ "$PARA_RC" -ne 0 ] || { echo "  an unknown image subcommand was accepted" >&2; return 1; }
-  assert_contains "$PARA_OUT" "unknown 'para image' command" "the dispatcher named the problem"
+  assert_contains "$PARA_OUT" "usage: para image" "the dispatcher named the problem"
 }
 
-# ------------------------------------------------------------------------- init
+# --------------------------------------------------------------------- init
 
 test_init_scaffolds_a_paraspace_dir() {
   local d; d="$(a_scaffolded_project void-minimal)"
@@ -316,27 +322,16 @@ test_init_scaffolds_a_paraspace_dir() {
   assert test -x "$d/.paraspace/hooks/provision"
 }
 
-test_init_names_the_project_after_its_directory() {
-  # PARA_IMAGE derives from PARA_PROJECT, so this sed is now the ONLY thing giving
-  # a scaffolded project its identity — and nothing asserted it.
-  local d out; d="$(scratch)"
-  mkdir -p "$d/My.App"
-  ( cd "$d/My.App" && env -u PARA_PROJECT_DIR "$PARA" init >/dev/null 2>&1 )
-  out="$(cat "$d/My.App/.paraspace/Parafile")"
-  assert_contains "$out" 'PARA_PROJECT:=my-app' "the dir name became the project slug"
-}
-
 test_init_lists_bundled_templates() {
-  local out; out="$(env -u PARA_PROJECT_DIR "$PARA" init --names 2>&1)"
+  local out; out="$(env -u PARA_PROJECT_DIR "$PARA" init --list 2>&1)"
   assert_contains "$out" "void-minimal"   "template listed" || return 1
   assert_contains "$out" "void-docker-gh" "default listed"
 }
 
 test_init_refuses_a_path_as_a_template_name() {
   # Without containment, `para init ../..` scaffolds an arbitrary tree into $PWD.
-  # Asserted on the MESSAGE: without the guard `para init ../..` still fails, just
-  # for an unrelated reason ("nothing to scaffold"), so an exit-status-only check
-  # would pass with the containment removed.
+  # Asserted on the MESSAGE: `para init ../..` would fail anyway once the path
+  # missed, so an exit-status-only check would pass with the guard removed.
   local d out rc=0; d="$(scratch)"
   out="$(cd "$d" && env -u PARA_PROJECT_DIR "$PARA" init ../.. 2>&1)" || rc=$?
   [ "$rc" -ne 0 ] || { echo "  init accepted a path traversal" >&2; return 1; }
@@ -344,12 +339,25 @@ test_init_refuses_a_path_as_a_template_name() {
   [ ! -e "$d/.paraspace" ] || { echo "  init scaffolded something anyway" >&2; return 1; }
 }
 
+test_a_scaffolded_project_takes_its_identity_from_the_directory() {
+  # No template rewriting at scaffold time: the engine derives PARA_PROJECT from
+  # the directory name, so a template ships without a project name baked in.
+  # PARA_PROJECT is unset for the same reason PARA_PROJECT_DIR is — the e2e
+  # sandbox exports one, and an inherited value is exactly what this test must
+  # not see. (It passed under `--cli` and failed under `--all` before this.)
+  local d out; d="$(scratch)"
+  mkdir -p "$d/My.App"
+  ( cd "$d/My.App" && env -u PARA_PROJECT_DIR -u PARA_PROJECT "$PARA" init void-minimal >/dev/null 2>&1 )
+  out="$(cd "$d/My.App" && env -u PARA_PROJECT_DIR -u PARA_PROJECT "$PARA" doctor 2>&1)"
+  assert_contains "$out" "my-app" "the directory name became the project slug"
+}
+
 test_template_helpers_do_not_drift() {
   # hooks/helpers is byte-identical across the bundled templates on purpose, and
   # cannot be factored into a shared overlay: it has to sit BESIDE the hooks that
   # source it — shellcheck resolves `. "$(dirname "$0")/helpers"` via
-  # source-path=SCRIPTDIR, sync_project pushes only .paraspace/hooks/ into a
-  # workspace, and each template dir is documented as runnable on its own.
+  # source-path=SCRIPTDIR, para pushes .paraspace/ into a workspace whole, and
+  # each template dir is documented as runnable on its own.
   local repo ref="" f rc=0 n=0
   repo="$(cd "$(dirname "$PARA")/.." && pwd)"
   for f in "$repo"/templates/*/.paraspace/hooks/helpers; do
@@ -362,10 +370,11 @@ test_template_helpers_do_not_drift() {
   return "$rc"
 }
 
-# --------------------------------------------------------------------- contract
-
-test_up_refuses_a_contract_version_mismatch() {
-  local p; p="$(a_project 'PARA_ROUTES="3000"' PARA_VERSION=999)"
-  assert_refuses "$p" "contract" || return 1
-  assert_backend_untouched
+# Run para against <project> with one extra environment variable, backend
+# fenced. The precedence tests are ABOUT the environment, so they set it
+# explicitly rather than going through para_in.
+_para_env() { # _para_env <project> <VAR=VALUE> <args>...
+  local proj="$1" assignment="$2"; shift 2
+  [ -n "$PARA_FENCE" ] || PARA_FENCE="$(a_fenced_backend)"
+  env PATH="$PARA_FENCE:$PATH" PARA_PROJECT_DIR="$proj" "$assignment" "$PARA" "$@" 2>&1
 }

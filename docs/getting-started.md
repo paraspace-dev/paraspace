@@ -13,35 +13,48 @@ host:
 - **Linux** — [install Caddy](https://caddyserver.com/docs/install) and
   [install Incus](https://linuxcontainers.org/incus/docs/main/tutorial/first_steps/)
 
-## Using a `para`-enabled repo
-
-If the repo already has a `.paraspace/` dir (a maintainer committed one),
-you're four commands from a running workspace:
+Then check the machine is ready:
 
 ```sh
-para image build  # build the project's base image — once per machine
-para up ws1       # launch an isolated workspace
-para sh ws1       # shell into the clone
-para web ws1      # open its https URL
+para doctor
 ```
 
-Two things to expect on a fresh machine: `para image build` takes several minutes
-(on macOS, `para` also boots its Colima VM first), and with the default
-template's hooks the first `up` **pauses at a printed SSH key** so you can
-authorize it with your git host — see
-[Git authentication](./git-auth.md). Your browser will distrust the
-workspace's certificate until you trust the local CA — see
-[Workspace URLs](./urls.md).
+It prints what's wrong and how to fix it — see
+[Troubleshooting](./troubleshooting.md).
 
-`para up` starts everything it needs — Incus (on macOS, the Colima VM) and the
-`para` Caddy. The full command surface (`down`, `rm`, `run`, …) is in
-[Commands](./commands.md).
+## Using a `para`-enabled repo
 
-## Enabling your project
+If the repo already has a `.paraspace/` directory, you're three commands from a
+running workspace:
 
-`para` needs one thing from a project: a `.paraspace/` dir at the repo root — a
-`Parafile` (config) and `hooks/` (provision + boot). Commit it, and every
-contributor — and every agent — gets the workflow above:
+```sh
+para image build  # build the project's base image — once per project, per arch
+para up ws1       # launch an isolated workspace
+para sh ws1       # shell into the clone
+```
+
+`para ls` prints each workspace's URL. Opening one is a
+[project command](./commands.md#project-commands) — most templates ship
+`para web`.
+
+Two things to expect on a fresh machine:
+
+- **`para image build` takes several minutes.** It's per-project and per-arch,
+  and it only happens again when the image source changes.
+- **The first `up` may pause at a printed SSH key**, so you can authorize it
+  with your git host — see [Shared authentication](./shared-auth.md).
+
+Your browser will distrust the workspace's certificate until you run
+`caddy trust` once — see [Workspace URLs](./urls.md).
+
+`para up` starts everything it needs, including para's Caddy. The full surface
+is in [Commands](./commands.md).
+
+## Enabling your own project
+
+`para` needs one thing from a project: a `.paraspace/` directory at the repo
+root. Commit it, and every contributor — and every agent — gets the workflow
+above.
 
 ```sh
 para init         # scaffold .paraspace/ from a working template
@@ -52,7 +65,7 @@ Then point it at your repo and your stack — the walkthrough is
 
 ## Next
 
-- [How it works](./how-it-works.md) — what problem this solves, and the
-  architecture that solves it.
+- [Running coding agents](./agents.md) — the workflow para is built for.
+- [How it works](./how-it-works.md) — the architecture.
 - [Workspace URLs](./urls.md) — clean `:443` URLs, your own domain, browser
   trust.

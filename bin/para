@@ -69,6 +69,7 @@ load_config() {
   PARA_STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/para"
   CADDYFILE="$PARA_STATE_DIR/Caddyfile"
   CADDY_PID="$PARA_STATE_DIR/caddy.pid"
+  CADDY_LOG="$PARA_STATE_DIR/caddy.log"
   # shellcheck disable=SC2034  # read by para_env's ${!PARA_@}, so a project
   # command can call back into para without relying on $PATH.
   PARA_BIN="$(cd "$(dirname "$0")" && pwd)/${0##*/}"
@@ -306,6 +307,16 @@ caddy_running() {
   case "$(ps -p "$pid" -o comm= 2>/dev/null)" in *caddy*) return 0 ;; *) return 1 ;; esac
 }
 
+# Caddy narrates every invocation in structured JSON on stderr, success or
+# not, so its output goes to a log and is surfaced only when something failed.
+# The started daemon inherits the same file, which is what makes $CADDY_LOG
+# worth keeping around rather than a temp file.
+caddy_run() { # caddy_run <args>…
+  if caddy "$@" >>"$CADDY_LOG" 2>&1; then return; fi
+  tail -n 20 "$CADDY_LOG" >&2
+  return 1
+}
+
 caddy_globals() {
 cat <<EOF
 {
@@ -361,16 +372,17 @@ caddy_sync() {
   need caddy
   mkdir -p "$PARA_STATE_DIR"
   { caddy_globals; caddy_workcopy; caddy_sites; } > "$CADDYFILE"
-  caddy validate --config "$CADDYFILE" --adapter caddyfile >/dev/null \
+  caddy_run validate --config "$CADDYFILE" --adapter caddyfile \
     || die "the generated Caddyfile is invalid (above) — check PARA_ROUTES and PARA_DOMAIN. It is at $CADDYFILE."
   if caddy_running; then
-    caddy reload --config "$CADDYFILE" --adapter caddyfile
+    caddy_run reload --config "$CADDYFILE" --adapter caddyfile \
+      || die "caddy refused the new config (above); the full log is $CADDY_LOG."
     return
   fi
   log "Starting para Caddy on :$PARA_HTTPS_PORT…"
   rm -f "$CADDY_PID"
-  caddy start --config "$CADDYFILE" --adapter caddyfile --pidfile "$CADDY_PID" \
-    || die "caddy could not start on :$PARA_HTTPS_PORT — 'para doctor' checks the usual causes."
+  caddy_run start --config "$CADDYFILE" --adapter caddyfile --pidfile "$CADDY_PID" \
+    || die "caddy could not start on :$PARA_HTTPS_PORT (above) — 'para doctor' checks the usual causes, and the full log is $CADDY_LOG."
   warn "If browsers distrust the certificates, run once:  caddy trust"
 }
 
@@ -594,7 +606,9 @@ cmd_caddy() {
       ;;
     status)
       if caddy_running; then
-        log "para Caddy is running (pid $(cat "$CADDY_PID")) on :$PARA_HTTPS_PORT — $CADDYFILE"
+        log "para Caddy is running (pid $(cat "$CADDY_PID")) on :$PARA_HTTPS_PORT"
+        log "  config $CADDYFILE"
+        log "  log    $CADDY_LOG"
       else
         log "para Caddy is not running — 'para caddy start'."
       fi
@@ -906,6 +920,12 @@ doctor_config() {
   printf '    PARA_POOL     %s\n' "$PARA_POOL"
   printf '    PARA_VOLUME   %s\n' "$PARA_VOLUME"
   printf '    Caddy port    %s\n' "$PARA_HTTPS_PORT"
+  # Caddy site addresses are whitespace-separated, so a domain with a space in
+  # it becomes TWO addresses and `caddy validate` accepts the result happily —
+  # the one bad value the generated Caddyfile cannot catch for itself.
+  case "$PARA_DOMAIN" in
+    *[[:space:]]*) d_bad "PARA_DOMAIN contains whitespace — Caddy reads '<workspace>.$PARA_DOMAIN' as two site addresses, and none of your URLs will resolve" ;;
+  esac
   # The user config describes your box, so a project-shaped key there applies
   # to every project on it. Nothing refuses that; this says it out loud.
   local key

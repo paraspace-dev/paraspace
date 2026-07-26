@@ -1,0 +1,49 @@
+#!/usr/bin/env bash
+set -euo pipefail
+# ============================================================================
+# release — cut a version and hand it to CI.
+#
+# Bumps package.json, commits, tags and pushes. From there
+# .github/workflows/publish.yml publishes the tag to npm; README's Development
+# section covers the one-time trusted-publisher setup.
+#
+#   Usage: bin/release <patch|minor|major|prerelease|x.y.z>
+#
+#   Via npm:
+#     npm run release patch
+#     npm run release 1.0.0
+#
+# A tag is public the moment it is pushed and npm never lets a version number
+# be reused, so everything that can refuse a release happens before the tag
+# exists: the checks below, then `npm version`, which runs the gates through
+# preversion and refuses on a dirty tree.
+# ============================================================================
+
+# Always the package's own repo, not whatever directory you're standing in.
+cd "$(cd "$(dirname "$0")/.." && pwd)"
+
+die() { echo "release: $*" >&2; exit 1; }
+
+case "${1:-}" in
+  # Print the header between the two `# ====` rules. Same idiom as
+  # bin/prune-branches and test/run.
+  -h|--help)
+    awk '/^# ={10,}$/{n++; next} n==1{sub(/^# ?/, ""); print} n>1{exit}' "$0"
+    exit 0 ;;
+  "") die "usage: bin/release <patch|minor|major|prerelease|x.y.z>" ;;
+esac
+
+branch="$(git rev-parse --abbrev-ref HEAD)"
+[ "$branch" = main ] || die "releases come from main; you are on '$branch'."
+
+# publish.yml refuses a tag that isn't on main, and a main that trails the
+# remote would tag the wrong tree.
+git fetch --quiet origin main
+if ! git merge-base --is-ancestor origin/main HEAD; then
+  die "main is behind origin/main — 'git pull' first."
+fi
+
+npm version "$1"
+git push --follow-tags
+
+echo "Released $(git describe --tags --abbrev=0) — 'gh run watch' follows the publish." >&2

@@ -1,7 +1,6 @@
 # CLAUDE.md — paraspace
 
-Guidance for Claude Code working in `packages/paraspace/`. Rules here refine the
-repo root `CLAUDE.md` for this subtree.
+Guidance for Claude Code working in this repo.
 
 ## What this is
 
@@ -9,8 +8,8 @@ ParaSpace is the
 `para` tool: parallel dev workspaces, each an unprivileged Incus system
 container with its own clone, Docker stack, bridge IP, and
 `https://<name>.<domain>` URL. **It is a standalone, self-contained,
-MIT-licensed npm package (`paraspace`)** that happens to live in this
-monorepo — its own `package.json`, `LICENSE`, and `.github/workflows/lint.yml`.
+MIT-licensed npm package (`paraspace`)**, published from a `v*` tag by
+`.github/workflows/publish.yml`.
 
 **Read [`README.md`](./README.md) and [`docs/`](./docs/README.md) first.** The
 README is the funnel (install, quick start, pointers); `docs/` is the
@@ -49,7 +48,7 @@ seam, decide breaking-vs-additive deliberately and update both the constant and
 
 ## Code + conventions
 
-- **Pure shell.** `bin/para` is one ~1,080-line bash script (`set -euo
+- **Pure shell.** `bin/para` is one ~1,200-line bash script (`set -euo
   pipefail`), organized as small helpers + `cmd_*` handlers dispatched from
   `main()`: terse helpers, `log/warn/die/need`, lowercase function names,
   POSIX-ish where practical. It is the minimal-engine rewrite
@@ -80,7 +79,7 @@ seam, decide breaking-vs-additive deliberately and update both the constant and
 ## House style: code a human wrote on purpose
 
 The bar is that someone who knows bash but not para can read any function top to
-bottom and be right about what it does. `bin/para2` is the reference. The rules
+bottom and be right about what it does. `bin/para` is the reference. The rules
 below are not aesthetic preferences — each one is a mess the rewrite cleaned up.
 
 - **No bash gymnastics.** If a line needs a comment warning you about bash,

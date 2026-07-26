@@ -82,6 +82,21 @@ merging anything touching `up`, routes or lifecycle. See
 `npm run site` previews the VitePress docs; `npm run site:build` checks for
 dead links.
 
+To release, from `main`:
+
+```sh
+npm run release patch      # or minor, major, prerelease, or an exact 1.0.0
+```
+
+That runs the gates, bumps `package.json`, tags and pushes;
+[`publish.yml`](./.github/workflows/publish.yml) publishes the tag to npm over
+[trusted publishing](https://docs.npmjs.com/trusted-publishers), so there is no
+token in the repo and npm attests the provenance itself. A `prerelease` goes
+out under the `next` tag rather than `latest`.
+
+The one-time setup is a trusted publisher, under the package's settings on
+npmjs.com: this repo, workflow `publish.yml`, action `npm publish`.
+
 ## License
 
 [MIT](./LICENSE)

@@ -11,12 +11,12 @@ provisioning out of parts it didn't write — and let a project **open hook poin
 of its own** that para has never heard of.
 
 ```sh
-# .paraspace/hooks/provision, once the clone is in place
+# anywhere in a project's own hook
 "$PARA_RUN_HOOK" post-clone
 ```
 
-para runs `provision` and `boot`. Every other name in that vocabulary belongs to
-projects and the people writing against them.
+para runs `provision`, `boot` and `image-build`. Every other name in that
+vocabulary belongs to projects and the people writing against them.
 
 ## The rule
 
@@ -24,24 +24,19 @@ For hook `H`, para runs the project's, then one per mod:
 
 ```
 hooks/H                    # the project's own
-mods/<m>/hooks/H           # each mod's, mods in LC_ALL=C directory order
+mods/<m>/hooks/H           # each mod's
 ```
 
 One file per hook name per owner. No `H.d/`, no `NN-` prefixes, no priority
-field:
+field, and **no promise about the order mods run in** — the glob's order is
+whatever the filesystem and locale give.
 
 > **Hooks are order-agnostic. Where order matters, fill a named point.**
 
 That is about the *hook*, not the outcome. Two hooks that write one file still
 collide, and para promises nothing about who wins —
-[mods.md](./mods.md#what-a-mod-may-assume) makes not-colliding an authoring rule
-rather than a mechanism.
-
-Sorting is `LC_ALL=C` so a run is reproducible across machines. In the runner
-that has to be `export -n LC_ALL 2>/dev/null; LC_ALL=C` — assigning to an
-already-exported variable keeps the export attribute, so on a guest whose
-`/etc/profile.d` exports `LC_ALL` (and `su -` is a login shell) every hook would
-inherit `C`, which is the regression the rule exists to prevent.
+[mods.md](./mods.md#what-a-mod-may-assume) makes that an authoring rule rather
+than a mechanism.
 
 ## Hooks are sourced in a subshell
 
@@ -72,7 +67,7 @@ The model is one sentence:
 > to its caller.**
 
 There is deliberately no channel for writing back. The one case that wanted it —
-`$BROWSER` for `gh auth login` — is solved in the image: the mod's build hook
+`$BROWSER` for `gh auth login` — is solved in the image: a mod's build hook
 writes `/etc/profile.d/`, which `su -` sources before any hook runs.
 
 The shebang becomes decorative. Keep `#!/usr/bin/env bash` on hooks — `bin/lint`
@@ -91,8 +86,8 @@ run_hook() { # run_hook <hook> <name>
 ```
 
 Enumerating on the host instead would work for `provision` and `boot`, and would
-leave every named point hand-rolling its own glob-and-sort in a project hook.
-One implementation, reachable from both sides, is the argument.
+leave every named point hand-rolling its own glob in a project hook. One
+implementation, reachable from both sides, is the argument.
 
 It is generic mechanism, not a boundary violation: no ports, no repo URLs, no
 compose knowledge. para already writes `~/.paraspace/env` and splices in
@@ -144,10 +139,10 @@ so a mod's hook is written *identically* to a project's:
 cp "$PARA_SKEL/zshrc" ~/.zshrc           # the mod's own skel
 ```
 
-**`PARA_RUN_HOOK` is the only new variable.** No `PARA_MOD`, no
-`PARA_MOD_DIR` — a hook already knows where it lives via `$PARA_HOOKS`, and
-nothing in v1 needs the name. `.shellcheckrc`'s `source-path=SCRIPTDIR` resolves
-`$PARA_HOOKS/helpers` by basename, so a mod's `hooks/helpers` follows for free.
+**`PARA_RUN_HOOK` is the only new variable.** No `PARA_MOD`, no `PARA_MOD_DIR`
+— a hook already knows where it lives via `$PARA_HOOKS`. `.shellcheckrc`'s
+`source-path=SCRIPTDIR` resolves `$PARA_HOOKS/helpers` by basename, so a mod's
+`hooks/helpers` follows for free.
 
 Two sharp edges to document:
 
@@ -167,7 +162,7 @@ the fourth `local` now and extracting later means editing `push_project` twice.
 mods and no `run-hook` lines resolves to one file and behaves identically.
 **Sourcing is not**: it changes hook semantics. Contract 1 is deliberately soft
 pre-adoption (`PARA_BASE_IMAGE` → `PARA_IMAGE_BASE` landed inside it in #21), so
-both land at 1 with a `docs/versioning.md` row. The open question that wants
+both land at 1 with a `docs/versioning.md` row. The question that wants
 answering there eventually: when contract 1 freezes — first real consumer, or
 1.0.
 
@@ -179,9 +174,9 @@ Two new claims on a tree the project ships verbatim, both named in
 
 CLI tier, against a fixture directory, no incus:
 
-- resolution: project before mods, `LC_ALL=C` order, a mod with no `H` skipped,
-  no `mods/` → unchanged, `hooks/helpers` never sourced, zero candidates prints
-  the skip line, each candidate announced.
+- resolution: project before mods, a mod with no `H` skipped, no `mods/` →
+  unchanged, `hooks/helpers` never sourced, zero candidates prints the skip
+  line, each candidate announced.
 - a failing hook aborts the rest, its path is in the error, its status
   propagates — including a `helpers`-style `die` (`exit 1`).
 - a hook with no exec bit runs; a hook's `cd`, `set -o` and stray variables
@@ -189,12 +184,11 @@ CLI tier, against a fixture directory, no incus:
 - `PARA_HOOKS`/`PARA_SKEL` re-pointed per hook; the documented cwd.
 - a nested point from inside a mod hook resolves every owner.
 - a hook that reads stdin gets the caller's, not the hook list.
-- an ambient exported `LC_ALL` doesn't reach hooks as `C`.
 - `npm pack --dry-run` covers `libexec/`.
 
 e2e (run it — CI won't): a fixture mod appending its name in `provision` and in
-a named point the fixture opens; both ran, in order, `up` still idempotent; a
-prompting hook still gets the terminal.
+a named point the fixture opens; both ran, `up` still idempotent; a prompting
+hook still gets the terminal.
 
 ## Docs
 
@@ -204,20 +198,13 @@ reserved name. The page is ~131 lines after #18 and the gate is ~150, so if it
 doesn't fit, the runner's contract splits to `docs/run-hook.md` with a sidebar
 entry and a `docs/README.md` router line.
 
-## Sequence
-
-1. **`void-docker-gh`'s seeding fix**, alone — see
-   [mods.md](./mods.md#the-first-pr-has-nothing-to-do-with-mods).
-2. **This plan.** Mods don't exist yet; the runner resolves `mods/*/hooks/H` and
-   finds nothing. Independently useful the day it lands: a project can split its
-   own guest provisioning into named points.
-3. [mods.md](./mods.md).
-
 ## Deliberately not in v1
 
 - **A cycle guard.** A hook point that invokes itself recurses until the
   container's limits bite. You have to author that on purpose.
 - **Refusing a project that ships `.paraspace/run-hook`.** para overwrites it;
   nobody has that file.
-- **Build-time points.** `cmd_image_build` never calls `push_project`, so no
-  runner reaches the builder until [mods.md](./mods.md#image-build).
+- **Deterministic mod ordering.** An earlier draft pinned `LC_ALL=C` so the host
+  and guest agreed on sort order, which only mattered because the image hash
+  walked the same tree. That hash is gone, and order is explicitly not a
+  promise, so the glob's own order is fine.

@@ -1,7 +1,10 @@
 # Hooks
 
-Hooks are where all the provisioning lives. `para` runs them **inside the
-workspace**, as the workspace user (`$PARA_USER`).
+Hooks are where all the provisioning lives. para runs them **inside the
+workspace**, as the workspace user (`$PARA_USER`), starting in
+`~/$PARA_CLONE_DIR` when it exists and `$HOME` when it doesn't — so `provision`
+starts in `$HOME` on the first `up` and in the clone every time after. Use
+absolute paths rather than relying on it.
 
 ## The two hooks
 
@@ -25,7 +28,7 @@ routed service is actually listening.
 docker compose up -d --wait          # blocks until healthchecks pass
 ```
 
-`para` gates on the container agent (and `$PARA_READY_HOST`, if you set one)
+para gates on the container agent (and `$PARA_READY_HOST`, if you set one)
 before hooks run, then trusts your boot hook's exit code.
 
 An absent hook is a visible no-op, so write only the ones you need.

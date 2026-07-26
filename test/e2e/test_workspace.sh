@@ -52,6 +52,11 @@ test_guest_paths_are_injected() {
   local skel; skel="$("$PARA" sh "$PARA_WS" -c 'echo "$PARA_SKEL"' 2>/dev/null)"
   assert_eq "/home/$PARA_USER/.paraspace/skel" "$skel" "PARA_SKEL names the guest skel dir" || return 1
 
+  # The one that names a file on BOTH sides: push_project overrides the host's
+  # value so the copy in here is what a hook reads.
+  local hostenv; hostenv="$("$PARA" sh "$PARA_WS" -c 'echo "$PARA_HOST_ENV"' 2>/dev/null)"
+  assert_eq "/home/$PARA_USER/.paraspace/host.env" "$hostenv" "PARA_HOST_ENV names the guest copy" || return 1
+
   # The host-only paths stay unset in here, so a hook can't reach a host file.
   local host; host="$("$PARA" sh "$PARA_WS" -c 'echo "${PARA_PROJECT_DIR-unset}"' 2>/dev/null)"
   assert_eq "unset" "$host" "PARA_PROJECT_DIR is not leaked into the guest"

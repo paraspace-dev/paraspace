@@ -354,7 +354,9 @@ test_a_scaffolded_project_takes_its_identity_from_the_directory() {
 
 test_template_helpers_do_not_drift() {
   # hooks/helpers is byte-identical across the bundled templates on purpose, and
-  # cannot be factored into a shared overlay: para pushes .paraspace/ into a
+  # cannot be factored into a shared overlay: it has to sit BESIDE the hooks that
+  # source it (shellcheck follows `. "$PARA_HOOKS/helpers"` by basename, through
+  # .shellcheckrc's source-path=SCRIPTDIR), para pushes .paraspace/ into a
   # workspace whole, and each template dir is documented as runnable on its own.
   local repo ref="" f rc=0 n=0
   repo="$(cd "$(dirname "$PARA")/.." && pwd)"

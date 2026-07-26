@@ -27,10 +27,10 @@ Everything project-specific lives in a consumer's `.paraspace/` dir (`Parafile` 
 `hooks/`), which para runs but never contains. When working here:
 
 - **Never leak project specifics into `bin/para`.** No project ports,
-  repo URLs, `.env` keys, compose knowledge, or refinance/domain concepts. If
+  repo URLs, `.env` vars, compose knowledge, or refinance/domain concepts. If
   something is project policy, it belongs in a `.paraspace/hooks/` script, exposed
   to para only through the versioned contract (`PARA_*` env, hook names, the
-  `Parafile` keys). The templates under `templates/` are the reference consumers
+  `Parafile` vars). The templates under `templates/` are the reference consumers
   (`void-docker-gh` is the `para init` default; `void-minimal`/`void-jchook` are
   siblings) — keep them minimal and runnable.
 
@@ -40,8 +40,8 @@ The para↔project interface is versioned (`PARA_CONTRACT`, currently **1**) —
 `.paraspace/` dir a project ships: its `Parafile`, its `hooks/`, and its
 `commands/` (host-side verbs that become `para <verb>`). A **breaking** change to
 injected env, the hook names/semantics, the `~/.paraspace` layout in the guest,
-or the `Parafile` keys must bump `PARA_CONTRACT`; additive changes don't.
-A project pins the contract it targets with the same key in its `Parafile`, and
+or the `Parafile` vars must bump `PARA_CONTRACT`; additive changes don't.
+A project pins the contract it targets with the same var in its `Parafile`, and
 para refuses on mismatch. If you change the
 seam, decide breaking-vs-additive deliberately and update both the constant and
 [`docs/versioning.md`](./docs/versioning.md).
@@ -123,7 +123,7 @@ below are not aesthetic preferences — each one is a mess the rewrite cleaned u
 ## Docs style: written for a reader, not a reviewer
 
 `README.md` and `docs/` are a published spec, not internal notes. **If you
-change a command, flag, `Parafile` key, hook semantic, or the image contract,
+change a command, flag, `Parafile` var, hook semantic, or the image contract,
 update the relevant page in the same change** — drift between `bin/para` and
 the docs is a bug. See [`plans/docs-rewrite.md`](./plans/docs-rewrite.md) for
 the in-flight rewrite and the page-by-page targets.

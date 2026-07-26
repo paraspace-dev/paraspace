@@ -1,33 +1,33 @@
 # The Parafile
 
 `.paraspace/Parafile` is your project's config: the few `PARA_*` variables
-`para` itself reads. It is **sourced as bash** and
-[precedence](#precedence) is whatever bash does. Most keys default sensibly and
-can be left out — a Parafile that restates a default is a copy that goes stale.
+`para` itself reads. It is **sourced as bash** and follows the
+[precedence](#precedence) rules. Most vars default sensibly and can be left out
+for a lean & simple config.
 
 Every value is a **scalar**. Arrays aren't forwarded to your hooks — they
-arrive as their first element — so a list is a delimited string, as
-`PARA_ROUTES` is. See [Hooks](./hooks.md#the-environment-para-injects).
+arrive as their first element — so a list is a delimited string. See
+[Hooks](./hooks.md#the-environment-para-injects).
 
-## What you have to decide
+## Required vars
 
-para picks neither your distro, your port, nor your repo, so three keys are
-yours to decide:
+ParaSpace doesn't pick your distro, your app's dev port, or your repo URL, so
+typically three vars are required:
 
-| Key | If you don't |
+| Var | Why it's needed |
 |---|---|
-| `PARA_BASE_IMAGE` | `para image build` refuses — it has no default |
-| `PARA_ROUTES` | the workspace publishes no HTTP and has no URL |
-| `PARA_ORIGIN` | the templates' clone hook fails; para itself never reads it |
+| `PARA_IMAGE_BASE` | `para image build` has no default |
+| `PARA_ROUTES` | determines which port(s) your workspace URLs point to |
+| `PARA_ORIGIN` | tells your provision hook which repo to clone |
 
-## Every key para reads
+## Every var para reads
 
-| Key | Default | What it does |
+| Var | Default | What it does |
 |---|---|---|
 | `PARA_CONTRACT` | — | the [contract](./versioning.md) your `.paraspace/` targets. para refuses on a mismatch |
 | `PARA_PROJECT` | the directory name, slugified (`My.App` → `my-app`) | project identity: workspace ownership, `para ls` scoping, the shared-volume name |
 | `PARA_IMAGE` | `$PARA_PROJECT` | the image `para up` launches and `para image build` publishes |
-| `PARA_BASE_IMAGE` | — | the Incus image `para image build` builds *from* |
+| `PARA_IMAGE_BASE` | — | the Incus image `para image build` builds *from* |
 | `PARA_IMAGE_BOOTSTRAP` | — | one `sh -c` line run in the builder before your payload |
 | `PARA_ROUTES` | empty | `[sub:]port` entries, one Caddy site each |
 | `PARA_DOMAIN` | `paraspace.dev` | wildcard domain workspaces are served under |
@@ -39,7 +39,7 @@ yours to decide:
 | `PARA_WORKCOPY_PORT` | — | proxy `https://localhost` to a stack you run on the **host** |
 | `PARA_WORKCOPY_HOST` | `localhost` | matters only if that host stack terminates TLS with SNI |
 
-Anything else you set is [forwarded to your hooks](#your-own-keys) untouched.
+Anything else you set is [forwarded to your hooks](#your-own-vars) untouched.
 
 ## The ones with subtleties
 
@@ -61,9 +61,8 @@ Commas, spaces, tabs and newlines all separate entries, so a long list can go
 one route per line. [Hooks](./hooks.md#the-environment-para-injects) see one
 normalized space-separated list.
 
-para does **not** validate routes — `caddy validate` does, before every reload,
-and it names the site it rejected. A bad port or two workspaces claiming one
-hostname fails loudly, with nothing written.
+`caddy validate` runs before every reload, so any configuration issues
+fail loudly.
 
 Empty means "this workspace serves no HTTP" — a worker, a bare box. `para ls`
 shows no URL, `$PARA_URL` is empty in your hooks, and `para doctor` mentions it
@@ -76,7 +75,7 @@ Set it only to point several projects at one image, or to name an image built
 elsewhere. Aliases are Incus-daemon-global, so two projects naming the same
 image share it: `para image build` in either republishes it for both.
 
-### `PARA_BASE_IMAGE` and `PARA_IMAGE_BOOTSTRAP`
+### `PARA_IMAGE_BASE` and `PARA_IMAGE_BOOTSTRAP`
 
 The base is **required to build**, and any Incus image works
 (`images:debian/13`, `images:voidlinux`, `images:alpine/edge`, …): para pins no
@@ -95,21 +94,7 @@ file to. Your `image-build.sh` creates that user — it gets all three in its
 environment — so if you change them, **rebuild the image**, or the chowns land
 on a uid with no passwd entry and the shared volume becomes unwritable.
 
-## Keys para only forwards to hooks
-
-These belong to the **hook** contract. para never acts on them; it forwards
-them like any other `PARA_*`. They're documented here because the Parafile is
-where you set them.
-
-- **`PARA_ORIGIN`** — the git URL your clone hook clones. A Parafile at its own
-  repo's toplevel can derive it:
-  `: "${PARA_ORIGIN:=$(git -C "$PARA_PROJECT_DIR" remote get-url origin)}"`.
-  Don't use that in a project nested inside a larger repo — it walks up and
-  finds the outer remote.
-- **`PARA_CLONE_BRANCH`** — which branch to check out. Applies at clone time
-  only; to move an existing workspace, `para rm` then `para up`.
-
-## Your own keys
+## Your own vars
 
 Any `PARA_FOO` you set reaches your hooks, project commands and image build
 untouched — that's how a project declares its own knobs (`PARA_GH_AUTH` in the
@@ -119,6 +104,9 @@ reads). See
 [One workspace, a custom env var](./cookbook.md#one-workspace-a-custom-env-var)
 for varying one per workspace.
 
+> 💡 `PARA_ORIGIN` and `PARA_CLONE_BRANCH` are actually custom project vars that
+> are never acted on by `para` itself.
+
 ## Precedence
 
 Two sourced bash files and the engine's defaults, in that order:
@@ -127,7 +115,7 @@ Two sourced bash files and the engine's defaults, in that order:
 environment  >  user config  >  Parafile  >  para's defaults
 ```
 
-Write your keys with these idioms and the environment can still win:
+Write your vars with these idioms and the environment can still win:
 
 ```sh
 : "${PARA_DOMAIN:=myapp.dev}"      # a value, unless the environment has one
@@ -144,7 +132,7 @@ Some knobs describe *your box*, not the project, so they belong in
 it from a commented template on first use. It's sourced bash with the same two
 idioms.
 
-| Key | Default | What it does |
+| Var | Default | What it does |
 |---|---|---|
 | `PARA_HTTPS_PORT` | `8443` | the port para's Caddy binds — `443` for port-less URLs ([Workspace URLs](./urls.md)) |
 | `PARA_POOL` | `default` | the Incus storage pool |
@@ -152,10 +140,7 @@ idioms.
 | `PARA_IP_LO` / `PARA_IP_HI` | `200` / `249` | the band static IPs are allocated from |
 | `PARA_CADDY_ADMIN` | Caddy's default | give para's Caddy its own admin address when something else has `localhost:2019` |
 
-Nothing stops you putting a project key here, but a box-wide `PARA_PROJECT` or
+Nothing stops you putting a project var here, but a box-wide `PARA_PROJECT` or
 `PARA_ROUTES` applies to *every* project on the machine, which is rarely what
 you want. `para doctor` says so when it sees one.
 
-`PARA_DOMAIN` is the deliberate exception: a personal wildcard domain is a
-reasonable box-wide setting, and workspaces record their own domain, so
-projects on different domains coexist.

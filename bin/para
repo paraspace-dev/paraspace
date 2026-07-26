@@ -95,7 +95,7 @@ load_config() {
   : "${PARA_CLONE_DIR:=app}"
   : "${PARA_CLONE_BRANCH:=}"
   : "${PARA_ORIGIN:=}"
-  : "${PARA_BASE_IMAGE:=}"
+  : "${PARA_IMAGE_BASE:=}"
   : "${PARA_IMAGE_BOOTSTRAP:=}"
   : "${PARA_READY_HOST:=}"
   # Caddy's admin endpoint. Empty means Caddy's own default (localhost:2019),
@@ -736,7 +736,7 @@ image_src_sha() { # image_src_sha [<was-incremental>]
     # The mode is part of the identity: `-i` layers onto the existing image and
     # skips the bootstrap, so an image built that way is NOT what a clean
     # rebuild produces — and `image status` should report exactly that.
-    printf '%s\n%s\n%s\n' "${1:-0}" "$PARA_BASE_IMAGE" "$PARA_IMAGE_BOOTSTRAP"
+    printf '%s\n%s\n%s\n' "${1:-0}" "$PARA_IMAGE_BASE" "$PARA_IMAGE_BOOTSTRAP"
     cat "$PARA_PROJECT_DIR/.paraspace/image-build.sh"
   } | sha256_of
 }
@@ -760,10 +760,10 @@ cmd_image_build() {
   # an incomplete Parafile is more useful to hear about than an absent incus.
   local payload="$PARA_PROJECT_DIR/.paraspace/image-build.sh"
   [ -f "$payload" ] || die "missing provisioning payload: $payload"
-  local base="$PARA_BASE_IMAGE"
+  local base="$PARA_IMAGE_BASE"
   [ "$from_current" -eq 0 ] || base="$PARA_IMAGE"
   [ -n "$base" ] \
-    || die "PARA_BASE_IMAGE is not set — name the incus image to build from in .paraspace/Parafile, e.g. : \"\${PARA_BASE_IMAGE:=images:debian/13}\". See docs/image.md."
+    || die "PARA_IMAGE_BASE is not set — name the incus image to build from in .paraspace/Parafile, e.g. : \"\${PARA_IMAGE_BASE:=images:debian/13}\". See docs/image.md."
 
   require_incus
   if [ "$from_current" -eq 1 ]; then
@@ -844,7 +844,7 @@ cmd_image_status() {
   elif [ "$sha" = "$current" ]; then source="up to date"
   else source="drifted — the image inputs changed since this build"; fi
   printf '  image    %s\n  built    %s\n  base     %s\n  source   %s\n' \
-    "$PARA_IMAGE" "${built:-unknown}" "${PARA_BASE_IMAGE:-<unset>}" "$source"
+    "$PARA_IMAGE" "${built:-unknown}" "${PARA_IMAGE_BASE:-<unset>}" "$source"
 }
 
 cmd_image_rm() {
@@ -994,7 +994,7 @@ doctor_config() {
   # The user config describes your box, so a project-shaped key there applies
   # to every project on it. Nothing refuses that; this says it out loud.
   local key
-  for key in PARA_PROJECT PARA_IMAGE PARA_ORIGIN PARA_ROUTES PARA_BASE_IMAGE PARA_VOLUME; do
+  for key in PARA_PROJECT PARA_IMAGE PARA_ORIGIN PARA_ROUTES PARA_IMAGE_BASE PARA_VOLUME; do
     if [ -f "$PARA_CONFIG" ] && grep -q "^[^#]*$key" "$PARA_CONFIG"; then
       d_warn "$key is set in the user config, so it applies to EVERY project on this box — it probably belongs in a Parafile."
     fi

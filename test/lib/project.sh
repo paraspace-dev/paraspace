@@ -43,7 +43,7 @@ scratch_cleanup() {
 # override either by passing its own (plain assignments: last wins). Echoes the
 # project dir.
 #
-#   p="$(a_project PARA_ROUTES='"3000"' PARA_BASE_IMAGE=images:alpine/edge)"
+#   p="$(a_project PARA_ROUTES='"3000"' PARA_IMAGE_BASE=images:alpine/edge)"
 #
 # Note the spelling: these are PLAIN assignments, which under para's precedence
 # model means "the project insists". A test about the environment winning must

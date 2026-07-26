@@ -3,7 +3,80 @@
  * Palette reference: https://github.com/morhetz/gruvbox
  */
 
+/*
+ * The hero's display face, self-hosted from public/fonts/ (SIL OFL, license
+ * alongside the file), so the page makes no third-party request and works
+ * offline. Anton SC draws its small caps rather than faking them: the
+ * lowercase codepoints map to real small-cap glyphs, which is why nothing here
+ * asks for font-variant-caps — that would shrink letters that are already
+ * small caps. It earns the display job in the hero and nowhere else, since
+ * heavy type makes a reference page harder to scan, so the docs stay on the
+ * body face. Latin subset only; the unicode-range hands anything outside it
+ * back to the stack.
+ */
+@font-face {
+  font-family: 'Anton SC';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/anton-sc-latin-400.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA,
+    U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193,
+    U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+/*
+ * Body and code: IBM Plex Sans and Plex Mono, self-hosted alongside the display
+ * face. They're siblings by design, which is the point — the prose and the
+ * commands inside it are the same voice at two widths, and Plex Mono has enough
+ * character to carry a terminal without being a novelty. The theme entry pulls
+ * vitepress/theme-without-fonts so the default Inter isn't shipped underneath
+ * these. Sans is the variable file: one download covers 400 through 700, which
+ * is every weight the theme asks for.
+ */
+@font-face {
+  font-family: 'IBM Plex Sans';
+  font-style: normal;
+  font-weight: 100 700;
+  font-display: swap;
+  src: url('/fonts/ibm-plex-sans-latin-var.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA,
+    U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193,
+    U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/ibm-plex-mono-latin-400.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA,
+    U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193,
+    U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+/* Mono has no variable cut, so the one bold the page actually uses — the `$`
+   prompt in the hero terminal — gets its own file rather than a fake bold. */
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('/fonts/ibm-plex-mono-latin-600.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA,
+    U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193,
+    U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
 :root {
+  --para-display: 'Anton SC', var(--vp-font-family-base);
+
+  --vp-font-family-base: 'IBM Plex Sans', ui-sans-serif, system-ui, sans-serif,
+    'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
+  --vp-font-family-mono: 'IBM Plex Mono', ui-monospace, 'Menlo', 'Monaco',
+    'Consolas', 'Liberation Mono', 'Courier New', monospace;
+
   --vp-c-brand-1: #d65d0e;
   --vp-c-brand-2: #e56b12;
   --vp-c-brand-3: #fe8019;
@@ -21,18 +94,24 @@
   --vp-button-brand-active-border: transparent;
 
   --vp-home-hero-name-color: transparent;
-  --vp-home-hero-name-background: linear-gradient(120deg, #fe8019 30%, #fabd2f);
+  /* The gold end of the ramp is bright enough to disappear into the cumulus
+     deck, which left "Space" fading out of the wordmark in light mode. Light
+     takes the deep end of the same gruvbox ramp; dark keeps the bright one. */
+  --vp-home-hero-name-background: linear-gradient(120deg, #d65d0e 30%, #b57614);
 
   /* Inline code defaults to the brand color, which makes it read as a link;
      gruvbox gold stays in the site's warm family while reading as its own
      thing (faded variant for light-bg contrast). */
   --vp-code-color: #94600e;
 
-  /* Prose links are the syntax-highlighter's string blue, not the brand orange:
-     against a page this warm, orange links blur into the inline code and the
-     headings, while the blue reads as the one interactive thing on the line. */
-  --para-link: #032f62;
-  --para-link-hover: #0550ae;
+  /* Prose links are blue, not the brand orange: against a page this warm,
+     orange links blur into the inline code and the headings, while the blue
+     reads as the one interactive thing on the line. The exact value is the
+     identifier blue the code blocks use for shell arguments (see
+     ../shiki-gruvbox.ts) — a workspace name in a snippet and a link in a
+     sentence are the same blue, so the page has one blue, not two. */
+  --para-link: #076678;
+  --para-link-hover: #0e7285;
   --vp-code-link-color: var(--para-link);
   --vp-code-link-hover-color: var(--para-link-hover);
 
@@ -76,8 +155,10 @@
 
   --vp-code-color: #fabd2f;
 
-  --para-link: #9ecbff;
-  --para-link-hover: #c8e1ff;
+  --vp-home-hero-name-background: linear-gradient(120deg, #fe8019 30%, #fabd2f);
+
+  --para-link: #83a598;
+  --para-link-hover: #a2bfb4;
 }
 
 /*
@@ -140,6 +221,20 @@
     order: 3;
     margin: 32px 0 0;
   }
+}
+
+/*
+ * The wordmark and the headline are the poster; everything under them is the
+ * caption. The face ships one weight, so both lines ask for exactly that — any
+ * other and the browser synthesizes a bold over the top. Tracking is neutral on
+ * purpose — a starting point to tune by eye, not a correction applied blind.
+ */
+.VPHome .VPHero .name,
+.VPHome .VPHero .text {
+  font-family: var(--para-display);
+  font-weight: 400;
+  letter-spacing: 0.01em;
+  line-height: 1.05;
 }
 
 /*
@@ -212,8 +307,8 @@
   padding: 1px;
   background: linear-gradient(
     168deg,
-    color-mix(in srgb, var(--sky-high) 42%, transparent),
-    color-mix(in srgb, var(--sky-high) 16%, transparent) 46%,
+    color-mix(in srgb, var(--sky-high) 62%, transparent),
+    color-mix(in srgb, var(--sky-high) 24%, transparent) 46%,
     transparent 76%
   );
   /* Two-layer mask minus the content box = a 1px gradient ring. */
@@ -239,8 +334,8 @@
 .VPHome .VPFeature:hover::before {
   background: linear-gradient(
     168deg,
-    color-mix(in srgb, var(--sky-high) 66%, transparent),
-    color-mix(in srgb, var(--sky-high) 26%, transparent) 46%,
+    color-mix(in srgb, var(--sky-high) 82%, transparent),
+    color-mix(in srgb, var(--sky-high) 34%, transparent) 46%,
     transparent 78%
   );
 }
@@ -298,4 +393,102 @@
   .VPHome .VPFeature:hover {
     transform: none;
   }
+}
+
+/*
+ * The markdown below the feature grid inherits the home layout's 1280px
+ * container, so Install and Quick start ran the full width of the page: a
+ * one-line install command in a very wide box, and prose at ~110 characters a
+ * line. Match the docs measure instead — 816px less the 64px gutters is the
+ * same 688px a docs page gets, which also shortens the h2 rules so the landing
+ * page stops looking like a doc page.
+ */
+@media (min-width: 960px) {
+  .VPHome .vp-doc.container {
+    max-width: 816px;
+  }
+}
+
+/*
+ * The page used to end on a paragraph and then a few hundred pixels of empty
+ * page. It closes on a call to action instead, cut from the same glass as the
+ * feature panes, and the layout's trailing margin comes in behind it.
+ */
+.Layout .VPHome {
+  margin-bottom: 64px;
+}
+
+.VPHome .home-cta {
+  margin-top: 72px;
+  padding: 44px 32px;
+  border-radius: 12px;
+  text-align: center;
+  background: linear-gradient(
+    168deg,
+    color-mix(in srgb, var(--vp-c-bg-soft) 96%, transparent) 0%,
+    color-mix(in srgb, var(--vp-c-bg-soft) 62%, transparent) 60%,
+    transparent 100%
+  );
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--sky-high) 26%, transparent);
+  backdrop-filter: blur(10px) saturate(1.1);
+}
+
+.dark .VPHome .home-cta {
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--neb-rose) 18%, transparent);
+}
+
+/* No rule above it and no top gap: the band is its own thing, not a section. */
+.VPHome .home-cta h2 {
+  margin: 0;
+  padding-top: 0;
+  border-top: none;
+  font-size: 24px;
+  letter-spacing: -0.02em;
+}
+
+.VPHome .home-cta p {
+  margin: 10px auto 0;
+  max-width: 46ch;
+  color: var(--vp-c-text-2);
+}
+
+.VPHome .home-cta-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+.VPHome .home-cta-btn {
+  display: inline-block;
+  padding: 0 20px;
+  border-radius: 20px;
+  line-height: 38px;
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+  transition:
+    background-color 0.25s,
+    color 0.25s;
+}
+
+.VPHome .home-cta-btn.brand {
+  background-color: var(--vp-button-brand-bg);
+  color: var(--vp-button-brand-text);
+}
+
+.VPHome .home-cta-btn.brand:hover {
+  background-color: var(--vp-button-brand-hover-bg);
+  color: var(--vp-button-brand-hover-text);
+}
+
+.VPHome .home-cta-btn.alt {
+  background-color: var(--vp-button-alt-bg);
+  color: var(--vp-button-alt-text);
+}
+
+.VPHome .home-cta-btn.alt:hover {
+  background-color: var(--vp-button-alt-hover-bg);
+  color: var(--vp-button-alt-hover-text);
 }

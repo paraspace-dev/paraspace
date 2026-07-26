@@ -301,7 +301,7 @@ test_image_build_refuses_without_a_base_image() {
   # about — which `assert_backend_untouched` is here to pin.
   local p; p="$(a_project)"
   printf 'true\n' > "$p/.paraspace/image-build.sh"
-  assert_refuses "$p" "PARA_BASE_IMAGE" image build || return 1
+  assert_refuses "$p" "PARA_IMAGE_BASE" image build || return 1
   assert_backend_untouched
 }
 

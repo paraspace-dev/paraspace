@@ -34,7 +34,7 @@ agent CLI you use — para degrades rather than breaks without them.
 
 The command is base-agnostic plumbing:
 
-1. launches a builder from **`$PARA_BASE_IMAGE`** with `security.nesting=true`;
+1. launches a builder from **`$PARA_IMAGE_BASE`** with `security.nesting=true`;
 2. runs **`$PARA_IMAGE_BOOTSTRAP`** in it via `sh -c`, if set;
 3. pipes your **`.paraspace/image-build.sh`** into it as root under `bash -s`,
    with every `PARA_*` exported ahead of it;
@@ -71,7 +71,7 @@ $ para image status
 ```
 
 `drifted` means the `image-build.sh` payload, `$PARA_IMAGE_BOOTSTRAP` or
-`$PARA_BASE_IMAGE` changed since the build, so rebuilding would give you
+`$PARA_IMAGE_BASE` changed since the build, so rebuilding would give you
 something different. `unknown` means the image predates provenance stamping, or
 was built by a plain `incus` action.
 

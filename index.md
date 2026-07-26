@@ -21,15 +21,7 @@ features:
       height: 32
       wrap: true
     title: Real isolation
-    details: Each workspace is an unprivileged Incus system container with its own clone, app stack, and bridge IP. Safely run your coding agents in YOLO mode, without impacting your host or other workspaces.
-  - icon:
-      light: /icons/sputnik-light.svg
-      dark: /icons/sputnik-dark.svg
-      width: 32
-      height: 32
-      wrap: true
-    title: Caddy at the doorway
-    details: Each workspace has its own IP, so your app binds its usual ports — nothing remapped, nothing path-rewritten, so WebSockets and hot reload work with no configuration.
+    details: Each workspace runs in an unpriveleged system container. Boot up is fast, system memory and compute are shared, and you can run containerized stacks inside it. Set your coding agent to YOLO mode and enjoy peace of mind.
   - icon:
       light: /icons/key-light.svg
       dark: /icons/key-dark.svg
@@ -37,23 +29,7 @@ features:
       height: 32
       wrap: true
     title: Authenticate once
-    details: Credentials live on a shared per-project volume. Run gh auth login in one workspace and the whole project is authed — one revocable key per project, never your host keys.
-  - icon:
-      light: /icons/console-light.svg
-      dark: /icons/console-dark.svg
-      width: 32
-      height: 32
-      wrap: true
-    title: A real terminal
-    details: <code>para sh</code> is a native shell in the container — a real pty, your dotfiles, no web terminal. One workspace per desktop, switched with your own window manager.
-  - icon:
-      light: /icons/rocket-light.svg
-      dark: /icons/rocket-dark.svg
-      width: 32
-      height: 32
-      wrap: true
-    title: A thin engine
-    details: About a thousand lines of bash over Incus and Caddy. Your project's <code>.paraspace</code> dir owns the image, the provisioning, the boot — and adds <code>para</code> verbs of its own.
+    details: Run <code>gh auth login</code> in one workspace and every workspace on the project is authenticated — including the one you create next week, and after a reboot. One revocable key per project, and never your host's.
   - icon:
       light: /icons/helmet-light.svg
       dark: /icons/helmet-dark.svg
@@ -61,7 +37,31 @@ features:
       height: 32
       wrap: true
     title: Made for agents
-    details: One agent per workspace, a dozen at a time. Every one has its own clone, its own database, and its own URL — and <code>para ls</code> shows you the whole fleet.
+    details: Run a dozen at once and none of them can see another's branch, database, or half-finished edits. Every task stays a separate PR, and <code>para ls</code> shows you the whole fleet.
+  - icon:
+      light: /icons/sputnik-light.svg
+      dark: /icons/sputnik-dark.svg
+      width: 32
+      height: 32
+      wrap: true
+    title: A URL per workspace
+    details: <code>https://fix-login.paraspace.dev</code> the moment it's up — no DNS to set up, local TLS & CA trust is automatic. Your stack keeps its usual ports, so hot reload and WebSockets need no configuration.
+  - icon:
+      light: /icons/rocket-light.svg
+      dark: /icons/rocket-dark.svg
+      width: 32
+      height: 32
+      wrap: true
+    title: A thin engine
+    details: Your project has total control over virtually every aspect of the parallel workspace lifecycle, from building the image and booting the stack, to custom verbs and execution hooks.
+  - icon:
+      light: /icons/console-light.svg
+      dark: /icons/console-dark.svg
+      width: 32
+      height: 32
+      wrap: true
+    title: A real terminal
+    details: No iframes, no web terminal. <code>para sh</code> is a real pty on your own machine, so tmux, Neovim and Claude Code behave and support custom dotfiles per box. Each workspace feels like an extension of your normal environment.
 ---
 
 ## Install

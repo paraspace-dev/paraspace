@@ -12,9 +12,9 @@ set -euo pipefail
 # This is yours to grow — make it as robust as your stack needs. It's idempotent:
 # para re-runs it on every `para up`. Full hook contract: the paraspace README.
 
-. "$(dirname "$0")/helpers"
+. "$PARA_HOOKS/helpers"
 
-skel="$HOME/.paraspace/skel"
+skel="$PARA_SKEL"
 shared="$PARA_SHARED"
 
 # ---- 1. seed the shared volume (once) --------------------------------------
@@ -79,10 +79,10 @@ if ! clone; then
 fi
 
 # ---- 4. .env ---------------------------------------------------------------
-# para seeds the project's own .env (if it has one) to ~/.paraspace/host.env; copy it
+# para seeds the project's own .env (if it has one) to $PARA_HOST_ENV; copy it
 # into the clone. Nothing there means nothing to do.
 cd "$HOME/$PARA_CLONE_DIR"
-if [ -f "$HOME/.paraspace/host.env" ]; then
-  cp "$HOME/.paraspace/host.env" .env
+if [ -f "$PARA_HOST_ENV" ]; then
+  cp "$PARA_HOST_ENV" .env
   chmod 600 .env
 fi

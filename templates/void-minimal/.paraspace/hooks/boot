@@ -17,6 +17,6 @@ set -euo pipefail
 #
 # (templates/void-docker-gh/.paraspace/hooks/boot does exactly this.)
 
-. "$(dirname "$0")/helpers"
+. "$PARA_HOOKS/helpers"
 
 stage "Bare box — nothing to boot. Add your app's start command here."

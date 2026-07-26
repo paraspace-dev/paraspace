@@ -36,6 +36,32 @@ test_routes_reach_the_provision_hook() {
   assert_eq "8080 api:8080" "$got" "the hook received both routes, space-joined"
 }
 
+# shellcheck disable=SC2016  # the guest expands these, not us
+test_guest_paths_are_injected() {
+  # PARA_HOOKS/PARA_SKEL are guest-only — para appends them to ~/.paraspace/env
+  # so a hook names what it reads instead of rebuilding the layout out of $HOME.
+  # Assert the value AND that it resolves: an export pointing at nothing would
+  # still read as "set", and every template's `. "$PARA_HOOKS/helpers"` rides on it.
+  local hooks; hooks="$("$PARA" sh "$PARA_WS" -c 'echo "$PARA_HOOKS"' 2>/dev/null)"
+  assert_eq "/home/$PARA_USER/.paraspace/hooks" "$hooks" "PARA_HOOKS names the guest hooks dir" || return 1
+  local found; found="$("$PARA" sh "$PARA_WS" -c '[ -f "$PARA_HOOKS/helpers" ] && echo ok' 2>/dev/null)"
+  assert_eq "ok" "$found" "the helpers every hook sources is reachable through it" || return 1
+
+  # Exported even though the hello fixture ships no skel/ — the variable names
+  # the path either way, which is what lets a hook guard with a plain [ -f ].
+  local skel; skel="$("$PARA" sh "$PARA_WS" -c 'echo "$PARA_SKEL"' 2>/dev/null)"
+  assert_eq "/home/$PARA_USER/.paraspace/skel" "$skel" "PARA_SKEL names the guest skel dir" || return 1
+
+  # The one that names a file on BOTH sides: push_project overrides the host's
+  # value so the copy in here is what a hook reads.
+  local hostenv; hostenv="$("$PARA" sh "$PARA_WS" -c 'echo "$PARA_HOST_ENV"' 2>/dev/null)"
+  assert_eq "/home/$PARA_USER/.paraspace/host.env" "$hostenv" "PARA_HOST_ENV names the guest copy" || return 1
+
+  # The host-only paths stay unset in here, so a hook can't reach a host file.
+  local host; host="$("$PARA" sh "$PARA_WS" -c 'echo "${PARA_PROJECT_DIR-unset}"' 2>/dev/null)"
+  assert_eq "unset" "$host" "PARA_PROJECT_DIR is not leaked into the guest"
+}
+
 test_workspace_is_listed_and_running() {
   local names; names="$("$PARA" ls --names 2>/dev/null)"
   assert_contains "$names" "$PARA_WS" "ls --names includes the workspace" || return 1

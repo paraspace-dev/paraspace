@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Shared helpers for the hello fixture's hooks. Sourced, not executed:
-#   . "$(dirname "$0")/helpers"
+#   . "$PARA_HOOKS/helpers"
 # A trimmed copy of the templates' helpers — just enough to narrate the hooks.
 
 if [ -t 2 ]; then

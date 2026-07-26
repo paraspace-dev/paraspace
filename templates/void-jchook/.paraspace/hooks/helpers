@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Shared helpers for the para hooks. Sourced, not executed — each hook does:
-#   . "$(dirname "$0")/helpers"
+#   . "$PARA_HOOKS/helpers"
 # so the hook bodies read as WHAT they do, not how they print it.
 
 # Color, but only on a terminal — para captures hook output to logs.

@@ -52,12 +52,12 @@ More in [Shared authentication](./shared-auth.md).
 
 ## Bring your dotfiles
 
-Put them in `.paraspace/skel/`, which para pushes to `~/.paraspace/skel` before
-hooks run. Copy them for files you'll edit per workspace, link them through the
+Put them in `.paraspace/skel/`, which para pushes to `$PARA_SKEL` before hooks
+run. Copy them for files you'll edit per workspace, link them through the
 shared volume for ones you want to change everywhere at once:
 
 ```sh
-cp    ~/.paraspace/skel/zshrc  ~/.zshrc          # per workspace
+cp "$PARA_SKEL/zshrc" ~/.zshrc                   # per workspace
 mkdir -p "$PARA_SHARED/nvim"
 ln -sfn "$PARA_SHARED/nvim" ~/.config/nvim       # shared across workspaces
 ```

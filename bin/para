@@ -436,16 +436,19 @@ push_project() { # push_project <name>
   local ct="$CT_PREFIX$1" home="/home/$PARA_USER"
   incus exec "$ct" -- rm -rf "$home/.paraspace"
   incus_q file push -r "$PARA_PROJECT_DIR/.paraspace" "$ct$home/"
-  # para_env is the host's view; two corrections make it true in here. The
-  # sharp one is PARA_HOST_ENV: it names a file on the HOST, while the copy the
-  # hooks read is the one pushed just below.
-  { para_env
-    printf 'export PARA_HOST_ENV=%q\n' "$home/.paraspace/host.env"
-    printf 'unset PARA_BIN PARA_PROJECT_DIR PARA_CONFIG PARA_CONFIG_DIR PARA_STATE_DIR\n'
-  } | incus_q file push --mode 0600 - "$ct$home/.paraspace/env"
   if [ -f "$PARA_HOST_ENV" ]; then
     incus_q file push --mode 0600 "$PARA_HOST_ENV" "$ct$home/.paraspace/host.env"
   fi
+  # Below here is the guest's view of the layout, and para_env forwards whatever
+  # PARA_* is in scope — so these three reach the hooks instead of the host's.
+  # Local: the host keeps its own PARA_HOST_ENV, which the push above still needs.
+  # shellcheck disable=SC2034  # all three are read by para_env's ${!PARA_@}
+  local PARA_HOOKS="$home/.paraspace/hooks" \
+        PARA_SKEL="$home/.paraspace/skel" \
+        PARA_HOST_ENV="$home/.paraspace/host.env"
+  { para_env
+    printf 'unset PARA_BIN PARA_PROJECT_DIR PARA_CONFIG PARA_CONFIG_DIR PARA_STATE_DIR\n'
+  } | incus_q file push --mode 0600 - "$ct$home/.paraspace/env"
   incus exec "$ct" -- chown -R "$PARA_UID:$PARA_GID" "$home/.paraspace"
   # A hook is run by path so its shebang decides, which needs the exec bit —
   # and a checkout, a tarball or a push can all lose it.

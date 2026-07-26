@@ -1,13 +1,10 @@
 # Hooks
 
-Hooks are where all the provisioning lives. `para` runs them **inside the
-workspace**, as the workspace user (`$PARA_USER`, uid `$PARA_UID` — `app`/`1000`
-by default). Everything domain-specific — git, `gh`, dotfiles, `.env`, booting
-the stack — belongs here, never in `para`.
-
-The working directory is `~/$PARA_CLONE_DIR` when it exists and `$HOME`
-otherwise — so a provision hook starts in `$HOME` on the first `up` and in the
-clone on every one after. Use absolute paths rather than relying on it.
+Hooks are where all the provisioning lives. para runs them **inside the
+workspace**, as the workspace user (`$PARA_USER`), starting in
+`~/$PARA_CLONE_DIR` when it exists and `$HOME` when it doesn't — so `provision`
+starts in `$HOME` on the first `up` and in the clone every time after. Use
+absolute paths rather than relying on it.
 
 ## The two hooks
 
@@ -32,28 +29,39 @@ docker compose up -d --wait          # blocks until healthchecks pass
 ```
 
 para gates on the container agent (and `$PARA_READY_HOST`, if you set one)
-before hooks run, then trusts your boot hook's exit code. A hook that returns
-early is why a workspace comes up and its URL then 502s.
+before hooks run, then trusts your boot hook's exit code.
 
-An absent hook is a visible no-op, so write only the ones you need. para runs
-*only* the two named hooks — anything else under `.paraspace/hooks/` is synced
-along and never executed, which is how the templates keep a shared `helpers`
-file beside them.
+An absent hook is a visible no-op, so write only the ones you need.
 
-Hooks are executed **by path**, so their own shebang decides the interpreter.
+`provision` and `boot` are the only two para invokes — but they are not the only
+things that can live in `.paraspace/hooks/`. para syncs the whole directory and
+marks it executable, so anything else you put there is yours to source or run
+from them: a shared library, a step a long hook factors out, a script one of
+your [commands](./commands.md#project-commands) hands off to.
+
+```sh
+. "$PARA_HOOKS/helpers"        # a library to source — what the templates do
+"$PARA_HOOKS/seed-dotfiles"    # a step to run
+```
+
+Everything here runs **by path**, so each file's own shebang decides its
+interpreter.
 
 ## How your project reaches the workspace
 
 Before the hooks run, para replaces the guest's `~/.paraspace` with your
 project's `.paraspace/` directory. Same name on both sides:
 
-| In the guest | What it is |
-|---|---|
-| `~/.paraspace/hooks/` | your hooks, plus anything they source |
-| `~/.paraspace/skel/` | your seed files (dotfiles etc.), for a hook to copy or link |
-| `~/.paraspace/env` | para's context as export lines. Every `PARA_*` except the handful that name paths on the *host* (`PARA_BIN`, `PARA_PROJECT_DIR`, `PARA_CONFIG`, `PARA_CONFIG_DIR`, `PARA_STATE_DIR`), which are unset here rather than pointing at files that don't exist; `PARA_HOST_ENV` names the copy in this directory |
-| `~/.paraspace/host.env` | `$PARA_HOST_ENV` from the host, if that file exists |
-| `~/.paraspace/commands/` | synced along, but these run on the *host* — see [Commands](./commands.md#project-commands) |
+Name these by the variables para injects rather than by `$HOME` — the layout is
+para's to change, and the variable is the part it promises:
+
+| In the guest | Reach it as | What it is |
+|---|---|---|
+| `~/.paraspace/hooks/` | `$PARA_HOOKS` | your hooks, plus anything they source |
+| `~/.paraspace/skel/` | `$PARA_SKEL` | your seed files (dotfiles etc.), for a hook to copy or link |
+| `~/.paraspace/host.env` | `$PARA_HOST_ENV` | your `.env` from the host, if that file exists |
+| `~/.paraspace/env` | — | para's context as export lines. Every `PARA_*` except the handful that name paths on the *host* (`PARA_BIN`, `PARA_PROJECT_DIR`, `PARA_CONFIG`, `PARA_CONFIG_DIR`, `PARA_STATE_DIR`), which are unset here rather than pointing at files that don't exist |
+| `~/.paraspace/commands/` | — | synced along, but these run on the *host* — see [Commands](./commands.md#project-commands) |
 
 para reads the `Parafile` and `image-build.sh` itself, on the host. Like
 `commands/`, they are synced into the guest as well, but nothing in the
@@ -61,8 +69,8 @@ workspace runs them — so don't put a host-only secret in a `Parafile`.
 
 Files come from your **host checkout**, not the clone, and are pushed fresh on
 every `up` — so editing a hook takes effect on the next `para up` without
-re-cloning anything. A hook can seed from `~/.paraspace/skel` before the clone
-even exists.
+re-cloning anything. A hook can seed from `$PARA_SKEL` before the clone even
+exists.
 
 ## The environment para injects
 
@@ -87,6 +95,7 @@ The documented contract is:
 | `PARA_DOMAIN` | the wildcard domain it's served under |
 | `PARA_PROJECT` | the project identity slug |
 | `PARA_SHARED` | the shared volume's mount point (`/para/shared`) |
+| `PARA_HOOKS`, `PARA_SKEL` | your `hooks/` and `skel/` in the guest. Guest-side only — on the host these two are unset, and `commands/` use `$PARA_PROJECT_DIR` |
 | `PARA_CLONE_DIR`, `PARA_CLONE_BRANCH`, `PARA_ORIGIN` | what to clone, and where |
 | `PARA_USER`, `PARA_UID`, `PARA_GID` | the workspace user's identity |
 | `PARA_HOSTNAME` | the host's short hostname — the ssh-key label |

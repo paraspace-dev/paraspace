@@ -6,7 +6,7 @@ set -euo pipefail
 # listening. `docker compose up -d --wait` blocks until healthchecked services are
 # healthy (and plain ones are running) — which is what para gates routing on.
 
-. "$(dirname "$0")/helpers"
+. "$PARA_HOOKS/helpers"
 
 cd "$HOME/$PARA_CLONE_DIR"
 stage "docker compose up"

@@ -28,6 +28,14 @@
      thing (faded variant for light-bg contrast). */
   --vp-code-color: #94600e;
 
+  /* Prose links are the syntax-highlighter's string blue, not the brand orange:
+     against a page this warm, orange links blur into the inline code and the
+     headings, while the blue reads as the one interactive thing on the line. */
+  --para-link: #032f62;
+  --para-link-hover: #0550ae;
+  --vp-code-link-color: var(--para-link);
+  --vp-code-link-hover-color: var(--para-link-hover);
+
   /* Nebula palette, for the dark theme's night sky. Deep-space values on hues
      gruvbox already owns (purple #b16286, light purple #d3869b, blue #458588)
      so it reads as the same brand, not a purple bolt-on. Gas 4 is the existing
@@ -67,6 +75,21 @@
   --vp-c-brand-soft: rgba(254, 128, 25, 0.16);
 
   --vp-code-color: #fabd2f;
+
+  --para-link: #9ecbff;
+  --para-link-hover: #c8e1ff;
+}
+
+/*
+ * Links in prose only. Nav, sidebar, and buttons keep the brand orange — the
+ * blue is for things inside a paragraph that you can click.
+ */
+.vp-doc a {
+  color: var(--para-link);
+}
+
+.vp-doc a:hover {
+  color: var(--para-link-hover);
 }
 
 /*

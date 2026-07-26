@@ -1,5 +1,8 @@
 import { h } from 'vue'
-import DefaultTheme from 'vitepress/theme'
+// theme-without-fonts is the default theme minus its bundled Inter. The body
+// and code faces are declared in custom.css instead, so shipping Inter as well
+// would be ~50KB of font nobody renders.
+import DefaultTheme from 'vitepress/theme-without-fonts'
 import Sky from './Sky.vue'
 import TerminalDemo from './TerminalDemo.vue'
 import './custom.css'

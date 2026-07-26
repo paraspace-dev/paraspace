@@ -4,7 +4,7 @@
       <span class="orbit"><span class="sat" /></span>
     </div>
 
-    <!-- Parallel-universe ghosts of the terminal -->
+    <!-- ws2 and ws3, one color plate each -->
     <div class="ghost g2" aria-hidden="true" />
     <div class="ghost g1" aria-hidden="true" />
 
@@ -32,7 +32,8 @@
 </template>
 
 <style scoped>
-/* Gruvbox dark-hard terminal, identical in light and dark page themes. */
+/* Gruvbox dark-hard terminal on the nebula; gruvbox light on the daytime sky —
+   see the light override below the palette. */
 .para-hero {
   --gb-bg: #1d2021;
   --gb-bg-soft: #282828;
@@ -43,12 +44,41 @@
   --gb-green: #b8bb26;
   --gb-aqua: #8ec07c;
   --gb-red: #fb4934;
+  /* The stack behind the terminal: one pane filled, one drawn. */
+  --gb-ghost-fill: color-mix(in srgb, var(--gb-bg) 52%, transparent);
+  --gb-ghost-line: color-mix(in srgb, var(--gb-gray) 48%, transparent);
+  --gb-ghost-line-far: color-mix(in srgb, var(--gb-gray) 34%, transparent);
 
   position: relative;
   width: 100%;
   max-width: 440px;
   margin: 0 auto;
-  padding: 28px 0 0 28px;
+  /* Headroom for the stack, on the two sides it actually travels: two layers
+     up and to the right at 14px each. Keep this in step with .ghost's inset
+     and the translate below — the three together are what make the offsets
+     land on one diagonal. */
+  padding: 28px 28px 0 0;
+}
+
+/*
+ * Daylight runs the whole terminal on gruvbox light. These are the same nine
+ * inks the code blocks further down the page are highlighted with (see
+ * .vitepress/shiki-gruvbox.ts) — a command in the hero and the same command in
+ * Quick start are then literally the same color, which is the argument for
+ * doing this at all. It also settles the stack: the ghost plates derive their
+ * fill and line from --gb-bg and --gb-gray, so they turn to paper and pencil
+ * on their own, with no separate light-mode treatment to keep in sync.
+ */
+html:not(.dark) .para-hero {
+  --gb-bg: #fbf1c7;
+  --gb-bg-soft: #ebdbb2;
+  --gb-fg: #3c3836;
+  --gb-gray: #7c6f64;
+  --gb-orange: #af3a03;
+  --gb-yellow: #b57614;
+  --gb-green: #79740e;
+  --gb-aqua: #427b86;
+  --gb-red: #9d0006;
 }
 
 /* The page nebula supplies the ambient color now; this is just the warm bloom
@@ -79,6 +109,13 @@
   border: 1px dashed color-mix(in srgb, var(--gb-gray) 45%, transparent);
   border-radius: 50%;
   transform: rotate(-14deg);
+}
+
+/* Gruvbox gray is a mid tone picked to sit on the nebula; on the bright sky it
+   lands close enough to the cloud to vanish. Light mode draws the ring in the
+   same dark ink as the satellite. */
+html:not(.dark) .orbit {
+  border-color: color-mix(in srgb, #3c3836 38%, transparent);
 }
 
 .sat {
@@ -118,29 +155,55 @@ html:not(.dark) .sat {
 
 /* ---- Parallel-universe terminal stack ---------------------------------- */
 
+/*
+ * ws2 and ws3, receding behind the front window. Three dimmed copies of the
+ * same pane just read as a smudge, so the stack changes state as it goes back
+ * instead of only changing opacity: the near one is a translucent pane, the far
+ * one is a drawn outline with nothing inside it. Solid, glass, line — the way a
+ * mission diagram renders the thing itself, the thing behind it, and the thing
+ * that's only a plan. It also fixes the daylight problem the dimming had, since
+ * a hairline can't smudge a bright sky the way a dark pane does.
+ */
 .ghost,
 .term {
   border-radius: 10px;
+}
+
+.term {
   background: var(--gb-bg);
   border: 1px solid color-mix(in srgb, var(--gb-gray) 35%, transparent);
 }
 
+/* Sits exactly on the terminal to start with, so the only thing separating the
+   layers is the translate — an even 14px up and right, one step per layer. */
 .ghost {
   position: absolute;
-  inset: 0 28px 28px 0;
+  inset: 28px 28px 0 0;
 }
-.ghost.g1 { transform: translate(14px, -14px); opacity: 0.45; }
-.ghost.g2 { transform: translate(28px, -28px); opacity: 0.2; }
 
-/* Against the daytime sky the dark ghosts read as gray smudges rather than
-   dimmer terminals, so they pull back. */
-html:not(.dark) .ghost.g1 { opacity: 0.28; }
-html:not(.dark) .ghost.g2 { opacity: 0.12; }
+.ghost.g1 {
+  background: var(--gb-ghost-fill);
+  border: 1px solid var(--gb-ghost-line);
+  transform: translate(14px, -14px);
+}
+
+.ghost.g2 {
+  background: none;
+  border: 1px solid var(--gb-ghost-line-far);
+  transform: translate(28px, -28px);
+}
+
 
 .term {
   position: relative;
   overflow: hidden;
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+}
+
+/* A dark terminal needed a heavy shadow to lift off the nebula. A cream one
+   needs only enough to sit above the cloud, or it reads as soot. */
+html:not(.dark) .term {
+  box-shadow: 0 10px 28px -14px rgba(60, 56, 54, 0.45);
 }
 
 .term-bar {
@@ -182,7 +245,10 @@ html:not(.dark) .ghost.g2 { opacity: 0.12; }
 .cmd::before {
   content: '$ ';
   color: var(--gb-orange);
-  font-weight: 700;
+  /* 600, not 700: that's the bold cut of Plex Mono the page loads, and asking
+     for a weight no loaded face has leaves the choice to each engine's font
+     matching — some pick the 600, some smear a synthetic bold over it. */
+  font-weight: 600;
 }
 
 /* Typed commands: width reveal in character steps. */

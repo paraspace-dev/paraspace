@@ -91,7 +91,7 @@ unchanged, on the ports it already uses. Routes are one line of your
 
 ### A thin engine your project takes over
 
-`para` is about a thousand lines of bash over `incus` and `caddy`: it makes a
+`para` is simply a thin wrapper over `incus` and `caddy`: it makes a
 container, gives it an IP, attaches a volume, points Caddy at it, and runs your
 hooks. It knows nothing about your stack. The extension points are all files in
 *your* repo:
@@ -103,8 +103,7 @@ hooks. It knows nothing about your stack. The extension points are all files in
 | how the stack boots, and when it's ready | `.paraspace/hooks/boot` |
 | **new `para` verbs** | `.paraspace/commands/<verb>` |
 
-That last row matters most. `para claude ws1` is not a feature of para — it's a
-file a template ships:
+`para claude ws1` is not a feature of para — it's a configurable command your template ships.
 
 ```sh
 #!/usr/bin/env bash
@@ -123,8 +122,7 @@ So the answer to "can para do X for my project" is that your project can.
 - **A git workflow.** Each workspace gets its own clone; branching, review and
   merge stay exactly what they were.
 
-[Prior art](./prior-art.md#when-not-to-use-paraspace) has the fuller version,
-including which alternative to reach for instead.
+See [Prior art](./prior-art.md) for a comparison of alternatives.
 
 ## Next
 

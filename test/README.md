@@ -53,7 +53,7 @@ the published image ~5.5 MB and the whole path Docker-free.
 The image is built by **`para image build`**, from the fixture's own
 [`.paraspace/image-build.sh`](fixtures/hello/.paraspace/image-build.sh)
 (`apk add bash busybox-extras sudo`, plus a `$PARA_USER` user) on the
-`PARA_BASE_IMAGE`/`PARA_IMAGE_BOOTSTRAP` its Parafile declares
+`PARA_IMAGE_BASE`/`PARA_IMAGE_BOOTSTRAP` its Parafile declares
 (`images:alpine/edge` + `apk add --no-cache bash`), published as the
 `alpine-minimal` alias. That's deliberate: the fixture is the non-Void,
 Docker-free second consumer, so building it is also the only coverage
@@ -81,7 +81,7 @@ Every run is sandboxed so it never touches your real para state:
   teardown reclaims everything even if a test aborts;
 - **the para identity and image keys inherited from your shell are unset**
   (`PARA_VOLUME`, `PARA_PROJECT`, `PARA_PROJECT_DIR`, `PARA_IMAGE`,
-  `PARA_BASE_IMAGE`, `PARA_IMAGE_BOOTSTRAP`). Both halves matter: teardown
+  `PARA_IMAGE_BASE`, `PARA_IMAGE_BOOTSTRAP`). Both halves matter: teardown
   deletes `PARA_VOLUME`, and an inherited `PARA_IMAGE` would make a
   `PARA_TEST_REBUILD=1` run publish the fixture payload over *your* image alias.
 

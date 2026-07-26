@@ -25,7 +25,7 @@
 
 # What image build builds FROM. Alpine ships no bash and para runs the payload
 # with `bash -s`, so the bootstrap has exactly one job: put bash there.
-: "${PARA_BASE_IMAGE:=images:alpine/edge}"
+: "${PARA_IMAGE_BASE:=images:alpine/edge}"
 : "${PARA_IMAGE_BOOTSTRAP:=apk add --no-cache bash}"
 
 # A hostname the guest must resolve before para runs anything in it. Guest DNS

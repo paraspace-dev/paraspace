@@ -29,7 +29,7 @@
 # BASH in the builder (para runs image-build.sh with `bash -s`); here it also
 # refreshes Void's bundled xbps, a rolling-release snapshot that can be too stale
 # to install against. Set it to "" if your base needs nothing.
-: "${PARA_BASE_IMAGE:=images:voidlinux}"
+: "${PARA_IMAGE_BASE:=images:voidlinux}"
 : "${PARA_IMAGE_BOOTSTRAP:=xbps-install -Syu xbps bash}"
 
 # HTTP routes para publishes through its Caddy — one TLS site per "[sub:]port",

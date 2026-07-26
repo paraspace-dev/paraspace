@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # Guest provisioning for the e2e fixture's base image. Runs as root inside a
-# fresh $PARA_BASE_IMAGE container — `images:alpine/edge` per the Parafile,
+# fresh $PARA_IMAGE_BASE container — `images:alpine/edge` per the Parafile,
 # bootstrapped with `apk add --no-cache bash` (Alpine ships no bash, and para
 # runs this payload with `bash -s`) — invoked by `para image build`.
 #

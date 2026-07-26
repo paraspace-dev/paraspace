@@ -1,8 +1,7 @@
 # Project setup
 
 `para` needs one thing from a project: a **`.paraspace/`** directory at the repo
-root. `para` finds it by walking up from `$PWD`, the way git and compose find
-theirs.
+root. `para` finds it by walking up from `$PWD`.
 
 ## Scaffold with `para init`
 
@@ -39,8 +38,8 @@ The scaffolded files are commented and carry working defaults — read them in
 place. The usual adaptation, in order:
 
 1. **`Parafile`** — point `PARA_ORIGIN` at your repo, list your `PARA_ROUTES`
-   (one entry per port you want a URL for), and name a `PARA_BASE_IMAGE`.
-   Every key is in [the Parafile reference](./parafile.md).
+   (one entry per port you want a URL for), and name a `PARA_IMAGE_BASE`.
+   Every var is in [the Parafile reference](./parafile.md).
 2. **`image-build.sh`** — the packages your stack needs baked into the base
    image, and the workspace user. See [The image contract](./image.md).
 3. **`hooks/provision`** — everything before boot: seed the shared volume,

@@ -45,7 +45,7 @@ sandbox_base() {
   #     launch from the wrong image and fail with no /usr/sbin/httpd.
   # sandbox_e2e sets its own run-unique values after this.
   unset PARA_VOLUME PARA_PROJECT PARA_PROJECT_DIR
-  unset PARA_IMAGE PARA_BASE_IMAGE PARA_IMAGE_BOOTSTRAP
+  unset PARA_IMAGE PARA_IMAGE_BASE PARA_IMAGE_BOOTSTRAP
   # PARA_POOL is deliberately NOT in that list, so the run shares the real pools.
   # That is safe because isolation here is by NAME: everything the run creates is
   # run-unique, teardown is guarded to those names, and para has no pool-level

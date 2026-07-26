@@ -1,0 +1,62 @@
+name: publish
+
+# Publish to npm when a v* tag is pushed: `npm version <bump> && git push --follow-tags`.
+#
+# Auth is npm trusted publishing (OIDC) — no token in repo secrets. It needs a
+# trusted publisher registered on npmjs.com naming this repo and this file;
+# README's Development section has the setup.
+on:
+  push:
+    tags: ['v*']
+
+# id-token mints the OIDC token npm authenticates with.
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0        # "tag is on main", below, needs main's history
+      # Node 24 for npm >= 11.5.1, which trusted publishing requires.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+
+      # The tag names the release; package.json is what npm actually publishes.
+      # A mismatch ships the wrong version under the right name.
+      - name: tag matches package.json
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          pkg="$(node -p "require('./package.json').version")"
+          if [ "$tag" != "$pkg" ]; then
+            echo "$GITHUB_REF_NAME does not match package.json $pkg — release with 'npm version <bump> && git push --follow-tags'" >&2
+            exit 1
+          fi
+
+      # npm never lets a version number be reused, so a stray tag on a topic
+      # branch burns it on unreviewed code.
+      - name: tag is on main
+        run: |
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
+            echo "$GITHUB_REF_NAME is not on main — merge first, then tag main" >&2
+            exit 1
+          fi
+
+      # Run the gates before npm talks to the registry at all; prepublishOnly
+      # runs the same script under `npm publish`, so a laptop can't skip them.
+      - run: npm run check
+
+      # npm swallows every OIDC failure and falls back to a token that isn't
+      # there, so verbose is what names a misconfigured trusted publisher when
+      # the publish 401s. Provenance needs no flag — OIDC attests on its own.
+      - name: publish
+        run: |
+          case "$GITHUB_REF_NAME" in
+            *-*) npm publish --tag next --loglevel verbose ;;  # a prerelease must not become `latest`
+            *)   npm publish --loglevel verbose ;;
+          esac

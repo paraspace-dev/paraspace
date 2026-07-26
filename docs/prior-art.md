@@ -13,6 +13,10 @@ usefully — which of them you should pick instead.
 ### A worktree per task
 
 `git worktree` gives each task its own checkout sharing one object database.
+**[par](https://github.com/coplane/par)** is this approach made ergonomic — a
+worktree plus a persistent tmux session per task, and a `.par.yaml` that copies
+the gitignored files into each new one. No relation to ParaSpace, despite the
+name.
 
 Free, instant, and the right answer when your work is *only* editing files. It
 doesn't carry `.gitignore`d state, so each worktree needs its `.env` and its
@@ -111,6 +115,7 @@ agent, over git worktrees, with an orchestrator on top).
 
 | | Isolation unit | Workspace files | Supports nested containers | Interface | Per-workspace URL |
 |---|---|---|---|---|---|
+| par | none — host processes | worktree | n/a — host Docker | CLI + tmux | ❌ |
 | Container Use | app container | branch per env | ❓ | MCP + CLI | ❌ |
 | Sculptor | container backend | worktree | ❓ | desktop app | ⚠️ in-app |
 | Agent of Empires | Docker / Podman / Apple Container | worktree | ❓ | TUI + web | ⚠️ in-app |

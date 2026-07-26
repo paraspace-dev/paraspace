@@ -115,7 +115,9 @@ Any `PARA_FOO` you set reaches your hooks, project commands and image build
 untouched — that's how a project declares its own knobs (`PARA_GH_AUTH` in the
 default template, the `PARA_PREPULL_IMAGES` the templates' `image-build.sh`
 reads). See
-[Hooks](./hooks.md#the-environment-para-injects).
+[Hooks](./hooks.md#the-environment-para-injects), and
+[One workspace, a custom env var](./cookbook.md#one-workspace-a-custom-env-var)
+for varying one per workspace.
 
 ## Precedence
 

@@ -151,12 +151,49 @@ exec "$PARA_BIN" sh "$1" -c 'docker compose logs -f --tail=100'
 `chmod +x` it and `para logs ws1` works. It runs on the host with every
 `PARA_*` exported — see [Commands](./commands.md#project-commands).
 
-## Work on a project nested in a bigger repo
+## A monorepo with more than one stack
 
-`para` finds the nearest `.paraspace/` walking up from `$PWD`, so a
-subdirectory can have its own. One thing to avoid: deriving `PARA_ORIGIN` from
-`git remote` in that case, since it walks up to the *enclosing* repo and clones
-the wrong thing. Name the URL explicitly.
+If you don't want every sub-project booting in every workspace, there are two
+ways to avoid it.
+
+### One `.paraspace/` per project
+
+para uses the nearest `.paraspace/` above `$PWD`, so `cd` picks the project:
+
+```sh
+cd apps/web  && para up web-ws     # apps/web/.paraspace
+cd apps/docs && para up docs-ws    # apps/docs/.paraspace
+```
+
+```sh
+# apps/docs/.paraspace/Parafile
+: "${PARA_PROJECT:=acme-docs}"    # "docs" alone is too generic to identify a project
+: "${PARA_ORIGIN:=git@github.com:acme/acme.git}"
+```
+
+### One workspace, a custom env var
+
+Keep a single `.paraspace/` and let a variable decide which services `boot`
+starts. The hooks store it in the workspace, so you pass it once:
+
+```sh
+# .paraspace/hooks/helpers — sourced by provision and boot
+STACK_FILE="$HOME/.para-stack"
+if [ -n "${PARA_STACK:-}" ]; then printf '%s\n' "$PARA_STACK" > "$STACK_FILE"; fi
+if [ -f "$STACK_FILE" ]; then PARA_STACK="$(cat "$STACK_FILE")"; fi
+: "${PARA_STACK:=web}"
+```
+
+```sh
+# .paraspace/hooks/boot
+docker compose --profile "$PARA_STACK" up -d --wait
+```
+
+`PARA_STACK=docs para up ws1` sets that workspace's stack, and a later
+`para up ws1` reconverges the same one.
+
+For a verb rather than an env var, a `.paraspace/commands/docs` that exports
+`PARA_STACK=docs` and runs `exec "$PARA_BIN" up "$@"` gives you `para docs ws1`.
 
 ## Point two projects at one credential store
 

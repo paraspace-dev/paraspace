@@ -61,7 +61,17 @@ loop.
 
 The [Cookbook](./cookbook.md) has recipes for what usually comes next:
 authenticating `gh`, seeding a database, bringing your dotfiles, pre-pulling
-images, and adding `para` verbs of your own.
+images, splitting a monorepo, and adding `para` verbs of your own.
+
+## Add your own env vars
+
+Any `PARA_*` variable you set in your `Parafile` reaches the hooks, the project
+commands and `image-build.sh`. See [the Parafile](./parafile.md#your-own-keys).
+
+```sh
+# Custom env var
+: "${PARA_CUSTOM:=my-scalar-value}"
+```
 
 ## Add your own verbs
 

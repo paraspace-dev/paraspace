@@ -142,7 +142,10 @@ one is a mess that rewrite is cleaning up.
   earns one. (`parafile.md` spent forty lines justifying route validation the
   engine no longer performs — that is what this rule is for.)
 - **One home per fact**, and everywhere else links to it. `PARA_ROUTES` was
-  explained on four pages and they disagreed.
+  explained on four pages and they disagreed. Invariants and gotchas count as
+  facts: don't re-explain one (machine-global workspace names, say) on every
+  page where it happens to bite. Any of them may get fixed, and the fix should
+  not mean hunting through twelve pages that each re-derive the old behavior.
 - **Say what it costs**, on the page where it bites, not in a "Limitations"
   section nobody reads. `para ls` needs incus reachable; an interactive
   `para sh` needs util-linux `su`; images are per-arch; the first

@@ -1,4 +1,5 @@
 import { defineConfig } from 'vitepress'
+import { gruvboxDark, gruvboxLight } from './shiki-gruvbox'
 
 // Site source is the repo root: `index.md` is the landing page and the
 // authoritative `docs/` tree is served as-is at /docs/. Everything else in
@@ -10,6 +11,22 @@ export default defineConfig({
   cleanUrls: true,
   lastUpdated: true,
 
+  // The three faces the first screen actually paints: the hero display, the
+  // body sans, and the mono the hero terminal is set in. Preloaded so none of
+  // them swaps under the reader — the rest of Plex Mono's weights can wait for
+  // the stylesheet. Fonts are fetched in CORS mode even same-origin, hence the
+  // crossorigin attribute.
+  head: (
+    [
+      '/fonts/anton-sc-latin-400.woff2',
+      '/fonts/ibm-plex-sans-latin-var.woff2',
+      '/fonts/ibm-plex-mono-latin-400.woff2',
+    ] as const
+  ).map((href) => [
+    'link',
+    { rel: 'preload', href, as: 'font', type: 'font/woff2', crossorigin: '' },
+  ]),
+
   srcExclude: ['README.md', 'CLAUDE.md', 'templates/**', 'plans/**', 'test/**'],
 
   // docs/README.md is the docs index on GitHub and npm; serve it at /docs/.
@@ -18,6 +35,10 @@ export default defineConfig({
   },
 
   sitemap: { hostname: 'https://paraspace.dev' },
+
+  markdown: {
+    theme: { light: gruvboxLight, dark: gruvboxDark },
+  },
 
   themeConfig: {
     nav: [{ text: 'Docs', link: '/docs/', activeMatch: '^/docs/' }],

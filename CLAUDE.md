@@ -148,9 +148,10 @@ one is a mess that rewrite is cleaning up.
   `para sh` needs util-linux `su`; images are per-arch; the first
   `para image build` takes minutes.
 - **Never document template policy as engine behavior.** The generic-mechanism
-  boundary applies to prose: `para claude` is a file the default template
-  ships, and every page that shows it says so. Blurring it teaches people to
-  file engine bugs about their own hooks.
+  boundary applies to prose: `para claude` is a file a template ships
+  (`void-jchook`, not the `void-docker-gh` default), and every page that shows
+  it says so. Blurring it teaches people to file engine bugs about their own
+  hooks.
 - **Show the command.** A page earns its keep with the line the reader can
   paste. Prose that surrounds no command is usually rationale in disguise.
 - **Don't restate defaults.** A doc — or a Parafile — that repeats a default is

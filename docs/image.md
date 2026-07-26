@@ -72,8 +72,7 @@ $ para image status
 
 `drifted` means the `image-build.sh` payload, `$PARA_IMAGE_BOOTSTRAP` or
 `$PARA_BASE_IMAGE` changed since the build, so rebuilding would give you
-something different. `unknown` means the image predates provenance stamping, or
-was built by a plain `incus` action.
+something different.
 
 `para image rm` deletes `$PARA_IMAGE` — to reclaim space or force a fully clean
 next build. Workspaces already `up` are clones and keep running.

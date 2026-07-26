@@ -9,7 +9,7 @@ set -euo pipefail
 # the workspace name, so the routing test can prove it reached THIS workspace and
 # not some other site on the shared Caddy.
 
-. "$(dirname "$0")/helpers"
+. "$PARA_HOOKS/helpers"
 
 docroot="$HOME/www"
 port=8080

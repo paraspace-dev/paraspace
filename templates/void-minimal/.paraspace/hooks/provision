@@ -10,9 +10,9 @@ set -euo pipefail
 #
 # It's idempotent: para re-runs it on every `para up`.
 
-. "$(dirname "$0")/helpers"
+. "$PARA_HOOKS/helpers"
 
-skel="$HOME/.paraspace/skel"
+skel="$PARA_SKEL"
 shared="$PARA_SHARED"
 
 # ---- 1. seed the shared volume (once) --------------------------------------

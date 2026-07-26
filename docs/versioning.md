@@ -63,4 +63,6 @@ into a scratch directory to diff against a current template. Otherwise:
 | `para reconcile`, `install`, `image-build`, `config-import`, `config-sync` | deleted — `up` now re-pushes `.paraspace/` every time |
 
 New since then: `PARA_READY_HOST` (wait for guest DNS to resolve a host your
-hooks need), `.paraspace/commands/` (your own `para` verbs), and `para doctor`.
+hooks need), `.paraspace/commands/` (your own `para` verbs), `para doctor`, and
+`PARA_HOOKS`/`PARA_SKEL` (name the guest dirs instead of rebuilding them out of
+`$HOME`). All additive, so contract 1 covers them.

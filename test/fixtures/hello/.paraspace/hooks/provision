@@ -10,7 +10,7 @@ set -euo pipefail
 # $HOME, so the e2e suite can prove the volume is mounted and shared across a
 # project's workspaces.
 
-. "$(dirname "$0")/helpers"
+. "$PARA_HOOKS/helpers"
 
 shared="$PARA_SHARED"
 

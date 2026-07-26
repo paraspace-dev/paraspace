@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # Guest provisioning for the void-jchook base image. Runs as root INSIDE a fresh
-# $PARA_BASE_IMAGE container — `images:voidlinux` (glibc) per the Parafile,
+# $PARA_IMAGE_BASE container — `images:voidlinux` (glibc) per the Parafile,
 # launched with security.nesting=true and bootstrapped with $PARA_IMAGE_BOOTSTRAP —
 # invoked by `para image build`. Installs everything the carried dotfiles need so
 # `para up` only has to clone + `docker compose up`: Docker + compose (runit

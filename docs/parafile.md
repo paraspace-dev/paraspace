@@ -1,9 +1,9 @@
 # The Parafile
 
 `.paraspace/Parafile` is your project's config: the few `PARA_*` variables
-`para` itself reads. It is **sourced as bash** follows the
+`para` itself reads. It is **sourced as bash** and follows the
 [precedence](#precedence) rules. Most vars default sensibly and can be left out
-for a lean &amp; simple config.
+for a lean & simple config.
 
 Every value is a **scalar**. Arrays aren't forwarded to your hooks — they
 arrive as their first element — so a list is a delimited string. See
@@ -104,7 +104,7 @@ reads). See
 [One workspace, a custom env var](./cookbook.md#one-workspace-a-custom-env-var)
 for varying one per workspace.
 
-> 💡 `PARA_ORIGIN` and `PARA_CLONE_DIR` are actually custom project vars that
+> 💡 `PARA_ORIGIN` and `PARA_CLONE_BRANCH` are actually custom project vars that
 > are never acted on by `para` itself.
 
 ## Precedence

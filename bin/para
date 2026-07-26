@@ -393,7 +393,7 @@ caddy_sync() {
       || die "caddy refused the new config (above); the full log is $CADDY_LOG."
     return
   fi
-  log "Starting para Caddy on :$PARA_HTTPS_PORT…"
+  log "Starting para Caddy on :${PARA_HTTPS_PORT}…"
   rm -f "$CADDY_PID"
   caddy_run start --config "$CADDYFILE" --adapter caddyfile --pidfile "$CADDY_PID" \
     || die "caddy could not start on :$PARA_HTTPS_PORT (above) — 'para doctor' checks the usual causes, and the full log is $CADDY_LOG."
@@ -513,7 +513,7 @@ cmd_up() {
       || die "no image '$PARA_IMAGE' — build it first with 'para image build'."
     ip="$(alloc_ip)" \
       || die "no free IP in the .$PARA_IP_LO-.$PARA_IP_HI band on $PARA_BRIDGE — remove a workspace, or widen PARA_IP_LO/HI."
-    log "Launching $ct at $ip…"
+    log "Launching $ct at ${ip}…"
     incus launch "$PARA_IMAGE" "$ct" --storage "$PARA_POOL" \
       -c security.nesting=true -d eth0,ipv4.address="$ip"
     # Immediately, before anything that can fail: an unstamped container has no
@@ -582,7 +582,7 @@ cmd_rm() {
     warn "no workspace '$name' to remove (see: para ls)"
     return
   fi
-  log "Deleting $ct…"
+  log "Deleting ${ct}…"
   incus delete -f "$ct"
   # Only if it is already up: starting Caddy is `up`'s job, and a `rm` should
   # neither resurrect one you stopped nor fail on a host without caddy at all.
@@ -892,7 +892,7 @@ cmd_init() {
   local root="$src/.paraspace"
   [ "$full" -eq 0 ] || root="$src"
 
-  log "Scaffolding '$template' into $PWD…"
+  log "Scaffolding '$template' into ${PWD}…"
   local file rel dest added=0 skipped=0
   while IFS= read -r file; do
     rel="${file#"$src"/}"

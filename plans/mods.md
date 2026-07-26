@@ -49,59 +49,91 @@ Hook names above are **this template's vocabulary, not para's** — see
 [Conventions](#conventions-are-the-real-interface).
 
 `para mod add` is a convenience, not a requirement: a mod is just a directory,
-so a project can write one by hand and a fixture can ship one inline.
+so a project can write one by hand and a fixture can ship one committed.
 
 ## `para mod`
 
 ```
 para mod add <git-url|path> [--as <name>]   vendor a mod into .paraspace/mods/
-para mod ls                                 what's vendored, and from where
+para mod ls [--names]                       what's vendored, and from where
 para mod rm <name>                          delete it
 para mod update [<name>]                    re-vendor from .mod-source
 ```
 
-**The name** is the basename of the spec, minus `.git` and any `#ref`, with
-`--as` to override. It needs its own `validate_mod_name` — `validate_name` is
-the *workspace* validator (31 chars, must start `a-z`, and an error message that
+`cmd_mod` calls **`require_project`** first, like `run_project_command` does.
+Outside a project `PARA_PROJECT_DIR` is empty, so every path becomes
+`/.paraspace/mods/<name>`: `add` would fail with a raw `cp` error instead of
+para's own, and `rm` would report success on a no-op.
+
+**The name** is the spec's basename, minus `.git`, any `#ref`, and a leading
+`paraspace-mod-` — the ecosystem naming convention, which would otherwise put
+the prefix in every directory, every `$PARA_MOD`, and the resolution order.
+`--as` overrides. It needs its own `validate_mod_name`: `validate_name` is the
+*workspace* validator (31 chars, must start `a-z`, and an error message that
 says "workspace"), so a repo called `Dotfiles` would be refused for the wrong
-reason. `add` refuses an existing directory unless it came from `update`.
+reason.
 
 **Vendoring is `rm -rf "$dest" && cp -R "$tmp/." "$dest"`.** No copy loop, no
-parameterized `copy_tree`, no chmod predicate: exec bits come from the clone,
-and `cmd_init` is untouched. `update` is the same operation — which is *why*
-overlaying was rejected, since a force-copy never removes a file the author
-deleted upstream and a hook renamed `provision` → `post-clone` would leave both,
-the stale one running forever. Split `mod_vendor <spec> <dir>` (clone → strip
-`.git` → shape check → replace → stamp) from `cmd_mod_add` (parse, validate,
-report) so neither blows the ~30-line gate.
+parameterized `copy_tree`, no chmod predicate — and `cmd_init` is untouched.
+`update` is the same operation, which is *why* overlaying was rejected: a
+force-copy never removes a file the author deleted upstream, so a hook renamed
+`provision` → `post-clone` would leave both, the stale one running forever.
+Split `mod_vendor <spec> <dir>` (fetch → strip → shape check → replace → stamp)
+from `cmd_mod_add` (parse, validate, report) so neither blows the ~30-line gate.
 
 Load-bearing details:
 
-- **Strip the mod's `.git`.** Otherwise "the tree in git is the truth" is false
-  in the consumer's repo, and `push_project` ships the object store into every
-  workspace on every `up`.
+- **Strip `.git`, `.gitignore` and `.gitattributes`.** `.git` because otherwise
+  "the tree in git is the truth" is false and `push_project` ships the object
+  store into every workspace. The other two because they then apply to the
+  vendored copy *inside the consumer's repo*: a dotfiles mod ignoring
+  `lazy-lock.json` or `*.local` means `git add .paraspace/mods/x` silently omits
+  those files, the consumer commits an incomplete mod, and a teammate's
+  `para up` runs a different mod than the author shipped.
 - **Check the shape.** `para init` refuses a repo with no `.paraspace/`; a mod's
-  repo root *is* the mod, so refuse a clone with none of `hooks/`, `commands/`,
+  repo root *is* the mod, so refuse a fetch with none of `hooks/`, `commands/`,
   `skel/`. Without it, `para mod add <any repo>` vendors an arbitrary tree that
-  para then makes executable and pushes into every workspace.
+  para pushes into every workspace and executes.
 - **Validate the name before it reaches a path.** `para mod rm ''` is
   `rm -rf .paraspace/mods/`; `para mod rm ../hooks` takes the project's hooks.
-  `add` and `update` need the same guard on the write side.
-- **`.mod-source` stores the original spec verbatim**, `#ref` included, so
-  `update` is a parse-free re-vendor. It also records a tree hash at vendor
-  time, so `ls` can print `modified` and `update` can refuse without `--force`
-  rather than silently eating local edits. A hand-written mod has no
-  `.mod-source`: bare `update` warns and skips it, never dies.
-- **A mod may declare the contract it targets**, checked at `add`/`update` —
-  not at `up`, which would make mods executable on the host. Without it, a mod
-  written against a later contract fails confusingly, or its hook silently never
-  runs.
+- **A local path is copied, not cloned**, and resolved to absolute at add time.
+  Cloning would vendor the last commit while the author is iterating
+  uncommitted — "added my mod, ran `up`, my change isn't there". Absolute
+  because para finds the project by walking *up*, so `update`'s cwd genuinely
+  varies. That is the one exception to storing the spec verbatim.
+- **`need git`**, and a `doctor_host` check: `mod add` makes git a host
+  prerequisite, where para's only current use is a guarded read. `#ref` takes a
+  branch or tag, not a commit sha — `git clone --branch` can't do shas.
+
+`.mod-source` stores the spec verbatim (`#ref` included) so `update` is a
+parse-free re-vendor, plus a tree hash so `ls` can print `modified` and `update`
+can refuse without `--force` rather than silently eating local edits. Two things
+that hash must get right: it **excludes `.mod-source` itself**, or the recorded
+value can never match and every mod reports `modified` the moment it's added;
+and it is `sha256_of` per file, then `sha256_of` over the `LC_ALL=C`-sorted
+`<sha>  <path>` list — hashing concatenated content alone loses renames, and
+concatenating paths with content is ambiguous. Worth stating what it can't see:
+`find -type f` misses symlinks and modes.
+
+A mod with no `.mod-source` is hand-written: bare `update` warns and skips it.
+So is a modified one — dying mid-list would re-vendor mod 1, abort on mod 2 and
+never touch mod 3, which is a partial state from a converging verb.
+
+**A mod may declare the contract it targets**, in a named file with a stated
+format. Check it in `require_project` and surface it in `doctor_project` — not
+only at `add`/`update`, because the case that actually happens is *para*
+upgrading while the vendored mod sits still, which add-time checking never sees.
+(An earlier draft justified add-time-only by "reading it at `up` would make mods
+executable on the host". That was a category error: reading a declaration isn't
+executing it, and para already sources the `Parafile` on the host.)
 
 **`para mod` must be registered in four places** or it half-exists: `main`'s
 dispatch, `usage`'s PROJECT block (CLAUDE.md requires `--help` and
 `docs/commands.md` share one grouping), `is_engine_verb` (or a project command
 named `mod` is silently shadowed with no `doctor` warning), and
-`cmd_completions`' verb list plus a `mod)` case arm.
+`cmd_completions` — which needs `add|ls|rm|update` at position 2 *and* vendored
+names at 3, or the existing fallback offers **workspace** names for
+`para mod rm <TAB>`. That is what `ls --names` is for.
 
 ### No bundled mods, one in-repo reference
 
@@ -109,20 +141,21 @@ para's tarball ships no mods. The reason is not "copy-once vs dependency" —
 that collapses, since mods are vendored too and para's obligation also ends at
 the copy. The reasons are **registry risk** (a bundled list plus an `update`
 verb makes para's tarball the index) and **release cadence**: dotfiles change
-weekly, para doesn't, and coupling the two means either your nvim tweaks wait
-for a para release or para releases carry nvim tweaks. `dotfiles-jchook` ships
-as its own repo, and `para mod update` picks up its changes with no para release
-at all.
+weekly, para doesn't, and coupling them means either your nvim tweaks wait for a
+para release or para releases carry nvim tweaks. `dotfiles-jchook` ships as its
+own repo, and `para mod update` picks up its changes with no para release at all.
 
-But the repo needs **one reference mod in-tree**, under `test/fixtures/`, or
-nothing here is ever exercised: `bin/lint` would never lint a mod hook, no test
-would see the documented shape, and the acceptance test below can't run in CI or
-be sandboxed. It exercises two hook points, a command, a skel file, a build hook
-and a `.mod-source`. It is also why `para mod add` takes a **local path**.
+But the repo needs **one reference mod in-tree**, or nothing here is ever
+exercised: `bin/lint` would never lint a mod hook and no test would see the
+documented shape. It goes at `test/fixtures/hello/.paraspace/mods/<m>/`,
+**committed** — see [Tests](#test-checklist) for why it can't be vendored at
+test time — exercising two hook points, a command, a skel file, a build hook and
+a `.mod-source`. (Confirmed: `bin/lint`'s shebang discovery picks it up, and
+`.shellcheckrc`'s `source-path=SCRIPTDIR` resolves its own `helpers`.)
 
-(So the `helpers` copy a mod must ship lives in the *mod author's* repo and is
+So the `helpers` copy a mod must ship lives in the *mod author's* repo and is
 their problem — `test_template_helpers_do_not_drift` globs `templates/*` and
-can't reach it.)
+can't reach it.
 
 ## Commands
 
@@ -131,14 +164,16 @@ can't reach it.)
 command → mod command** (mods in `LC_ALL=C` order).
 
 This needs a refactor the surface hides. `project_commands` returns bare names,
-and three callers rebuild the path from `$PARA_PROJECT_DIR/.paraspace/commands/`:
-`run_project_command`, `command_summary` via `usage_project_commands`, and
-`doctor_project`. For a mod verb every one is wrong — `--help` would `sed` a
-nonexistent file per mod verb (stderr noise inside `--help`), and
-`run_project_command` would `die "unknown command"` for a verb `para commands`
-just listed. Replace it with **one resolver emitting paths in precedence
-order**; the three callers consume paths, and `usage_project_commands`' header
-`PROJECT COMMANDS (%s/.paraspace/commands)` stops being a lie.
+and two callers rebuild the path from `$PARA_PROJECT_DIR/.paraspace/commands/`:
+`run_project_command`, and `command_summary` via `usage_project_commands`. For a
+mod verb both are wrong — `--help` would `sed` a nonexistent file per mod verb
+(stderr noise inside `--help`), and `run_project_command` would
+`die "unknown command"` for a verb `para commands` just listed. Replace it with
+**one resolver emitting paths in precedence order**; the callers consume paths,
+and `usage_project_commands`' header `PROJECT COMMANDS (%s/.paraspace/commands)`
+stops being a lie. `run_project_command` exports `PARA_MOD`/`PARA_MOD_DIR` when
+the verb resolved to a mod — that export is the entire justification for
+`PARA_MOD_DIR` existing, so it lands with the resolver or not at all.
 
 **`para commands` stays one bare name per line**, deduped first-wins. It is a
 scripting surface and the shipped completion feeds it straight into
@@ -155,8 +190,12 @@ reach the image. `.paraspace/` goes into the builder and the payload opens named
 points — the same resolution rule as everywhere else, rather than a second
 list-and-loop kept in step by prose.
 
-Five things the naive version gets wrong:
-
+- **Push the runner into the builder too**, `--mode 0755`, and set
+  `PARA_RUN_HOOK` in the generated env. Without both, the migrated
+  `image-build.sh`'s first named point is an unbound variable under `set -u` and
+  `para image build` fails for every project on day one. The builder's value
+  differs from the workspace's, which is the concrete reason the variable exists
+  rather than a literal path.
 - **Stop piping the payload.** `cmd_image_build` pipes
   `{ para_env; cat "$payload"; }` into `bash -s`, so **the payload is stdin** —
   and the runner deliberately hands stdin to each hook. A build hook that runs
@@ -164,44 +203,38 @@ Five things the naive version gets wrong:
   `image-build.sh`: the docker enable, the daemon wait and the overlay-driver
   check never run, the pipeline exits 0, and `image_publish` publishes exactly
   the broken image that driver check exists to refuse. Silently. Since the tree
-  is now *in* the builder, run it by path instead — push a generated
-  `/root/.paraspace/env`, then `incus exec … bash -c '. …/env; exec bash
-  …/image-build.sh' &` + `wait "$!"`. The interrupt dance survives byte for
-  byte, and payload and hooks each get a clean stdin.
+  is now *in* the builder, run it by path: push a generated env, then
+  `incus exec … bash -c '. …/env; exec bash …/image-build.sh' &` + `wait "$!"`.
+  The interrupt dance survives byte for byte, and payload and hooks each get a
+  clean stdin.
 - **`rm -rf` the builder's tree before pushing.** `incus file push -r` merges;
   it never deletes. `push_project` opens with exactly this `rm -rf` for exactly
   this reason. Without it, `para image build -i` — which relaunches from
   `$PARA_IMAGE` — runs mods you deleted, because they're still in the image.
 - **Don't bake `.paraspace/` into the published image.** `image_publish`
-  snapshots the builder's whole rootfs. `rm -rf /root/.paraspace` before it, or
-  every published image carries project source and a pinned copy of para's
-  runner.
-- **`chmod -R +x` the builder tree too**, for the reason `push_project` already
-  does it: a checkout, a tarball or a push can all lose the bit, and a build
-  hook without it fails the build with 126.
-- **Correct the builder's env like the guest's.** `cmd_image_build` pipes raw
-  `para_env`, so `PARA_BIN`, `PARA_PROJECT_DIR`, `PARA_CONFIG*`,
-  `PARA_STATE_DIR` reach a build hook as *host* paths — the exact set
-  `push_project` unsets. A mod hook that works at `packages` would die at
-  `provision`.
+  snapshots the builder's whole rootfs, so `rm -rf` the tree before it or every
+  published image carries project source and a pinned copy of para's runner.
+- **Correct the builder's env the way `push_project` corrects the guest's** —
+  the same set, named once rather than enumerated here so it can't drift. Raw
+  `para_env` hands a build hook `PARA_BIN`, `PARA_PROJECT_DIR`, `PARA_CONFIG*`
+  and `PARA_STATE_DIR` as *host* paths, so a mod hook that works at `packages`
+  would die at `provision`.
+
+Exec bits need no work here: the runner repairs them, which is why that moved
+into the runner in the first place.
 
 **`image_src_sha` must cover the mods**, and hashing content alone is not
-enough: `cat`ting a file list drops the names, so deleting one hook and creating
-another with the same bytes yields an identical hash for a genuinely different
-image. Hash **path then content**, over an `LC_ALL=C`-sorted list, and hash the
-whole of `.paraspace/` rather than trying to enumerate what the builder can
-reach — build hooks now see `$PARA_SKEL`, so the project's `skel/` is an image
-input too. Over-broad is the right failure direction: a spurious rebuild beats a
-stale image reported as current. One `image_inputs()` helper, and it must not
-break the *no-mods* case — an unmatched glob handed to `cat` exits non-zero, and
-`pipefail` turns that into "the image inputs could not be hashed" for the
-majority of projects.
-
-Three spellings of one path (`~/.paraspace/run-hook`, `/root/.paraspace/…`,
-`$PARA_HOOKS`-relative) is one too many, right after #18 established naming
-these by injected variables. Inject one — a `PARA_RUN_HOOK` — used by `bin/para`,
-the templates and the docs. The hardcoded `/root` also assumes the base image's
-root home.
+enough: deleting one hook and creating another with the same bytes yields an
+identical hash for a genuinely different image. Reuse the mod tree hash — per
+file, then over the sorted `<sha>  <path>` list — across the whole of
+`.paraspace/` rather than enumerating what the builder can reach, since build
+hooks now see `$PARA_SKEL` and the project's `skel/` is an image input too.
+Over-broad is the right failure direction: a spurious rebuild beats a stale
+image reported as current. It must not break the *no-mods* case — an unmatched
+glob handed to `cat` exits non-zero and `pipefail` turns that into "the image
+inputs could not be hashed" for the majority of projects. And it flips every
+already-published image to `drifted` once, including every developer's cached
+fixture image: one line in `docs/image.md` beats the support question.
 
 ## What a mod may assume
 
@@ -211,9 +244,9 @@ Only para's contract: `$PARA_*`, `$HOME`, `$PARA_SHARED`, and its own
 - **Not the project's `helpers`.** Template policy, not engine contract, and
   `$PARA_HOOKS/helpers` resolves to the mod's own anyway — so a mod ships one.
   (Promoting `helpers` into the engine would make para own log formatting.)
-- **Never clobber.** Every seeder guards the destination *and* its source.
-  **First writer wins.** This is what makes `mod add` safe against a volume
-  that's been live for months with hand-edited files.
+- **Never clobber** — but see [Conventions](#conventions-are-the-real-interface):
+  never-clobber and append-a-fragment are different rules for different files,
+  and which one applies is a property of the file, not of mods in general.
 - **Not its position**, and not that another mod ran.
 - **Not stdin past its own prompt.** One stdin feeds every hook in a point.
 - **Not that its context survives `su -`/`sudo`.** Both reset the environment;
@@ -243,8 +276,8 @@ tier tests **removal**, not just addition.
 The same asymmetry bites on add: a mod added to an already-seeded volume gets
 its *new* paths (nvim, tmux) and skips the ones the base already wrote (zshrc) —
 so you get the mod's editor and the base's shell. Half-applied, silently. The
-reseed story is the answer, and the e2e test must assert the half-applied state
-is what actually happens rather than asserting it is correct.
+reseed story is the answer, and the e2e test asserts that this is what happens,
+not that it is desirable.
 
 ## The first PR has nothing to do with mods
 
@@ -254,7 +287,7 @@ never reaches an existing shared volume.** Replacing the sentinel with per-file
 guards fixes it, converges, and removes the migration's hardest blocker — with
 no engine change, no #18 and no mods.
 
-Two traps in that edit:
+Three traps in that edit:
 
 - **`[ -e dest ] || cp` is not a drop-in for `[ -f src ] && cp`.** Under
   `set -euo pipefail` they differ: with the source missing, the `&&` form's
@@ -265,6 +298,9 @@ Two traps in that edit:
 - **Retire `.seeded` rather than keeping it.** With per-destination guards it is
   strictly less precise, and keeping it breaks the gitconfig fix below on every
   pre-existing volume.
+- **`void-minimal` and `test/fixtures/hello` carry the same sentinel.** The
+  fixture is what the e2e tier actually runs, and `void-minimal` is the file
+  readers are pointed at to copy the seeding block from. Convert all three.
 
 ## Migrating `void-jchook`
 
@@ -282,9 +318,9 @@ So `void-docker-gh` **gains two hook points** — it is not untouched, and this
 plan should never have claimed it would be:
 
 ```sh
-~/.paraspace/run-hook seed-shared     # before its own seeding
-…                                     # guarded, so a mod's file survives
-~/.paraspace/run-hook pre-clone       # everything that must precede the clone
+"$PARA_RUN_HOOK" seed-shared     # before its own seeding
+…                                 # guarded, so a mod's file survives
+"$PARA_RUN_HOOK" pre-clone        # everything that must precede the clone
 clone || authorize_key
 ```
 
@@ -293,23 +329,40 @@ clone || authorize_key
 | the `skel/` tree (nvim, tmux, claude, zshrc, bin) | `mods/dotfiles-jchook/skel/` |
 | seeding the shared volume | `hooks/seed-shared`, guarded both ways |
 | symlinks, `chsh`, the managed Claude policy | `hooks/pre-clone` — **not** `provision`, which is after the clone and defeats the point |
-| the `image-build.sh` diff (packages, Claude Code, /tmp) | `hooks/packages` |
+| the `image-build.sh` diff (packages, Claude Code) | `hooks/packages` |
 | `commands/{claude,run}` | `mods/dotfiles-jchook/commands/` |
 | the `Parafile` and `boot` diffs | nothing — they were prose differences |
 | the template itself | deleted; its README content moves to the mod's repo |
 
-Two wrinkles to settle rather than discover:
+Everything else in that diff — `/tmp` perms, the docker group,
+`PARA_PREPULL_IMAGES`, `known_hosts`, recording the clone dir — is already in
+the base and moves nowhere.
 
-- **The gitconfig is written whole by both**, and jchook's adds an `[alias]`
-  block its zsh aliases need. The fix is an `[include]` in the base's gitconfig
-  plus an included file from the mod — but written **idempotently outside** the
-  seed guard (`grep -q '^\[include\]' … || printf … >>`), or a volume seeded
-  before the change never gets the include line and the aliases fail with
-  `git: 'graph' is not a git command`.
+Four wrinkles to settle rather than discover:
+
+- **`$shared/gitconfig` needs an owner, and first-writer-wins is the wrong rule
+  for it.** git has no include-*directory*, so composing means each mod appends
+  its own `[include] path =` line — which means the first mod to run *creates*
+  the file, the base's guarded write then skips, and `[user] name/email` is
+  never written. Every workspace fails `git commit` with "Please tell me who you
+  are". So: **the base owns `$shared/gitconfig`**, writes it idempotently
+  *before* `seed-shared`, mods write only `$shared/gitconfig.d/<mod>`, and the
+  base emits one include line per file it finds there.
+- **`$BROWSER` fits no hook point.** `void-jchook` exports it so the base's
+  `authorize_key` device flow sees it — and a `pre-clone` hook is a separate
+  process that cannot export into its caller. The interactive path is already
+  covered by the mod's own zshrc; the non-interactive one isn't. Cleanest fix
+  inside the boundary: the mod's `packages` build hook writes
+  `/etc/profile.d/`.
+- **`packages` runs late, and its name suggests early.** It must come after the
+  base's `useradd` (Claude Code installs *as* `$PARA_USER`) and after the base's
+  `-Syu` full upgrade, or it is Void's partial-upgrade footgun that the base's
+  own comment warns about. The position is the contract; document it where the
+  point is defined.
 - **`ln -sfn` onto a real `~/.claude` nests inside it.** The trigger isn't
-  `image build -i` (that path is already guarded); it's a *workspace* where
-  `claude` ran once and recreated `~/.claude` before the mod was added. The
-  mod's hook does `[ -L ~/.claude ] || rm -rf ~/.claude` first.
+  `image build -i` (already guarded); it's a *workspace* where `claude` ran once
+  and recreated `~/.claude` before the mod was added. The mod's hook does
+  `[ -L ~/.claude ] || rm -rf ~/.claude` first.
 
 **Migration check** (a one-time manual equivalence, not a test):
 `para init void-docker-gh && para mod add <url>` reproduces today's
@@ -327,15 +380,20 @@ opening with the fact that para enforces none of it. Two audiences, one page —
 project authors ("open these points if you want mods to work with you"), mod
 authors ("assume only these"). The editorial test that keeps it from swallowing
 the contract docs: **if para still works when you ignore it, it's a convention;
-if para breaks, it's contract** and belongs in `versioning.md`/`hooks.md`.
+if para breaks, it's contract** and belongs in `versioning.md`/`run-hook.md`.
 
 Contents: the hook point names (`seed-shared`, `pre-clone`, `post-clone`,
-`packages`), with the reference template as their executable definition; the
-`$PARA_SHARED` layout; the base image; `paraspace-mod-*` repo naming; never
-clobber; and the one to lead with — **compose, don't collide**: shared config
-should be include-based (`zshrc.d/`, git `[include]`) so two mods add fragments
-instead of fighting over a file. Without that, last-writer-wins is the entire
-ecosystem.
+`packages`) *and where each sits*, with the reference template as their
+executable definition; the `$PARA_SHARED` layout; the base image;
+`paraspace-mod-*` repo naming; and the two that have to be stated together or
+they read as contradictory —
+
+- **Never clobber** a file with a single owner (`zshrc`, `tmux.conf`).
+- **Append a fragment** to a file with many (`gitconfig.d/<mod>`,
+  `zshrc.d/<mod>`), where the owner is the base and mods only ever add.
+
+Which rule applies is a property of the file, and the layout says which. Without
+that distinction the gitconfig failure above is the whole ecosystem's default.
 
 Worth stating plainly: **conventions are more expensive to change than
 contracts.** A `PARA_CONTRACT` bump has a mechanism — para refuses and says so.
@@ -355,6 +413,8 @@ a declared-but-missing mod is a `doctor` warning, not a behavior change. And
 **para never writes to a `Parafile`**; `para config-set` was deleted in favor of
 hand-editing, and resurrecting it here would be a step backward. `init` gains
 `--no-mods` and prints each fetch, since it would now touch the network.
+`cmd_init`'s `chmod` case has the same `.paraspace/hooks/*` blind spot the copy
+loop had, so it needs widening when this lands.
 
 Separate PR, after the core lands.
 
@@ -380,23 +440,23 @@ Same change, or it's drift:
 - new `docs/mods.md` and `docs/conventions.md` — both need a
   `.vitepress/config.mts` sidebar entry **and** a line in `docs/README.md`, the
   router.
-- `docs/hooks.md` — resolution, `run-hook` as public API, `PARA_MOD*`, the
-  guest-layout table, #18's re-pointing reword. At 122 of ~150 lines, so
-  authoring detail lives in `mods.md` and links back.
 - `docs/commands.md` — mod commands, precedence, and the template→commands table.
-- `docs/image.md` — the builder push and named build points.
+- `docs/image.md` — the builder push, named build points, and the one-time
+  `drifted` cliff.
 - `docs/versioning.md` — the reserved names, and why executing a new path is
   still additive.
-- `docs/parafile.md` — link "Your own keys" rather than re-deriving it.
+- `docs/project-setup.md` — a `mods/` row in "What's in `.paraspace/`", the page
+  a new user reads first.
+- `docs/parafile.md` — link "Your own vars" rather than re-deriving it.
 - `docs/cookbook.md` — "Bring your dotfiles" and "Add a `para` verb" are the two
   recipes a mod supersedes.
 - `void-jchook` is named in: `README.md` (including "three runnable templates"),
   `docs/project-setup.md` ×2, `docs/commands.md`, `docs/agents.md`,
   `docs/shared-auth.md`, `CLAUDE.md` ×2 — plus **relative links from
   `templates/void-docker-gh/README.md` and `templates/void-minimal/README.md`**,
-  which ship in the tarball and would 404, and a mention in
-  `void-minimal`'s `skel/zshrc`. `docs/agents.md` is the sharpest: it teaches
-  `para claude`, so it must now say *mod*, not *template*.
+  which ship in the tarball and would 404, and a mention in `void-minimal`'s
+  `skel/zshrc`. `docs/agents.md` is the sharpest: it teaches `para claude`, so it
+  must now say *mod*, not *template*.
 - `plans/minimal-engine.md` says there is no third hook class. This supersedes
   that; add a row to its line-budget table, which is the repo's own stated gate
   for policy creeping back into the engine.
@@ -408,21 +468,39 @@ Same change, or it's drift:
 
 ## Test checklist
 
-CLI tier: `mod add` from a local path and a URL → files land, exec bits
-preserved, `.git` stripped, shape check refuses a non-mod; `update` removes an
-upstream-deleted file and refuses a modified tree without `--force`; `rm`/`add`
-refuse a name with a path in it; `ls` shows source and `modified`; command
-precedence (mod verb resolves, project verb wins, engine verb beats both) and
-`para commands` still one bare name per line; `para mod` present in all four
-registration sites.
+The fixture mod is **committed**, not vendored at test time. `sandbox.sh` points
+`PARA_PROJECT_DIR` at the in-repo `test/fixtures/hello` and teardown doesn't
+cover it, so a test that ran `mod add` there would dirty the working tree, make
+`bin/lint` lint the vendored copy as well as the source, and fail on the second
+run with "already vendored" — order-independence and re-runnability both gone.
 
-e2e tier (run it — CI won't): the fixture mod through a full `up` — two points,
-a command, a skel file; **`mod add` onto an already-seeded volume** (assert what
-actually happens, including the half-applied case); **`mod rm` followed by
-`up`** (assert the shared volume and symlinks survive, because that is the
-documented behavior); `para image build` with a mod's build hook, then `image
-status` after editing it → rebuild needed, which needs `PARA_TEST_REBUILD=1`
-since the fixture image is cached and this would otherwise pass vacuously.
+CLI tier — and most of this belongs here, so CI actually runs it. `add`/`rm`/
+`update` drive a **copied** project (`cp -R "$FIXTURE_DIR" "$(scratch)/hello"`),
+which needs no incus:
+
+- `mod add` from a local path and a URL → files land, exec bits preserved,
+  `.git`/`.gitignore` stripped, shape check refuses a non-mod, name derived
+  without the `paraspace-mod-` prefix, `--as` overrides.
+- `update` removes an upstream-deleted file; refuses a modified tree without
+  `--force`; warns and skips a hand-written mod and a modified one in a bare
+  `update` rather than dying mid-list.
+- a freshly added mod does **not** report `modified` (the `.mod-source`
+  self-reference).
+- `rm`/`add` refuse a name with a path in it; `cmd_mod` outside a project fails
+  with para's own error.
+- command precedence (mod verb resolves, project verb wins, engine verb beats
+  both), `para commands` still one bare name per line, `PARA_MOD_DIR` exported
+  to a mod's command.
+- `para mod` present in all four registration sites, including
+  `para mod rm <TAB>` offering mod names rather than workspaces.
+
+e2e tier (run it — CI won't): the committed fixture mod through a full `up` —
+two points, a command, a skel file; **`mod add` onto an already-seeded volume**
+(assert the half-applied reality); **`mod rm` followed by `up`** (assert the
+shared volume and symlinks survive, because that is the documented behavior);
+`para image build` with a mod's build hook, then `image status` after editing it
+→ rebuild needed, which needs `PARA_TEST_REBUILD=1` since the fixture image is
+cached and this would otherwise pass vacuously.
 
 ## Deferred
 

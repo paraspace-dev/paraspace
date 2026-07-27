@@ -22,11 +22,11 @@
 # : "${PARA_PROJECT:=my-project}"
 
 # What `para image build` builds FROM: the incus image its builder launches, and
-# one `sh -c` line run inside it before .paraspace/image-build.sh. NEITHER has a
+# one `sh -c` line run inside it before .paraspace/hooks/image-build. NEITHER has a
 # default — para never picks your distro, and a para update must not be able to
 # change it under you. Any incus image works (`images:debian/13`,
 # `images:alpine/edge`, …); this template targets Void. The bootstrap must leave
-# BASH in the builder (para runs image-build.sh with `bash -s`); here it also
+# BASH in the builder (para runs the image-build hook with bash); here it also
 # refreshes Void's bundled xbps, a rolling-release snapshot that can be too stale
 # to install against. Set it to "" if your base needs nothing.
 : "${PARA_IMAGE_BASE:=images:voidlinux}"
@@ -90,6 +90,6 @@ PARA_ROUTES="${PARA_ROUTES-8080}"
 
 # Docker images to bake into the base image, so `para up` doesn't pull them in
 # every workspace. This is THIS PROJECT'S key, not one para knows about: para
-# forwards every PARA_* to .paraspace/image-build.sh, which pre-pulls whatever
+# forwards every PARA_* to .paraspace/hooks/image-build, which pre-pulls whatever
 # it finds here. Space-separated tags, matching your compose file.
 # : "${PARA_PREPULL_IMAGES:=caddy:2-alpine postgres:17-alpine}"

@@ -30,7 +30,7 @@ fi
 [ -f "$shared/zshrc" ] && ln -sfn "$shared/zshrc" ~/.zshrc
 
 # This bare image logs you into bash. The moment you add `zsh` to
-# .paraspace/image-build.sh and rebuild, switch the login shell so the seeded
+# .paraspace/hooks/image-build and rebuild, switch the login shell so the seeded
 # zshrc applies. Harmless (and skipped) until then.
 if command -v zsh >/dev/null 2>&1 && [ "$SHELL" != "$(command -v zsh)" ]; then
   sudo chsh -s "$(command -v zsh)" "$PARA_USER" 2>/dev/null || true
@@ -38,7 +38,7 @@ fi
 
 # ---- where this grows ------------------------------------------------------
 # This box clones nothing and boots nothing. When you have an app:
-#   • add its toolchain to .paraspace/image-build.sh (the empty `pkgs=""` block)
+#   • add its toolchain to .paraspace/hooks/image-build (the empty `pkgs=""` block)
 #   • clone it here — copy the shared-volume seeding, git-key authorization, and
 #     .env handling from templates/void-docker-gh/.paraspace/hooks/provision
 #   • bring it up in .paraspace/hooks/boot, and point PARA_ROUTES at its port

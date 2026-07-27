@@ -25,7 +25,7 @@ your own repo.
 void-jchook/
   .paraspace/
     Parafile               # identity, the base image, the demo origin, one route (:8080)
-    image-build.sh         # docker + git + zsh/tmux/Neovim toolchain + Claude Code
+    hooks/image-build      # docker + git + zsh/tmux/Neovim toolchain + Claude Code
     hooks/provision        # seed + link the shared dev env, clone, copy .env
     hooks/boot             # docker compose up -d --wait
     hooks/helpers          # colored output + small guards, sourced by the hooks
@@ -72,7 +72,7 @@ Swap the dotfiles under `skel/` for your own, point `PARA_ORIGIN` at your repo,
 and adapt the hooks to your stack (`hooks/provision` seeds + clones,
 `hooks/boot` brings services up). A `para up` re-pushes `skel/` and re-runs the
 hooks, so dotfile edits go live with no image rebuild. Add a language runtime in
-`image-build.sh` (there's a commented Bun example). Keep the image contract:
+`hooks/image-build` (there's a commented Bun example). Keep the image contract:
 docker→overlayfs, a `$PARA_USER`/`$PARA_UID` user in the `docker` group, bash +
 git.
 

@@ -82,7 +82,7 @@ The base is **required to build**, and any Incus image works
 default, so your distro can't change under you when para updates.
 
 The bootstrap is one `sh -c` line run in the builder before your
-`.paraspace/image-build.sh`. Its job is to leave **bash** in the image (para
+`.paraspace/hooks/image-build`. Its job is to leave **bash** in the image (para
 runs the payload with `bash -s`) and refresh the package index if the base
 needs it — `xbps-install -Syu xbps bash` on Void, `apk add --no-cache bash` on
 Alpine, `apt-get update` on Debian. Leave it unset if your base needs nothing.
@@ -90,7 +90,7 @@ Alpine, `apt-get update` on Debian. Leave it unset if your base needs nothing.
 ### `PARA_USER` / `PARA_UID` / `PARA_GID`
 
 The workspace user para runs hooks and `para sh` as, and chowns every pushed
-file to. Your `image-build.sh` creates that user — it gets all three in its
+file to. Your `hooks/image-build` creates that user — it gets all three in its
 environment — so if you change them, **rebuild the image**, or the chowns land
 on a uid with no passwd entry and the shared volume becomes unwritable.
 
@@ -98,7 +98,7 @@ on a uid with no passwd entry and the shared volume becomes unwritable.
 
 Any `PARA_FOO` you set reaches your hooks, project commands and image build
 untouched — that's how a project declares its own knobs (`PARA_GH_AUTH` in the
-default template, the `PARA_PREPULL_IMAGES` the templates' `image-build.sh`
+default template, the `PARA_PREPULL_IMAGES` the templates' `hooks/image-build`
 reads). See
 [Hooks](./hooks.md#the-environment-para-injects), and
 [One workspace, a custom env var](./cookbook.md#one-workspace-a-custom-env-var)

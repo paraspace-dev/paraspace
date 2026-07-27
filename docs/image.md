@@ -11,7 +11,7 @@ para's own mechanism needs very little:
 - a **workspace user** — `$PARA_USER` with uid/gid `$PARA_UID`/`$PARA_GID`
   (`app` and `1000`/`1000` by default). para runs hooks and `para sh` as that
   user and chowns every pushed file to those ids, so the user your
-  `image-build.sh` creates **must** match. It gets all three in its
+  `hooks/image-build` creates **must** match. It gets all three in its
   environment;
 - **bash** — para invokes hooks and shells via `su -s /bin/bash`;
 - **util-linux `su`**, if you run `para sh <ws> -c '<cmd>'` from a terminal —
@@ -25,7 +25,7 @@ the bundled templates' is — the image also needs **docker**, that workspace us
 in the `docker` group, and nesting that resolves to **overlayfs** — on a btrfs
 or ZFS pool it silently [falls back to the very slow `vfs`
 driver](./troubleshooting.md#everything-inside-the-workspace-is-slow). para
-doesn't check that; the templates' `image-build.sh` does.
+doesn't check that; the templates' `hooks/image-build` does.
 
 For full ergonomics also include `tmux`, a login shell like `zsh`, and whatever
 agent CLI you use — para degrades rather than breaks without them.
@@ -36,10 +36,17 @@ The command is base-agnostic plumbing:
 
 1. launches a builder from **`$PARA_IMAGE_BASE`** with `security.nesting=true`;
 2. runs **`$PARA_IMAGE_BOOTSTRAP`** in it via `sh -c`, if set;
-3. pipes your **`.paraspace/image-build.sh`** into it as root under `bash -s`,
-   with every `PARA_*` exported ahead of it;
-4. publishes the result as **`$PARA_IMAGE`**. A failed or interrupted build
-   leaves the existing image untouched.
+3. pushes your whole **`.paraspace/`** to `/opt/.paraspace` in the builder, the
+   same way `para up` pushes it to `~/.paraspace` in a workspace — so
+   `$PARA_HOOKS`, `$PARA_SKEL` and every other `PARA_*` name real paths in
+   there;
+4. runs **`.paraspace/hooks/image-build`** as root, with no tty and no stdin;
+5. removes `/opt/.paraspace` and publishes the result as **`$PARA_IMAGE`**. A
+   failed or interrupted build leaves the existing image untouched.
+
+Your project's tree is a build *input*, so step 5 takes it back out before the
+snapshot — a workspace should find its `.paraspace/` at `~`, pushed fresh by
+`para up`, and nowhere else.
 
 Both keys live in the [Parafile](./parafile.md), which is also where the
 per-distro bootstrap examples are.
@@ -54,7 +61,7 @@ Two caveats:
   one clean build before relying on the result.
 
 The templates'
-[`image-build.sh`](https://github.com/paraspace-dev/paraspace/blob/main/templates/void-docker-gh/.paraspace/image-build.sh)
+[`hooks/image-build`](https://github.com/paraspace-dev/paraspace/blob/main/templates/void-docker-gh/.paraspace/hooks/image-build)
 is the reference: a package list, a user, and Docker set up for nesting.
 
 ## Checking it — `para image status`
@@ -70,9 +77,9 @@ $ para image status
 `PARA_IMAGE_BASE` names today. After a `-i` build it is `$PARA_IMAGE` itself,
 which is how you tell an incremental image from a clean one.
 
-Rebuild when you've edited your `image-build.sh` — nothing checks for you, and
-if you leave it too long you find out because the tool you added isn't in the
-workspace.
+Rebuild when you've edited your `hooks/image-build` — nothing checks for you,
+and if you leave it too long you find out because the tool you added isn't in
+the workspace.
 
 `para image rm` deletes `$PARA_IMAGE` — to reclaim space or force a fully clean
 next build. Workspaces already `up` are clones and keep running.

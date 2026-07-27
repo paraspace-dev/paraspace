@@ -300,7 +300,8 @@ test_image_build_refuses_without_a_base_image() {
   # you. Checked before the daemon, so an incomplete Parafile is what you hear
   # about — which `assert_backend_untouched` is here to pin.
   local p; p="$(a_project)"
-  printf 'true\n' > "$p/.paraspace/image-build.sh"
+  mkdir -p "$p/.paraspace/hooks"
+  printf 'true\n' > "$p/.paraspace/hooks/image-build"
   assert_refuses "$p" "PARA_IMAGE_BASE" image build || return 1
   assert_backend_untouched
 }

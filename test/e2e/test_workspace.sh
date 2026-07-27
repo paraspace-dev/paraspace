@@ -73,7 +73,7 @@ test_workspace_is_listed_and_running() {
 
 test_sh_c_runs_as_the_workspace_user() {
   # $PARA_USER/UID/GID are pinned by the sandbox (see test/lib/sandbox.sh) and
-  # reach both the fixture's image-build.sh and para's runtime chowns, so assert
+  # reach both the fixture's hooks/image-build and para's runtime chowns, so assert
   # against them rather than a literal — that's what makes the ids overridable.
   local uid; uid="$("$PARA" sh "$PARA_WS" -c 'id -u' 2>/dev/null)"
   assert_eq "$PARA_UID" "$uid" "workspace user is uid $PARA_UID" || return 1

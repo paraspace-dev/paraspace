@@ -46,8 +46,8 @@ seam, decide breaking-vs-additive deliberately and update both the constant and
   2,244-line predecessor; it is the reference for **House style**, below, and
   new code should read like it.
 - **ShellCheck is the static gate**, run via `bin/lint` (or `npm run lint`) — CI
-  runs the same on every push/PR. It lints the CLI plus the templates' hooks,
-  `image-build.sh`, and the `test/` scripts (discovered by shebang). Hook sources
+  runs the same on every push/PR. It lints the CLI plus the templates' hooks
+  and the `test/` scripts (discovered by shebang). Hook sources
   resolve via `.shellcheckrc` (`source-path`), so prefer that over per-file
   directives. **Run `bin/lint` before finishing any change here** — it's the
   static gate.

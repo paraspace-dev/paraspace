@@ -55,7 +55,7 @@ into a scratch directory to diff against a current template. Otherwise:
 | unset `PARA_ROUTES` was refused | unset means empty means no HTTP; `para doctor` mentions it |
 | para validated routes and domains | `caddy validate` does, before every reload |
 | per-project keys refused from the user config | allowed; `para doctor` advises instead |
-| `PARA_PREPULL_IMAGES` injected into the image build | gone — set your own key and read it in `image-build.sh` |
+| `PARA_PREPULL_IMAGES` injected into the image build | gone — set your own key and read it in `hooks/image-build` |
 | image stamped uid/user/contract/incremental | only `user.para.base` — `para image status` reports when it was built and from what |
 | `para start` / `para stop` | `para caddy start\|stop\|status` |
 | `para config-set KEY VALUE` | `para config edit` — the file is hand-edited now |
@@ -66,3 +66,22 @@ New since then: `PARA_READY_HOST` (wait for guest DNS to resolve a host your
 hooks need), `.paraspace/commands/` (your own `para` verbs), `para doctor`, and
 `PARA_HOOKS`/`PARA_SKEL` (name the guest dirs instead of rebuilding them out of
 `$HOME`). All additive, so contract 1 covers them.
+
+## Changes inside contract 1
+
+Contract 1 is not frozen until 1.0. Until then a break lands **in** it rather
+than bumping it: para has one consumer, and publishing a new contract for a
+migration nobody has made would be a version number describing nothing. Each one
+is listed here, and each is a hand edit to a `.paraspace/` scaffolded before it.
+
+- **`.paraspace/image-build.sh` → `.paraspace/hooks/image-build`.** One rule for
+  every hook: `para` runs it by name out of `hooks/`. `git mv` it. Nothing
+  refuses the old name — `para image build` says `missing image-build hook` and
+  names the path it wanted.
+- The builder now gets your **whole `.paraspace/`** at `/opt/.paraspace`, so a
+  build hook reads `$PARA_HOOKS` and `$PARA_SKEL` like any other hook, and gets
+  no stdin. A payload that piped its own input, or that ran a package manager
+  without `-y`, has to stop.
+
+At 1.0 this section closes and anything that breaks a `.paraspace/` bumps the
+number instead.

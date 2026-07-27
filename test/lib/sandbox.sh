@@ -83,7 +83,7 @@ sandbox_e2e() {
   # the run that actually builds. An existing alias is REUSED, because the
   # rebuild is by far the slow part, so in steady state most runs skip
   # image build entirely. Nothing detects that you edited the fixture's payload:
-  # if you touched image-build.sh, the Parafile's base/bootstrap, or
+  # if you touched hooks/image-build, the Parafile's base/bootstrap, or
   # cmd_image_build itself, rebuild explicitly with PARA_TEST_REBUILD=1.
   # --no-build skips even the existence check.
   # Hardcoded, not "${PARA_IMAGE:-…}": sandbox_base unset PARA_IMAGE precisely so

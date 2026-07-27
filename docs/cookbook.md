@@ -74,7 +74,7 @@ of gets there anyway. Declare the tags in your `Parafile`:
 : "${PARA_PREPULL_IMAGES:=postgres:17-alpine redis:8-alpine}"
 ```
 
-and pull them in `image-build.sh`, where they bake into the base image once
+and pull them in `hooks/image-build`, where they bake into the base image once
 instead of downloading in every workspace:
 
 ```sh

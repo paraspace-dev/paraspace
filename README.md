@@ -35,7 +35,7 @@ para sh ws1        # shell into the clone
 ## Set up your project
 
 `para` needs one thing from a project: a `.paraspace/` dir at the repo root —
-a `Parafile` (config), `hooks/` (provision + boot), an `image-build.sh`, and
+a `Parafile` (config), `hooks/` (provision, boot and image-build), and
 optionally `commands/` (your own `para` verbs). Scaffold it from a working
 template:
 

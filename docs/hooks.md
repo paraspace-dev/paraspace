@@ -1,8 +1,20 @@
 # Hooks
 
 Hooks are where all your provisioning lives. You write three; para decides when
-they run. Use absolute paths in them — `provision` and `boot` start in your
-clone once it exists and in `$HOME` before that.
+they run. Write bash, use absolute paths (`provision` and `boot` start in your
+clone once it exists and in `$HOME` before that), and don't worry about file
+permissions — para runs each hook whatever its mode.
+
+`hooks/` is yours beyond those three names, so a library or an extracted step
+goes in there too, reached through `$PARA_HOOKS`:
+
+```sh
+. "$PARA_HOOKS/helpers"             # a library to source
+bash "$PARA_HOOKS/seed-dotfiles"    # a step this hook factors out
+```
+
+To let other hooks slot into the middle of one of yours, open a
+[hook point](./hook-points.md).
 
 ## The three hooks
 
@@ -20,6 +32,14 @@ It must be **idempotent** — `para up` re-runs it on every converge, and
 "fix the hook, re-run `up`" is the normal loop. It may prompt: para gives it a
 tty when there's a human on both ends, which is where the ssh-key and `gh`
 flows live.
+
+Guest DNS comes up a beat after the container, so a hook that clones can race
+it. Name the host you need in your [Parafile](./parafile.md) and `para up`
+blocks until the guest resolves it:
+
+```sh
+: "${PARA_READY_HOST:=github.com}"
+```
 
 ### `boot`
 
@@ -51,35 +71,6 @@ manager that stops to ask will hang the build — pass `-y`, or whatever your
 distro's equivalent is.
 
 What the image has to end up containing is [its own page](./image.md).
-
-## Writing one
-
-para runs every hook the same way: with `bash`, as a fresh process, with no
-arguments. What that means for you:
-
-- **You don't need the exec bit.** A hook from a `core.fileMode=false` checkout,
-  a tarball or a zip runs anyway. Keep `#!/usr/bin/env bash` at the top so your
-  editor and shellcheck treat the file as bash — but para ignores it, so a
-  `python3` shebang would still run as bash.
-- **Nothing you do escapes.** A `cd`, an `export`, a `set -o` — none of it
-  reaches para or the next hook, so you can be as messy inside one as you like.
-- **`exit` means this hook.** Anything non-zero stops the `up`, and para names
-  the hook that failed and shows its output.
-- **You can't hand a value back.** To tell the rest of the workspace something,
-  write it to the filesystem — or, for an environment variable everything should
-  see, bake a `/etc/profile.d/` file in your `image-build` hook.
-
-`hooks/` is yours beyond those three names. Put a library or an extracted step
-in there and reach it through `$PARA_HOOKS` — with `bash` in front, since para
-didn't mark it executable either:
-
-```sh
-. "$PARA_HOOKS/helpers"             # a library to source
-bash "$PARA_HOOKS/seed-dotfiles"    # a step this hook factors out
-```
-
-To let *other* hooks slot into the middle of this one, see
-[Hook points](./hook-points.md).
 
 ## How your project reaches the workspace
 
@@ -147,14 +138,27 @@ port](./cookbook.md#serve-more-than-one-port) for the loop.
 para's own internals may also appear in the environment; only the variables
 above are the [versioned contract](./versioning.md).
 
-## Waiting for the network
+## Passing something to a later hook
 
-Guest DNS comes up a beat after the container does, so a provision hook that
-clones can race it. If your hooks depend on reaching a host, name it:
+You can't add to that environment from inside a hook — an `export` you write
+lives and dies with it. Anything a *later* hook, your shell, or a project
+command has to see goes through a file, and **which file is decided by how long
+the value should live**:
 
-```sh
-: "${PARA_READY_HOST:=github.com}"
-```
+| To pass | Write | Read by | Lives as long as |
+|---|---|---|---|
+| "I already did this" | a sentinel beside the thing it guards | the same hook, next `up` | the thing it guards |
+| "the tool is installed" | nothing — just install it | anyone, via `command -v` | the image |
+| a shell variable (`PATH`, `$BROWSER`) | `/etc/profile.d/<name>.sh`, from `image-build` | every login shell after it — later hooks, `para sh`, your commands | the image |
+| a value only this workspace knows | a file under `$HOME` | whoever needs it, when they need it | the workspace |
+| a value every workspace shares | a file under `$PARA_SHARED` | every workspace of the project | the shared volume |
 
-`para up` then blocks until the guest resolves it before running anything.
-Leave it unset and para waits only for the container agent.
+Name what you write after whoever owns it — `/etc/profile.d/dotfiles.sh`,
+`$PARA_SHARED/dotfiles/` — so two things filling the same hook can't quietly
+land on one path.
+
+**The one that surprises people:** a `/etc/profile.d` file doesn't reach the
+hooks running beside it. The shell that runs your hooks read its environment
+before any of them started, so the file takes effect on the *next* thing para
+runs — `boot`, `para sh`, the next `up`. Two hooks that have to hand off within
+a single `provision` do it through a file each reads at the moment it needs it.

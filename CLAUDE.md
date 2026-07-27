@@ -122,7 +122,7 @@ the in-flight rewrite and the page-by-page targets.
 
 The bar is that someone who has never read the source can do the thing the page
 is about. These rules are the prose version of **House style** above, and each
-one is a mess that rewrite is cleaning up.
+one was a mess that a full rewrite had to clean up.
 
 - **Write for the reader's job, not the code's shape.** If a paragraph's
   grammatical subject is `para`, try rewriting it with the reader as the

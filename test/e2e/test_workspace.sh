@@ -131,28 +131,18 @@ test_image_build_status_and_rm_lifecycle() {
   local img="para-imgtest-$$"
   local rc=0 out
 
-  # Write path: a clean build must succeed and stamp provenance onto the image.
+  # Write path: a clean build must succeed and publish the alias.
   # An early return here can't leak: cmd_image_build's own trap tears down its
   # builder, and the publish is atomic, so a failed build leaves no '$img' alias.
   # Every step after this uses `|| rc=1` (no early return), so the unconditional
   # cleanup + `para image rm` at the end always run.
   env PARA_IMAGE="$img" "$PARA" image build >/dev/null 2>&1 \
     || { echo "  'para image build' of throwaway image '$img' failed" >&2; return 1; }
-  local sha; sha="$(incus image get-property "$img" user.para.src_sha 2>/dev/null || true)"
-  [ -n "$sha" ] || { echo "  build did not stamp user.para.src_sha" >&2; rc=1; }
 
-  # Read path: right after a clean build the source is in sync, and status names
-  # the image and its base.
+  # Read path: status names the image, when it was built, and its base.
   out="$(env PARA_IMAGE="$img" "$PARA" image status 2>&1)"
-  assert_contains     "$out" "up to date"         "status is up to date right after a build" || rc=1
-  assert_contains     "$out" "images:alpine/edge" "status reports the base image"            || rc=1
-
-  # Drift: change a reproducibility input via the environment (env beats the
-  # Parafile, so no file is mutated) — the current hash no longer matches the one
-  # stamped at build time, so status must flip to drifted.
-  out="$(env PARA_IMAGE="$img" PARA_IMAGE_BOOTSTRAP='apk add --no-cache bash coreutils' "$PARA" image status 2>&1)"
-  assert_contains     "$out" "drifted"    "status detects a changed image input" || rc=1
-  assert_not_contains "$out" "up to date" "a drifted image is not reported in sync" || rc=1
+  assert_contains "$out" "$img"               "status names the image"         || rc=1
+  assert_contains "$out" "images:alpine/edge" "status reports the base image"  || rc=1
 
   # rm deletes it — verify the image is actually gone afterwards.
   env PARA_IMAGE="$img" "$PARA" image rm >/dev/null 2>&1 \

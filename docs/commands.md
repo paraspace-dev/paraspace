@@ -76,7 +76,7 @@ it (`--force` overwrites); `path` prints its location — both for scripting.
 |---|---|
 | `para init [<template>] [--list] [-f\|--force] [--full]` | scaffold `.paraspace/` from a bundled template (default `void-docker-gh`), skipping files that already exist; `--full` copies the whole template tree, not just `.paraspace/` |
 | `para image build [-i\|--from-current]` | build and publish the project's base image; `-i` layers onto the current one for fast iteration — see [The image contract](./image.md) |
-| `para image status` | when `$PARA_IMAGE` was built, and whether its source has drifted since |
+| `para image status` | when `$PARA_IMAGE` was built, and from what base |
 | `para image rm` | delete `$PARA_IMAGE`. Running workspaces are clones and keep running |
 | `para commands` | list this project's own commands, one per line |
 | `para completions <bash\|zsh>` | print a completion script |

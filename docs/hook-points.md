@@ -1,35 +1,64 @@
 # Hook points
 
-A hook can run a point of its own — a name para has never heard of, filled by
-your other hooks and, once you vendor one, by a mod. It is how a project makes
-its own provisioning extensible without para learning anything about it.
+Your `provision` hook clones the repo. Now you need an ssh config, a credential
+helper, or an `insteadOf` rewrite to an internal mirror in place **before** it
+does — and you'd rather not paste that into the middle of a hook you already
+have, especially if it came from someone else.
 
-Open one from anywhere in one of your hooks:
+Open a point where the ordering matters:
 
 ```sh
+# .paraspace/hooks/provision — the line just before you clone
 "$PARA_RUN_HOOK" clone:before
 ```
 
-para invokes `provision`, `boot` and `image-build`; every other name in that
-vocabulary is yours. Spell them `<subject>:before` / `<subject>:after`, so a
-listing sorts by subject first and moment second.
+Anything named `clone:before` now runs at exactly that moment. para never learns
+the name — you invent it and you place it.
 
-Any name resolves to **every owner that has a hook by that name** — your
-`hooks/<name>` first, then each `mods/*/hooks/<name>`, with no promise about
-order among the latter. `mods/` is how a vendored component fills the same points
-your own hooks do; until you have one, a name resolves to your file or to
-nothing.
+## Filling one
 
-Three sharp edges:
+Write the file. There is nothing to register:
 
-- **Only exported variables reach a point.** It runs as a new process, so a
-  plain `repo_url=…` set three lines above the call is unset inside the hooks it
-  runs. Better than exporting it: pass nothing — a point is for filling in
-  behavior, not for handing over arguments.
-- **Don't re-source `~/.paraspace/env`.** It holds the *project's* values, so a
-  hook that re-sources it mid-run rewinds `$PARA_HOOKS` to the project's — wrong
-  file, no error.
-- **The context does not survive `su -`/`sudo`**, which reset the environment. A
-  build hook installing as another user needs
-  `su - "$PARA_USER" -c 'PARA_SKEL=… …'`.
+```sh
+cat > .paraspace/hooks/clone:before <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+git config --global url."git@github.com:".insteadOf https://github.com/
+EOF
+```
 
+More than one file can answer to a name — yours runs first, then any that came
+with a vendored component. **They run in no particular order**, so write each so
+it doesn't care what else filled the same point.
+
+## Naming
+
+Use `<subject>:before` and `<subject>:after` around the thing itself, so that
+listing `hooks/` groups them by subject:
+
+```
+clone:after   clone:before   provision
+```
+
+`provision`, `boot` and `image-build` are para's names. Every other name in
+`hooks/` is yours.
+
+## Passing things is the part that bites
+
+A point is for slotting in *behavior*, not for handing over data — the hooks it
+runs are separate processes, so:
+
+- **Ordinary variables don't travel.** A `repo_url=…` three lines above the call
+  is unset inside the hooks it runs. Export it if you must, but needing to is
+  usually a sign the value belongs in a file both sides read.
+- **`su -` and `sudo` wipe para's environment.** A hook that installs something
+  as another user has to carry what it needs across:
+
+  ```sh
+  su - "$PARA_USER" -c "PARA_SKEL=$PARA_SKEL install-my-dotfiles"
+  ```
+
+- **Don't re-source `~/.paraspace/env`** to get para's variables "back". It
+  holds your project's values, so doing that mid-run silently repoints
+  `$PARA_HOOKS` at your `hooks/` even when the hook reading it came from
+  somewhere else — wrong files, no error.

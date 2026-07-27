@@ -1,13 +1,14 @@
 # Hooks
 
-Hooks are where all the provisioning lives. `provision` and `boot` run **inside
-the workspace**, as the workspace user (`$PARA_USER`), starting in
-`~/$PARA_CLONE_DIR` when it exists and `$HOME` when it doesn't — so `provision`
-starts in `$HOME` on the first `up` and in the clone every time after. Use
-absolute paths rather than relying on it. `image-build` is the odd one out: it
-runs in the image builder, as root, before any workspace exists.
+Hooks are where all your provisioning lives. You write three; para decides when
+they run. Use absolute paths in them — `provision` and `boot` start in your
+clone once it exists and in `$HOME` before that.
 
 ## The three hooks
+
+Write only the ones you need. A missing hook is skipped, and para says
+`warn: no 'boot' hook` as it goes, so you can always tell "nothing to do" from
+"nothing ran".
 
 ### `provision`
 
@@ -34,55 +35,57 @@ before hooks run, then trusts your boot hook's exit code.
 
 ### `image-build`
 
-Builds the base image every workspace is cloned from: packages, the workspace
-user, whatever belongs in the image rather than installed per workspace. `para
-image build` runs it in a throwaway builder, **as root**, with your whole
-`.paraspace/` pushed to `/opt/.paraspace` — so `$PARA_HOOKS` and `$PARA_SKEL`
-point in there, not at a `$HOME` no one has created yet.
+Everything you want baked into the base image rather than installed per
+workspace: packages, the workspace user, a toolchain. `para image build` runs it
+once, in a throwaway container, and every workspace is a clone of the result.
 
-It gets **no tty and no stdin**: prompting is an `up`-only promise, so a package
-manager that stops to ask hangs the build. Pass `-y`. Your `.env` is the one
-thing that does *not* follow it in — `$PARA_HOST_ENV` names a file that exists
-only in a workspace, so read secrets at `provision`, not here.
+You're **root** here, and there is no workspace yet — no `$HOME`, and the user
+you're about to create doesn't exist. `$PARA_HOOKS` and `$PARA_SKEL` still point
+at your files (under `/opt`), so seeding from `skel/` works the same as it does
+in `provision`. Your `.env` is the one thing that does *not* follow you in:
+`$PARA_HOST_ENV` names a file that exists only in a workspace, so read secrets
+at `provision`, not here.
+
+**Nothing can prompt you.** There's no terminal on this path, so a package
+manager that stops to ask will hang the build — pass `-y`, or whatever your
+distro's equivalent is.
 
 What the image has to end up containing is [its own page](./image.md).
 
-An absent hook is a no-op, and para says so — `warn: no 'provision' hook` — so
-write only the ones you need and you still see what ran.
+## Writing one
 
-Those three are the only names para invokes, but the whole directory is synced,
-so anything else you put there is yours to source or hand off to:
+para runs every hook the same way: with `bash`, as a fresh process, with no
+arguments. What that means for you:
+
+- **You don't need the exec bit.** A hook from a `core.fileMode=false` checkout,
+  a tarball or a zip runs anyway. Keep `#!/usr/bin/env bash` at the top so your
+  editor and shellcheck treat the file as bash — but para ignores it, so a
+  `python3` shebang would still run as bash.
+- **Nothing you do escapes.** A `cd`, an `export`, a `set -o` — none of it
+  reaches para or the next hook, so you can be as messy inside one as you like.
+- **`exit` means this hook.** Anything non-zero stops the `up`, and para names
+  the hook that failed and shows its output.
+- **You can't hand a value back.** To tell the rest of the workspace something,
+  write it to the filesystem — or, for an environment variable everything should
+  see, bake a `/etc/profile.d/` file in your `image-build` hook.
+
+`hooks/` is yours beyond those three names. Put a library or an extracted step
+in there and reach it through `$PARA_HOOKS` — with `bash` in front, since para
+didn't mark it executable either:
 
 ```sh
-. "$PARA_HOOKS/helpers"             # a library — what the templates do
-bash "$PARA_HOOKS/seed-dotfiles"    # a step a long hook factors out
+. "$PARA_HOOKS/helpers"             # a library to source
+bash "$PARA_HOOKS/seed-dotfiles"    # a step this hook factors out
 ```
 
-## How para runs a hook
-
-Each one runs as **`bash <the file>`**, in its own process. Three things follow:
-
-- **The exec bit doesn't matter** — which is why the line above says `bash` — so
-  a checkout with `core.fileMode=false`, a tarball or a zip can't break a
-  workspace.
-- **The shebang is ignored.** Keep `#!/usr/bin/env bash` on your hooks anyway
-  (`bin/lint` finds files to check *by* shebang), but a `python3` shebang runs
-  as bash.
-- **A hook gets no arguments**, and nothing it does — `cd`, `set -o`, a stray
-  variable — reaches para or the next hook. `exit` ends that hook, and a non-zero
-  status stops the run.
-
-The model in one sentence: **a hook reads its environment and writes to the
-filesystem, never to its caller.** If the rest of the workspace must see
-something, put it on the filesystem or in the image (`/etc/profile.d`). A hook
-can also run [a hook point of its own](./hook-points.md).
+To let *other* hooks slot into the middle of this one, see
+[Hook points](./hook-points.md).
 
 ## How your project reaches the workspace
 
-Before the hooks run, para replaces the guest's `~/.paraspace` with your
-project's `.paraspace/` directory — same name on both sides. Name these by the
-variables para injects rather than by `$HOME`: the layout is para's to change,
-the variable is the part it promises.
+Your `.paraspace/` becomes the workspace's `~/.paraspace` — same name on both
+sides. Reach into it by variable rather than by `$HOME`: the layout is para's to
+change, the variable is what it promises.
 
 | In the guest | Reach it as | What it is |
 |---|---|---|
@@ -91,7 +94,7 @@ the variable is the part it promises.
 | `~/.paraspace/host.env` | `$PARA_HOST_ENV` | your `.env` from the host, if that file exists. Workspaces only — never pushed to the image builder |
 | `~/.paraspace/env` | — | para's context as export lines. Every `PARA_*` except the handful that name paths on the *host* (`PARA_BIN`, `PARA_PROJECT_DIR`, `PARA_CONFIG`, `PARA_CONFIG_DIR`, `PARA_STATE_DIR`), which are unset here rather than pointing at files that don't exist |
 | `~/.paraspace/commands/` | — | synced along, but these run on the *host* — see [Commands](./commands.md#project-commands) |
-| `~/.paraspace/run-hook` | `$PARA_RUN_HOOK` | para's own — it runs each hook. A name para owns: a file of yours at that path is overwritten |
+| `~/.paraspace/run-hook` | `$PARA_RUN_HOOK` | para's, not yours — it runs your hooks, and [runs your own hook points](./hook-points.md). Don't keep a file at this path; it's replaced on every `up` |
 
 para reads the `Parafile` itself, on the host. Like `commands/`, it is synced
 into the guest as well, but nothing in the workspace runs it — so don't put a
@@ -137,14 +140,9 @@ The documented contract is:
 force the scripted path, and para forwards it like any other `PARA_*` so your
 hooks can skip their prompts too.
 
-Routes are space-separated, so splitting them needs no helper:
-
-```sh
-for route in $PARA_ROUTES; do
-  port="${route##*:}"           # "api:3001" -> 3001, "3000" -> 3000
-  wait_for_port "$port"
-done
-```
+Routes arrive space-separated, so a `boot` hook can split them with plain word
+splitting — see [Serve more than one
+port](./cookbook.md#serve-more-than-one-port) for the loop.
 
 para's own internals may also appear in the environment; only the variables
 above are the [versioned contract](./versioning.md).

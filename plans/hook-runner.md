@@ -38,7 +38,7 @@ ran=0
 for owner in "$root" "$root"/mods/*; do
   hook="$owner/hooks/$name"
   [ -f "$hook" ] || continue
-  printf 'hook: %s\n' "${hook#"$root"/}" >&2
+  printf '\033[36m==>\033[0m hook: %s\n' "${hook#"$root"/}" >&2
   PARA_HOOKS="$owner/hooks" PARA_SKEL="$owner/skel" bash "$hook"
   status=$?  # its own line, NOT `if ! …; then` — see below.
   if [ "$status" -ne 0 ]; then
@@ -47,7 +47,9 @@ for owner in "$root" "$root"/mods/*; do
   fi
   ran=1
 done
-[ "$ran" -eq 1 ] || printf "no '%s' hook\n" "$name" >&2
+if [ "$ran" -eq 0 ]; then
+  printf "\033[33mwarn:\033[0m no '%s' hook\n" "$name" >&2
+fi
 ```
 
 That is the feature. What is deliberate in it:
@@ -85,7 +87,14 @@ That is the feature. What is deliberate in it:
   caller's stdin.
 - **`ran`** keeps `docs/hooks.md`'s "an absent hook is a visible no-op" true once
   the host stops checking — which [image build](./mods.md#image-build) needs more
-  than `provision` does.
+  than `provision` does. It is a `warn:`, not a note: nothing refuses a project
+  that still ships `image-build.sh`, so this line is all that stands between a
+  stale name and a published image with no provisioning in it.
+- **The runner owns the announcing**, in para's own `==>` and `warn:`. The host
+  used to `log "Running hook: $1"` before a call that might run zero scripts or
+  four; only the runner knows which. The two `printf`s are the one place para's
+  output style is spelled twice — cheaper than a `helpers` the engine owns, and
+  the alternative is announcing the same event from both sides.
 
 [posix-e]: https://pubs.opengroup.org/onlinepubs/9699919799/utilities/V3_chap02.html#set
 
@@ -111,14 +120,27 @@ the subject ends, `image-build:after` isn't. para's own three (`provision`,
 this is a convention the reference templates set, and
 [mods.md](./mods.md#why-the-vocabulary-is-the-product) is why that matters.
 
-On the host, `run_hook` loses its existence check and gains nothing:
+**A point a mod opens is named after the mod.** `dotfiles-jchook:after`, never
+`dotfiles:after`. The project owns the bare namespace because there is one
+project; there is no limit on mods, and two of them opening `dotfiles:after`
+collide with no error and no promise about who runs first. Prefixing costs a
+word and makes the collision impossible instead of undetected. Whether a mod
+should open one at all is [an authoring rule](./mods.md#what-a-mod-may-assume),
+not a mechanism.
+
+On the host, `run_hook` loses its existence check *and* its `log` line — the
+runner announces each hook it actually finds, and only it knows how many that
+is:
 
 ```sh
 run_hook() { # run_hook <hook> <name>
-  log "Running hook: $1"
-  ws_exec "$2" "exec ~/.paraspace/run-hook $1" || die "the '$1' hook failed (above)."
+  ws_exec "$2" "exec ~/.paraspace/run-hook '$1'" || die "the '$1' hook failed (above)."
 }
 ```
+
+The name is quoted in the guest command. Every caller is a literal in `bin/para`
+today, but named points make hook names a vocabulary projects write, and one
+`$1` that reaches here unquoted is a word-split at best.
 
 Enumerating on the host instead would work for `provision` and `boot`, and would
 leave every named point hand-rolling its own glob in a project hook. One
@@ -273,15 +295,25 @@ whole reason the runner is shaped the way it is:
   `helpers`-style `die` (`exit 1`) is what fails it.
 - no owner fills the name → `no 'X' hook` on stderr, exit 0.
 - a hook with no exec bit runs; `PARA_HOOKS`/`PARA_SKEL` re-pointed per hook.
-- a nested point from inside a mod hook resolves every owner.
+- a nested point from inside a mod hook resolves every owner, and
+  `$PARA_RUN_HOOK` is set in the hook's environment for it to have been reached
+  at all — the variable the whole named-point feature rests on.
+- a non-directory under `mods/` (a stray file, a `README`) is skipped, not
+  treated as an owner.
 - a hook that reads stdin gets the caller's, not the hook list — the one that
   catches a future rewrite of the loop into a pipe.
-- `npm pack --dry-run` covers `libexec/` — and `templates/`, which carries the
-  same exposure today with no test on it.
+- `npm pack --dry-run` covers `libexec/` — **its own assert**, next to separate
+  ones for `templates/` and `mods/`. One combined test says "something is
+  missing"; three say which, and `templates/` carries this exposure today with
+  no test on it at all.
 
 e2e (run it — CI won't): a fixture mod appending its name in `provision` and in
 a named point the fixture opens; both ran, `up` still idempotent; a prompting
-hook still gets the terminal.
+hook still gets the terminal. And **`image-build` through the runner in the
+builder** — the `/opt` paths and the `su - "$PARA_USER"` step-down meet there,
+which is the only place `guest_env`'s destination argument is load-bearing and
+the only place a wrong answer is silent (a build hook reads an absent
+`$PARA_SKEL` behind a `[ -f ]` guard, seeds nothing, and says nothing).
 
 ## `PARA_CONTRACT` stays 1
 

@@ -229,8 +229,7 @@ Only para's contract: `$PARA_*`, `$HOME`, `$PARA_SHARED`, and its own
 - **Not its position**, and not that another mod ran.
 - **Not stdin past its own prompt**, and no stdin at all in the builder.
 - **Not that it can write to its caller.** A hook reads its environment and
-  writes to the filesystem. Anything the rest of the workspace must see goes in
-  the image (`/etc/profile.d`) or on the filesystem.
+  writes to the filesystem — [the channels are below](#how-a-hook-reaches-a-later-hook).
 - **Not that its context survives `su -`/`sudo`.**
 - **Not the `Parafile`.** Mods are never sourced on the host. A mod's knobs are
   ordinary `PARA_*`, defaulted in its own hook and documented in its README.
@@ -243,6 +242,35 @@ and neither touches it again. Your later edits survive both. Two mods that both
 claim `~/.zshrc` is a conflict para will not detect: a hook must be idempotent,
 and where the outcome depends on order para promises nothing.
 
+### A mod may open a point
+
+A mod **may** open its own [named point](./hook-runner.md#naming-a-point), and
+it is named after the mod: `dotfiles-jchook:after`, never `dotfiles:after`.
+
+It is not a SHOULD, and the reason is the same one that keeps
+[v1's templates from opening any](#shape): a point in something you ship is a
+promise you keep. A blanket "every mod exposes `:before` and `:after`" makes
+every mod a promise-keeper for consumers that don't exist yet, and it papers
+over the rule two bullets up — **a mod may not assume another mod ran**. `B`
+filling `A:after` only works if `A` opened it, so `A` had to anticipate `B`.
+That is the anticipation problem relocated, not solved.
+
+So, for a mod that opens one:
+
+- **It is public API.** The mod's README lists every point it opens, and
+  removing one breaks its consumers.
+- **A hook filling a point nobody opened never runs, silently.** That is the
+  sharp edge of the whole feature and it has no diagnostic today. Cheapest fix,
+  worth doing with the runner: `para doctor` collects the `$PARA_RUN_HOOK` call
+  sites across every owner and reports hook files no one invokes.
+
+**Ordering between mods is not what points are for.** When it becomes real the
+answer is [`PARA_MODS`](#deferred) — an ordered list a template declares, which
+turns "no promise about order" into a promise in one place, for every mod at
+once. A lattice of `:before`/`:after` files between independently-vendored
+directories is the same thing assembled by hand, and it has to be reassembled
+every time someone adds a mod.
+
 **Mods have no `commands/` in v1 — and that is the first thing v2 should fix.**
 A mod that ships nvim, tmux and Claude Code wants to ship `para claude` with
 them; today `dotfiles-jchook`'s `claude` and `run` have to stay *project*
@@ -253,6 +281,66 @@ directory, and mods turn that into a short search path. What has to be decided
 rather than discovered is the collision rule (the project's verb wins, and
 `para doctor` says when two mods claim one name), which is why it is
 [deferred](#deferred) rather than bolted on here.
+
+### How a hook reaches a later hook
+
+A hook never writes to its caller, so everything a mod wants a *later* hook — or
+the user's shell — to see goes through a file. Which file is the whole design,
+and it is chosen by **lifetime**, not by convenience:
+
+| To pass | Write | Read by | Lives as long as |
+|---|---|---|---|
+| "I already did this" | a sentinel beside what it guards | the same hook, next `up` | the thing it guards |
+| "the tool is here" | nothing — install it | anyone, via `command -v` | the image |
+| a shell variable (`PATH`, `$BROWSER`) | `/etc/profile.d/<mod>.sh`, from `image-build` | every login shell: later hooks, `para sh`, project commands | the image |
+| a value only this workspace knows | a file under `$HOME` | whoever needs it, when they need it | the workspace |
+| a value every workspace shares | `$PARA_SHARED/<mod>/` | every workspace of the project | the volume |
+
+Three rules make those safe between mods that have never seen each other:
+
+- **Name it after the owner.** `/etc/profile.d/dotfiles-jchook.sh`,
+  `$PARA_SHARED/dotfiles-jchook/`. Nothing else namespaces them, and two mods
+  writing one path is precisely the collision para will not detect.
+- **Write values with `%q`**, the way `para_env` writes para's own. A path with
+  a space in it is what turns a value channel into an injection.
+- **Read defensively, never require.** A mod may not assume another mod ran, so
+  reading another's artifact means degrading when it is absent — not `die`.
+
+**The one that surprises people: nothing crosses inside a single phase.** Every
+owner's `provision` runs in *one* `ws_exec`, and `GUEST_PRELUDE` sourced the
+environment before the runner started — so a `/etc/profile.d` file mod A writes
+during `provision` does not reach mod B's `provision` in the same run. It
+reaches the next `ws_exec`: `boot`, `para sh`, the next `up`. Two mods that must
+hand off *within* a phase do it through a file each reads at the moment it needs
+it, never through the environment.
+
+#### The gap this leaves
+
+`/etc/profile.d` is the only channel that reaches the shell, and it costs an
+image build. Fine for `dotfiles-jchook`, which owns `~/.zshrc` outright. Not
+fine for the first mod that installs a toolchain at `provision` — `mise`, a
+cargo bin dir, anything whose path the image could not have known — where "added
+the mod, ran `up`, it isn't on `PATH`" is a rebuild away from working with
+nothing saying so.
+
+The shape that closes it is three lines in `GUEST_PRELUDE`:
+
+```sh
+for f in ~/.paraspace/env.d/*.sh; do
+  if [ -f "$f" ]; then . "$f"; fi
+done
+```
+
+`env.d/` is `/etc/profile.d` with a workspace lifetime and no root: a hook writes
+`env.d/<mod>.sh`, every later `ws_exec` sources it. It needs no cleanup rule,
+because `push_paraspace` already `rm -rf`s `.paraspace/` on every `up` — so it is
+derived state that provision rebuilds, not config that accumulates.
+
+**Not in v1**, by the same rule as everything else here: no bundled mod needs it,
+and a mechanism with no consumer is a promise. It is written down so the first
+mod that *does* need it reaches for this instead of appending to a `~/.zshrc` it
+doesn't own — which is exactly the convention-by-imitation
+[the vocabulary section](#why-the-vocabulary-is-the-product) is about.
 
 ### Mods are not reversible
 
@@ -311,8 +399,9 @@ Three wrinkles to settle rather than discover:
 
 - new `docs/mods.md` — needs a `.vitepress/config.mts` sidebar entry **and** a
   `docs/README.md` router line.
-- **the `image-build.sh` → `hooks/image-build` rename** is 44 mentions across 21
-  files, and lands with [PR 2](./hook-runner.md#landing-order) rather than here.
+- **the `image-build.sh` → `hooks/image-build` rename** is ~50 mentions across
+  ~27 files — re-grep at execution time, the count moves — and lands with
+  [PR 2](./hook-runner.md#landing-order) rather than here.
   The ones that are not a search-and-replace: `docs/image.md`'s numbered build
   steps (it documents the `bash -s` pipe), the three templates' `Parafile`
   comments (same), `docs/hooks.md`'s "para reads it on the host" line,
@@ -361,7 +450,11 @@ CLI tier — `add` drives a **copied** project
 - `add` outside a project fails with para's own error; `add ../x`, `add .` and
   `add ..` are refused by `cmd_init`'s name check.
 - `para mod` in all four registration sites.
-- `npm pack --dry-run` covers `mods/`.
+- a stray file under `mods/` (a `README`, a `.DS_Store`) is not treated as a mod
+  — the same assert as [the runner's](./hook-runner.md#test-checklist), from the
+  `add` side.
+- `npm pack --dry-run` covers `mods/` — its own assert, beside the ones for
+  `libexec/` and `templates/`.
 
 e2e (run it — CI won't): the committed fixture mod through a full `up`; **a mod
 added to an already-seeded volume** (assert the half-applied reality); `para
@@ -383,9 +476,14 @@ image build` with the fixture mod's `hooks/image-build` actually running.
   owns.
 - **Mod `commands/`** — the [first thing after this](#what-a-mod-may-assume),
   and the reason to keep `project_commands` easy to turn into a search path.
-- `PARA_MODS`, so a template can declare the mods it wants and `para init`
-  installs them. This is what makes templates composable; it comes after
-  `dotfiles-jchook` proves the seams.
+- **`PARA_MODS` — the designated follow-up PR**, not an open question. An
+  ordered list a template declares, which `para init` installs. It is what makes
+  templates composable, and it is also the answer to
+  [ordering between mods](#a-mod-may-open-a-point): declaring the list *is*
+  declaring the order, so "the glob's order is whatever the filesystem gives"
+  becomes a promise in one place rather than a lattice of `:before`/`:after`
+  files. It lands after `dotfiles-jchook` proves the seams, so the ordering rule
+  is written against two real mods instead of one imagined pair.
 - `docs/conventions.md` — the shared vocabulary mods assume. Only the
   [`<subject>:<when>`](./hook-runner.md#naming-a-point) grammar is settled here,
   and it goes in `docs/hooks.md`; the rest (`$PARA_SHARED`'s layout, which

@@ -19,10 +19,10 @@ commit messages; link to it.
 
 ## The generic-mechanism boundary
 
-para is a **generic mechanism** — the incus/Caddy/volume/lifecycle engine, like
-`docker compose`. It bakes in **nothing** about *how* a workspace is provisioned.
-Everything project-specific lives in a consumer's `.paraspace/` dir (`Parafile` +
-`hooks/`), which para runs but never contains.
+para is a **thin generic mechanism** — the incus/Caddy/volume/lifecycle engine,
+like `docker compose`. It bakes in **nothing** about *how* a workspace is
+provisioned: the real provision and boot logic lives in a consumer's
+`.paraspace/` dir (`Parafile` + `hooks/`), which para runs but never contains.
 
 ## Contract version
 
@@ -72,12 +72,8 @@ The bar is that someone who knows bash but not para can read any function top to
 bottom and be right about what it does. `bin/para` is the reference. The rules
 below are not aesthetic preferences — each one is a mess the rewrite cleaned up.
 
-- **Prefer the elegant tool.** Favor elegant designs whose usefulness falls out
-  of a few well-chosen primitives. Think Chemex over the $2,000 coffee pod
-  machine: fewer parts, less waste, easier upkeep, easier to understand and
-  reason about, no unnecessary digital clock, does one thing well, UNIX
-  philosophy, interchangeable parts, just as effective (if not more) in skilled
-  hands.
+- **Prefer the elegant tool.** Favor designs whose usefulness falls out of a few
+  well-chosen primitives.
 - **No bash gymnastics.** If a line needs a comment warning you about bash,
   write the line that doesn't need one. A reader should never need a manual for
   the *mechanism* of a line — only, occasionally, for the domain.

@@ -163,6 +163,58 @@ test_run_hook_reaches_every_owner_from_a_nested_point() {
     assert_contains "$(cat point)" "mod-point"     "and the mod filled it too" )
 }
 
+test_run_hook_traces_a_failure_through_nested_points() {
+  # A hook three points deep used to fail with a path and no answer to "how did
+  # para get here". Every level reports as the failure unwinds — the per-level
+  # line names the FILE, the stack names the POINTS — and the exit status is
+  # carried up unchanged rather than flattened to 1.
+  local root; root="$(a_paraspace)"
+  a_hook "$root" provision    "$(printf '%s\n' '#!/usr/bin/env bash' 'set -euo pipefail' '"$PARA_RUN_HOOK" clone:before')"
+  a_hook "$root" clone:before "$(printf '%s\n' '#!/usr/bin/env bash' 'set -euo pipefail' '"$PARA_RUN_HOOK" keys:setup')"
+  a_hook "$root" keys:setup   "$(printf '%s\n' '#!/usr/bin/env bash' 'exit 7')"
+  run_the_hook "$root" provision
+  assert_eq 7 "$HOOK_RC" "the deepest hook's status survived three levels" || return 1
+  assert_contains "$HOOK_OUT" "stack: provision > clone:before > keys:setup" \
+    "the deepest failure names the whole chain" || return 1
+  assert_contains "$HOOK_OUT" "hooks/keys:setup" "and the file that failed"
+}
+
+test_run_hook_does_not_trace_a_flat_failure() {
+  # The inverse, and the one that matters more: a provision that opens no point
+  # fails in ONE line. Without this the tracing quietly becomes noise on the
+  # path every project actually takes.
+  local root; root="$(a_paraspace)"
+  a_hook "$root" provision "$(printf '%s\n' '#!/usr/bin/env bash' 'exit 1')"
+  run_the_hook "$root" provision
+  assert_eq 1 "$HOOK_RC" "it still failed" || return 1
+  case "$HOOK_OUT" in
+    *stack:*) echo "  a flat failure printed a stack line" >&2; return 1 ;;
+  esac
+  return 0
+}
+
+test_run_hook_refuses_a_hook_point_cycle() {
+  # A point that invokes itself recursed until the container's limits bit.
+  local root; root="$(a_paraspace)"
+  a_hook "$root" provision "$(printf '%s\n' '#!/usr/bin/env bash' 'set -euo pipefail' '"$PARA_RUN_HOOK" provision')"
+  run_the_hook "$root" provision
+  [ "$HOOK_RC" -ne 0 ] || { echo "  a self-invoking point was allowed" >&2; return 1; }
+  assert_contains "$HOOK_OUT" "hook cycle: provision > provision" "the cycle names the chain"
+}
+
+test_run_hook_allows_the_same_point_twice_in_sequence() {
+  # The guard is about re-entrancy, not repetition: two calls in a row are two
+  # children with the same parent stack. Getting this wrong would break the
+  # ordinary case of filling one point at two moments.
+  local root; root="$(a_paraspace)"
+  a_hook "$root" provision "$(printf '%s\n' '#!/usr/bin/env bash' 'set -euo pipefail' \
+    '"$PARA_RUN_HOOK" seed' '"$PARA_RUN_HOOK" seed')"
+  a_hook "$root" seed "$(printf '%s\n' 'echo seeded')"
+  run_the_hook "$root" provision
+  assert_eq 0 "$HOOK_RC" "calling one point twice in a row is fine" || return 1
+  assert_eq 2 "$(grep -c seeded <<<"$HOOK_OUT")" "and it ran both times"
+}
+
 test_run_hook_leaves_stdin_with_the_hook() {
   # provision is documented to prompt, so the hook must inherit the caller's
   # stdin. A loop written as `find | while read` would feed it the hook list.

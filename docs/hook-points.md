@@ -62,3 +62,36 @@ runs are separate processes, so:
   holds your project's values, so doing that mid-run silently repoints
   `$PARA_HOOKS` at your `hooks/` even when the hook reading it came from
   somewhere else — wrong files, no error.
+
+## Reading a failure
+
+Once points nest, "which hook failed" stops being obvious, so para reports at
+every level as it unwinds:
+
+```
+error: hook failed (exit 7): hooks/keys:setup
+  stack: provision > clone:before > keys:setup
+error: hook failed (exit 7): hooks/clone:before
+  stack: provision > clone:before
+error: hook failed (exit 7): hooks/provision
+```
+
+Read it top down. **The first line is where it actually broke**, and the
+`stack:` beside it is the route para took to get there. Everything under it is
+the unwind. The exit status is the failing hook's own, carried up untouched — so
+`exit 7` reaches you as 7. A hook that opens no point fails in a single line,
+with no stack.
+
+**Your hook needs `set -e` for any of that to fire.** `"$PARA_RUN_HOOK" …` exits
+non-zero when something it ran failed, but a hook that doesn't stop on error
+carries on past it and can still exit 0 — and then `para up` reports a ready
+workspace with the error sitting in your scrollback. Every bundled template
+opens with `set -euo pipefail`. Start yours there too.
+
+A point that ends up invoking itself is refused rather than left to recurse:
+
+```
+error: hook cycle: provision > clone:before > provision
+```
+
+Calling the same point twice in a row is not a cycle, and runs twice.

@@ -2,8 +2,14 @@
 # Run every owner's <hook>: the project's, then each mod's. See docs/hooks.md.
 name="${1:?usage: run-hook <name>}"
 root="$(cd "$(dirname "$0")" && pwd)"
+stack="${PARA_HOOK_STACK:-}"
 export PARA_RUN_HOOK="$root/run-hook"
 ran=0
+
+case " $stack " in
+  *" $name "*) printf "\033[31merror:\033[0m hook cycle: %s\n" "$stack > $name" >&2; exit 1 ;;
+esac
+export PARA_HOOK_STACK="${stack:+$stack > }$name"
 
 for owner in "$root" "$root"/mods/*; do
   hook="$owner/hooks/$name"
@@ -12,7 +18,8 @@ for owner in "$root" "$root"/mods/*; do
   PARA_HOOKS="$owner/hooks" PARA_SKEL="$owner/skel" bash "$hook"
   status=$?  # its own line, NOT `if ! …; then` — that reports the status of `!`.
   if [ "$status" -ne 0 ]; then
-    printf 'hook failed: %s\n' "$hook" >&2
+    printf "\033[31merror:\033[0m hook failed (exit %s): %s\n" "$status" "${hook#"$root"/}" >&2
+    if [ -n "$stack" ]; then printf '  stack: %s\n' "$PARA_HOOK_STACK" >&2; fi
     exit "$status"
   fi
   ran=1

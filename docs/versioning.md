@@ -49,7 +49,7 @@ into a scratch directory to diff against a current template. Otherwise:
 | `$PROJECT_ROOT` while the `Parafile` is sourced | `$PARA_PROJECT_DIR` — same value, and it reaches hooks too |
 | `$PARA_ROUTES` comma-separated | space-separated: `for r in $PARA_ROUTES` |
 | `parse_routes` / `route_ports` helpers | delete them; `${r##*:}` is the port |
-| hooks run as `bash <path>` | `provision` and `boot` run by path — the shebang decides, so keep it executable; `image-build` runs as `bash <path>` |
+| hooks run as `bash <path>` | still `bash <path>` — the exec bit and the shebang are both ignored |
 | `.env` seeded to `~/.para/host.env` | `~/.paraspace/host.env`, pushed only if the file exists |
 | `PARA_HOST_ENV` unset/empty/set three-way | defaults to the project's `.env`; used if present |
 | unset `PARA_ROUTES` was refused | unset means empty means no HTTP; `para doctor` mentions it |
@@ -82,6 +82,17 @@ is listed here, and each is a hand edit to a `.paraspace/` scaffolded before it.
   build hook reads `$PARA_HOOKS` and `$PARA_SKEL` like any other hook, and gets
   no stdin. A build hook that piped its own input, or that ran a package manager
   without `-y`, has to stop.
+- **A hook name resolves to more than one script.** para runs your
+  `hooks/<name>`, then each `mods/*/hooks/<name>` — see
+  [Hook points](./hook-points.md). Nothing changes for a project with no
+  `mods/`.
+- **`.paraspace/run-hook` is a name para owns**, alongside `env` and `host.env`:
+  para writes its runner there on every push, so a file of yours at that path is
+  overwritten.
+- **The exec bit is no longer load-bearing**, and para no longer sets it. A hook
+  runs as `bash <the file>` whatever its mode, so a `core.fileMode=false`
+  checkout stops breaking a workspace — but a helper *you* run by path out of
+  `hooks/` now needs `bash` in front of it, or its own exec bit committed.
 
 At 1.0 this section closes and anything that breaks a `.paraspace/` bumps the
 number instead.

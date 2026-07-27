@@ -38,8 +38,10 @@ mean.
 - [Commands](./commands.md) — the full CLI surface, project commands, and
   shell completion.
 - [The Parafile](./parafile.md) — every key `para` reads from a project.
-- [Hooks](./hooks.md) — the `provision`/`boot` contract and the environment
-  `para` injects.
+- [Hooks](./hooks.md) — the `provision`/`boot`/`image-build` contract and the
+  environment `para` injects.
+- [Hook points](./hook-points.md) — running a hook point of your own, and how a
+  name resolves to more than one script.
 - [The image contract](./image.md) — what a base image must provide, and how
   `para image build` builds one.
 - [Workspace URLs](./urls.md) — dropping the `:8443`, using your own domain,

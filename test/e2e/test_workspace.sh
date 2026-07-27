@@ -73,6 +73,24 @@ test_image_carries_no_project_tree() {
   assert_eq "" "$found" "the published image has no /opt/.paraspace"
 }
 
+test_a_mod_fills_the_same_hooks_the_project_does() {
+  # The multi-owner rule, end to end: one hook name resolves to the project's
+  # hook and then each mods/*/hooks/<name>. The fixture ships one mod, and the
+  # runner is the only thing that makes any of this happen.
+  local seen; seen="$("$PARA" sh "$PARA_WS" -c 'cat ~/owners-seen' 2>/dev/null)"
+  assert_eq "project-provision" "$(head -n1 <<<"$seen")" "the project's hook ran first" || return 1
+  assert_contains "$seen" "mod-provision e2e-mod" "the mod's provision ran too" || return 1
+
+  # And a point the PROJECT opened, which para never learns the name of. It runs
+  # mid-provision, so it lands between the two lines above.
+  assert_contains "$seen" "mod-clone-before" "the mod filled the fixture's own hook point" || return 1
+
+  # Baked at build time, not written per workspace: this is the mod's
+  # image-build hook having run in the builder, through the same resolution.
+  local marker; marker="$("$PARA" sh "$PARA_WS" -c 'cat /etc/para-mod-marker' 2>/dev/null)"
+  assert_eq "e2e-mod-was-here" "$marker" "the mod's image-build hook reached the image"
+}
+
 test_workspace_is_listed_and_running() {
   local names; names="$("$PARA" ls --names 2>/dev/null)"
   assert_contains "$names" "$PARA_WS" "ls --names includes the workspace" || return 1

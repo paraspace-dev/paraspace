@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+set -euo pipefail
+# A mod's build hook, run in the builder after the project's. This is the seam
+# with the least margin for error: the builder's .paraspace/ is at /opt, not in
+# a $HOME that exists yet, so a wrong $PARA_HOOKS here reads an absent directory
+# behind some `[ -f ]` guard and seeds nothing, silently.
+#
+# Baked into the image rather than written per workspace, so a workspace finding
+# this file proves the mod's hook ran at BUILD time.
+
+[ -d "$PARA_HOOKS" ] \
+  || { echo "PARA_HOOKS ($PARA_HOOKS) does not resolve in the builder" >&2; exit 1; }
+
+echo "e2e-mod-was-here" > /etc/para-mod-marker

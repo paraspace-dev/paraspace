@@ -68,6 +68,15 @@ But the build is **cached**, and nothing invalidates that cache: an existing
 otherwise you're testing the image you built last time. `--no-build` skips even
 the existence check.
 
+The fixture also ships **one mod**, `.paraspace/mods/e2e-mod/`, committed rather
+than installed at test time — `PARA_PROJECT_DIR` points at the tracked fixture,
+so a test that vendored one would dirty the working tree and fail on a second
+run. It fills `provision`, `image-build`, and a `clone:before` point the
+fixture's own provision hook opens, which is what gives the tier its only
+coverage of a hook name resolving to more than one script. Its `image-build`
+half is baked into the cached image, so it is one more reason
+`PARA_TEST_REBUILD=1` matters.
+
 ## Isolation
 
 Every run is sandboxed so it never touches your real para state:

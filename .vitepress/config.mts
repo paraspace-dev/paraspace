@@ -72,6 +72,7 @@ export default defineConfig({
             { text: 'Commands', link: '/docs/commands' },
             { text: 'The Parafile', link: '/docs/parafile' },
             { text: 'Hooks', link: '/docs/hooks' },
+            { text: 'Hook points', link: '/docs/hook-points' },
             { text: 'The image contract', link: '/docs/image' },
             { text: 'Contract versioning', link: '/docs/versioning' },
             { text: 'Internals', link: '/docs/internals' },

@@ -1,26 +1,14 @@
 # Hooks
 
-Hooks are where all your provisioning lives. You write three; para decides when
-they run. Write bash, use absolute paths (`provision` and `boot` start in your
-clone once it exists and in `$HOME` before that), and don't worry about file
-permissions — para runs each hook whatever its mode.
-
-`hooks/` is yours beyond those three names, so a library or an extracted step
-goes in there too, reached through `$PARA_HOOKS`:
-
-```sh
-. "$PARA_HOOKS/helpers"             # a library to source
-bash "$PARA_HOOKS/seed-dotfiles"    # a step this hook factors out
-```
+Hooks are where all your provisioning lives.
 
 To let other hooks slot into the middle of one of yours, open a
 [hook point](./hook-points.md).
 
-## The three hooks
+## The three official hooks
 
-Write only the ones you need. A missing hook is skipped, and para says
-`warn: no 'boot' hook` as it goes, so you can always tell "nothing to do" from
-"nothing ran".
+Hooks can be named anything you want, but there are three blessed hooks that
+`para` knows about and runs for you.
 
 ### `provision`
 
@@ -44,13 +32,13 @@ blocks until the guest resolves it:
 ### `boot`
 
 Brings the stack up. The **readiness contract**: return zero only once every
-routed service is actually listening.
+routed service is actually listening, e.g.
 
 ```sh
 docker compose up -d --wait          # blocks until healthchecks pass
 ```
 
-para gates on the container agent (and `$PARA_READY_HOST`, if you set one)
+`para` gates on the container agent (and `$PARA_READY_HOST`, if you set one)
 before hooks run, then trusts your boot hook's exit code.
 
 ### `image-build`
@@ -70,7 +58,7 @@ at `provision`, not here.
 manager that stops to ask will hang the build — pass `-y`, or whatever your
 distro's equivalent is.
 
-What the image has to end up containing is [its own page](./image.md).
+See [The image contract](./image.md) to learn what your final image must contain.
 
 ## How your project reaches the workspace
 
@@ -85,9 +73,9 @@ change, the variable is what it promises.
 | `~/.paraspace/host.env` | `$PARA_HOST_ENV` | your `.env` from the host, if that file exists. Workspaces only — never pushed to the image builder |
 | `~/.paraspace/env` | — | para's context as export lines. Every `PARA_*` except the handful that name paths on the *host* (`PARA_BIN`, `PARA_PROJECT_DIR`, `PARA_CONFIG`, `PARA_CONFIG_DIR`, `PARA_STATE_DIR`), which are unset here rather than pointing at files that don't exist |
 | `~/.paraspace/commands/` | — | synced along, but these run on the *host* — see [Commands](./commands.md#project-commands) |
-| `~/.paraspace/run-hook` | `$PARA_RUN_HOOK` | para's, not yours — it runs your hooks, and [runs your own hook points](./hook-points.md). Don't keep a file at this path; it's replaced on every `up` |
+| `~/.paraspace/run-hook` | `$PARA_RUN_HOOK` | reserved for internal use by `para` |
 
-para reads the `Parafile` itself, on the host. Like `commands/`, it is synced
+`para` reads the `Parafile` itself, on the host. Like `commands/`, it is synced
 into the guest as well, but nothing in the workspace runs it — so don't put a
 host-only secret in a `Parafile`.
 
@@ -98,7 +86,7 @@ exists.
 
 ## The environment para injects
 
-para forwards **every `PARA_*` variable in scope** — your user config,
+`para` forwards **every `PARA_*` variable in scope** — your user config,
 everything your `Parafile` sets, and the per-workspace values para computes.
 So any `PARA_FOO` you invent reaches your hooks for free, no para change
 needed.

@@ -195,16 +195,41 @@ it**, not `push_project` — the builder execs its copy too.
 - **The `&` + `wait "$!"` interrupt dance is unchanged**, and still gives the
   build `/dev/null` for stdin. Prompting is an `up`-only promise; the docs must
   say so.
-- **`[ -f "$payload" ] || die` survives PR 2** pointed at the new path, and goes
-  away with the runner: whether any owner has an `image-build` hook is the
-  runner's business, not the host's. What replaces it is [the runner's `no 'X'
-  hook` line](./hook-runner.md#the-runner) — which matters more than it looks,
-  because the contract does not bump, so nothing refuses a project that still
-  ships `image-build.sh`. Silence there is a published image with no
-  provisioning in it.
+- **`[ -f "$payload" ] || die` survives PR 2** pointed at the new path, and
+  **stays on the host** through PR 3 — it just learns about mods. An earlier
+  draft handed it to the runner on the grounds that resolution is the runner's
+  business. Resolution is; *refusing* isn't. The runner's line prints inside the
+  builder, minutes in, and the build then publishes and exits 0 — so a
+  `.paraspace/` from `0.1.0` that still ships `image-build.sh` gets one line of
+  scrollback and a base image with no provisioning in it. The contract
+  deliberately doesn't bump, so this check is the only thing that refuses.
 
-`cmd_image_build` ends up shorter than its current 55 lines, so nothing needs
-extracting from it.
+The host can answer it locally, because `mods/` is a directory it already has:
+
+```sh
+have_hook() { # have_hook <name> — does any owner fill it?
+  local f
+  for f in "$PARA_PROJECT_DIR/.paraspace/hooks/$1" \
+           "$PARA_PROJECT_DIR"/.paraspace/mods/*/hooks/"$1"; do
+    if [ -f "$f" ]; then return 0; fi
+  done
+  return 1
+}
+```
+
+`cmd_image_build` keeps its one-line guard, now spanning owners and still firing
+before the daemon is touched:
+
+```sh
+have_hook image-build \
+  || die "no 'image-build' hook — .paraspace/hooks/image-build (renamed from image-build.sh). See docs/image.md."
+```
+
+That is the whole of it: one helper, and the `warn:`-vs-note question
+[the runner had to carry](./hook-runner.md#the-runner) goes away with it —
+absence is a note everywhere, and the one place it is a bug says so and stops.
+`cmd_image_build` still ends up shorter than its current 55 lines, so nothing
+needs extracting from it.
 
 ### Drift detection goes away
 
@@ -306,13 +331,16 @@ Three rules make those safe between mods that have never seen each other:
 - **Read defensively, never require.** A mod may not assume another mod ran, so
   reading another's artifact means degrading when it is absent — not `die`.
 
-**The one that surprises people: nothing crosses inside a single phase.** Every
-owner's `provision` runs in *one* `ws_exec`, and `GUEST_PRELUDE` sourced the
-environment before the runner started — so a `/etc/profile.d` file mod A writes
-during `provision` does not reach mod B's `provision` in the same run. It
-reaches the next `ws_exec`: `boot`, `para sh`, the next `up`. Two mods that must
-hand off *within* a phase do it through a file each reads at the moment it needs
-it, never through the environment.
+**The one that surprises people: inside a single phase the environment doesn't
+cross — files do.** Every owner's `provision` runs in *one* `ws_exec`, and
+`GUEST_PRELUDE` sourced the environment before the runner started, so a
+`/etc/profile.d` file mod A writes during `provision` does not reach mod B's
+`provision` in the same run; it reaches the next `ws_exec` (`boot`, the next
+`up`). Every other row of the table is unaffected — mod B's hook is a fresh
+process reading the filesystem as it finds it, so a sentinel, an installed tool
+or a `$PARA_SHARED` file mod A wrote seconds earlier is right there. Two mods
+that must hand off *within* a phase do it through a file each reads at the
+moment it needs it, never through the environment.
 
 #### The gap this leaves
 

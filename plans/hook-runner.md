@@ -55,7 +55,7 @@ for owner in "$root" "$root"/mods/*; do
   ran=1
 done
 if [ "$ran" -eq 0 ]; then
-  printf "\033[33mwarn:\033[0m no '%s' hook\n" "$name" >&2
+  printf "\033[36m==>\033[0m no '%s' hook\n" "$name" >&2
 fi
 ```
 
@@ -110,11 +110,12 @@ That is the feature. What is deliberate in it:
 - **A `for` over a glob, not a pipe**, so a hook that prompts still has the
   caller's stdin.
 - **`ran`** keeps `docs/hooks.md`'s "an absent hook is a visible no-op" true once
-  the host stops checking — which [image build](./mods.md#image-build) needs more
-  than `provision` does. It is a `warn:`, not a note: nothing refuses a project
-  that still ships `image-build.sh`, so this line is all that stands between a
-  stale name and a published image with no provisioning in it.
-- **The runner owns the announcing**, in para's own `==>` and `warn:`. The host
+  the host stops checking. **A note, not a `warn:`** — an unfilled point is the
+  normal state, so a template that opens `clone:before` would otherwise warn on
+  every `up` of every project that has no mod for it, forever. Where absence
+  really is a bug, the check belongs where it can `die`:
+  [image build](./mods.md#image-build) keeps its on the host.
+- **The runner owns the announcing**, in para's own `==>`. The host
   used to `log "Running hook: $1"` before a call that might run zero scripts or
   four; only the runner knows which. The two `printf`s are the one place para's
   output style is spelled twice — cheaper than a `helpers` the engine owns, and

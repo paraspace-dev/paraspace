@@ -164,10 +164,11 @@ incus exec "$builder" -- bash -c '. /opt/.paraspace/env; exec bash /opt/.paraspa
 wait "$!"
 ```
 
-`bash <path>`, not the path alone: `push_paraspace` has no `chmod`, and the
-runner sources hooks anyway, so the exec bit never becomes load-bearing in the
-builder. PR 3 rewrites that one path to `/opt/.paraspace/run-hook image-build`
-and nothing else here moves.
+`bash <path>`, not the path alone: `push_paraspace` has no `chmod`, so the exec
+bit never becomes load-bearing in the builder. It is also the form
+[the runner settles on](./hook-runner.md#a-hook-is-a-process) for every hook, so
+PR 2 is not a temporary spelling — PR 3 rewrites that one path to
+`/opt/.paraspace/run-hook image-build` and nothing else here moves.
 
 **`.paraspace/image-build.sh` becomes `.paraspace/hooks/image-build`.** Without
 the rename there are two mechanisms from day one — a root-level payload for the

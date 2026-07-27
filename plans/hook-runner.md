@@ -32,8 +32,14 @@ For hook `H` it runs the project's `hooks/H`, then each `mods/<m>/hooks/H`:
 # Run every owner's <hook>: the project's, then each mod's. See docs/hooks.md.
 name="${1:?usage: run-hook <name>}"
 root="$(cd "$(dirname "$0")" && pwd)"
+stack="${PARA_HOOK_STACK:-}"
 export PARA_RUN_HOOK="$root/run-hook"
 ran=0
+
+case " $stack " in
+  *" $name "*) printf "\033[31merror:\033[0m hook cycle: %s\n" "$stack > $name" >&2; exit 1 ;;
+esac
+export PARA_HOOK_STACK="${stack:+$stack > }$name"
 
 for owner in "$root" "$root"/mods/*; do
   hook="$owner/hooks/$name"
@@ -42,7 +48,8 @@ for owner in "$root" "$root"/mods/*; do
   PARA_HOOKS="$owner/hooks" PARA_SKEL="$owner/skel" bash "$hook"
   status=$?  # its own line, NOT `if ! …; then` — see below.
   if [ "$status" -ne 0 ]; then
-    printf 'hook failed: %s\n' "$hook" >&2
+    printf "\033[31merror:\033[0m hook failed (exit %s): %s\n" "$status" "${hook#"$root"/}" >&2
+    if [ -n "$stack" ]; then printf '  stack: %s\n' "$PARA_HOOK_STACK" >&2; fi
     exit "$status"
   fi
   ran=1
@@ -78,7 +85,24 @@ That is the feature. What is deliberate in it:
   cross into a child either way, so a hook gets exactly what its own file sets
   and `bash hooks/provision` still reproduces what para ran. What `set -e` would
   cost is the runner's own error path: it would exit at the failing hook without
-  naming it. Its only unset variable is `$1`, already `${1:?}`, and no pipe.
+  naming it. Its two possibly-unset variables carry their own defaults
+  (`${1:?}`, `${PARA_HOOK_STACK:-}`), and it contains no pipe.
+- **`PARA_HOOK_STACK` is the trace.** Each level appends the point it is about
+  to run and exports it down, so the failing level can name the whole chain —
+  `provision > clone:before > keys:setup`. Without it, a hook three points deep
+  fails with a path and no answer to "how did para get here". Every level still
+  reports as the failure unwinds, and that is not redundancy: the `stack:` line
+  names the *points*, each level's own line names the *file and owner* that
+  filled one. Only the deepest carries a complete stack, and it comes first.
+- **The stack line is suppressed at the top level** (`[ -n "$stack" ]`), where
+  it would only repeat the hook name already in the message. A `provision` that
+  opens no point fails in exactly one line, the way it does today — the tracing
+  is invisible until something actually nests.
+- **The cycle guard is one `case`**, and it exists because the stack does. A
+  point that invokes itself recursed until the container's limits bit; now it
+  stops at depth two and prints the chain. Re-entrancy is what trips it, not
+  repetition: calling one point twice in a row from one hook is two children
+  with the same parent stack, which is fine and stays fine.
 - **The root comes from its own path**, never from `$PARA_HOOKS` — which it
   re-points — so a nested point doesn't enumerate `mods/<m>/mods/*`.
 - **It exports `PARA_RUN_HOOK` itself**, because in the guest `~/.paraspace` *is*
@@ -202,10 +226,13 @@ written *identically* to a project's:
 cp "$PARA_SKEL/zshrc" ~/.zshrc           # the mod's own skel
 ```
 
-**`PARA_RUN_HOOK` is the only new variable.** No `PARA_MOD`, no `PARA_MOD_DIR` —
-a hook already knows where it lives via `$PARA_HOOKS`. `.shellcheckrc`'s
-`source-path=SCRIPTDIR` resolves `$PARA_HOOKS/helpers` by basename, so a mod's
-`hooks/helpers` follows for free.
+**Two new variables, both set by the runner** rather than by `para_env`, so
+neither appears in `~/.paraspace/env`: `PARA_RUN_HOOK` (the path a hook opens a
+point with) and `PARA_HOOK_STACK` (the chain that reached this hook, for reading
+— para rewrites it at every level). Both are additive, so the contract does not
+move. No `PARA_MOD`, no `PARA_MOD_DIR` — a hook already knows where it lives via
+`$PARA_HOOKS`. `.shellcheckrc`'s `source-path=SCRIPTDIR` resolves
+`$PARA_HOOKS/helpers` by basename, so a mod's `hooks/helpers` follows for free.
 
 Three sharp edges to document:
 
@@ -213,6 +240,12 @@ Three sharp edges to document:
   clone:before` is a new process, so a plain `repo_url=…` set three lines above
   it is unset inside the hooks it runs. Export what a point is meant to see —
   or, better, don't: the point is filling in behavior, not receiving arguments.
+- **A hook that opens a point needs `set -e` to honor the failure.** The nested
+  runner reports and exits non-zero, so the error and its stack are always on
+  screen — but a hook without `set -e` carries on past the failed
+  `"$PARA_RUN_HOOK" …` and can still exit 0, and then `para up` reports a ready
+  workspace over a visible error. Templates ship `set -euo pipefail`; this is
+  the rule for hooks written elsewhere, and the reason the trace is loud.
 - **Don't re-source `~/.paraspace/env`.** It holds the *project's* values and
   `GUEST_PRELUDE` re-sources it on every `ws_exec`, so a hook that re-sources it
   mid-run rewinds `PARA_HOOKS`/`PARA_SKEL` — wrong file, no error.
@@ -300,6 +333,13 @@ whole reason the runner is shaped the way it is:
   at all — the variable the whole named-point feature rests on.
 - a non-directory under `mods/` (a stray file, a `README`) is skipped, not
   treated as an owner.
+- **the trace**: a failure three points deep names every level, and the deepest
+  line carries the full `stack:`. Assert the *flat* case too — a `provision`
+  that opens no point still fails in one line with no `stack:` — or the tracing
+  quietly becomes noise on the path everyone actually takes.
+- **the cycle guard**: a point that invokes itself exits 1 naming the chain,
+  rather than recursing. And its inverse, which is the one that matters: the
+  same point invoked twice *in sequence* from one hook runs twice.
 - a hook that reads stdin gets the caller's, not the hook list — the one that
   catches a future rewrite of the loop into a pipe.
 - `npm pack --dry-run` covers `libexec/` — **its own assert**, next to separate
@@ -349,17 +389,17 @@ bumps it.
 ## Docs
 
 `docs/hooks.md` gains the resolution rule, "a hook is a process" and its two
-consequences, `PARA_RUN_HOOK` and the three sharp edges — and drops its
-"Everything here runs **by path**, so each file's own shebang decides its
-interpreter" line in favor of them. `docs/versioning.md`
-gains two rows besides the pre-release notes above: para now runs
-`.paraspace/mods/*/hooks/*`, and `.paraspace/run-hook` joins `env` and
+consequences, `PARA_RUN_HOOK`/`PARA_HOOK_STACK` and the four sharp edges — and
+drops its "Everything here runs **by path**, so each file's own shebang decides
+its interpreter" line in favor of them. It also wants **the trace read
+end-to-end once**, on a worked nested failure: that is the page someone lands on
+at the wrong moment, and a stack is only obvious to whoever designed it.
+`docs/versioning.md` gains two rows besides the pre-release notes above: para now
+runs `.paraspace/mods/*/hooks/*`, and `.paraspace/run-hook` joins `env` and
 `host.env` as a name para owns.
 
 ## Deliberately not in v1
 
-- **A cycle guard.** A hook point that invokes itself recurses until the
-  container's limits bite. You have to author that on purpose.
 - **Refusing a project that ships `.paraspace/run-hook`.** para overwrites it.
 - **Deterministic mod ordering**, and any `LC_ALL=C` to get it. Order is
   explicitly not a promise.

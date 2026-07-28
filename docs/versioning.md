@@ -56,7 +56,7 @@ into a scratch directory to diff against a current template. Otherwise:
 | para validated routes and domains | `caddy validate` does, before every reload |
 | per-project keys refused from the user config | allowed; `para doctor` advises instead |
 | `PARA_PREPULL_IMAGES` injected into the image build | gone — set your own key and read it in `image-build.sh` |
-| image stamped uid/user/contract/incremental | only `user.para.src_sha` |
+| image stamped uid/user/contract/incremental | only `user.para.base` — `para image status` reports when it was built and from what |
 | `para start` / `para stop` | `para caddy start\|stop\|status` |
 | `para config-set KEY VALUE` | `para config edit` — the file is hand-edited now |
 | `para run`, `claude`, `web`, `key` | project commands in `.paraspace/commands/` |

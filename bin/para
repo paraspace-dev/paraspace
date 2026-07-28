@@ -728,25 +728,6 @@ cmd_image() {
   esac
 }
 
-# The reproducibility surface of a build, hashed: the payload, the bootstrap
-# line, and the base it layers on. `image status` compares it against the hash
-# stamped at publish time to say whether a rebuild would produce something else.
-image_src_sha() { # image_src_sha [<was-incremental>]
-  {
-    # The mode is part of the identity: `-i` layers onto the existing image and
-    # skips the bootstrap, so an image built that way is NOT what a clean
-    # rebuild produces — and `image status` should report exactly that.
-    printf '%s\n%s\n%s\n' "${1:-0}" "$PARA_IMAGE_BASE" "$PARA_IMAGE_BOOTSTRAP"
-    cat "$PARA_PROJECT_DIR/.paraspace/image-build.sh"
-  } | sha256_of
-}
-
-sha256_of() {
-  if command -v sha256sum >/dev/null 2>&1; then sha256sum
-  elif command -v shasum >/dev/null 2>&1; then shasum -a 256
-  else return 1; fi | awk '{print $1}'
-}
-
 cmd_image_build() {
   require_project
   local from_current=0
@@ -796,7 +777,7 @@ cmd_image_build() {
   # INT trap, which tears the builder down.
   { para_env; cat "$payload"; } | incus exec "$builder" -- bash -s &
   wait "$!"
-  image_publish
+  image_publish "$base"
   # Before the traps are cleared, so an interrupt here is still covered.
   incus delete -f "$builder"
   trap - EXIT INT TERM
@@ -808,7 +789,7 @@ cmd_image_build() {
 # halts; a snapshot because publishing a just-stopped instance races its rootfs
 # settling; a temp alias because publishing over the live alias would leave the
 # box with no image at all if the publish failed.
-image_publish() {
+image_publish() { # image_publish <base>
   incus stop -f "$builder"
   incus snapshot create "$builder" publish
   log "Publishing as '$PARA_IMAGE'…"
@@ -817,9 +798,9 @@ image_publish() {
   incus image delete "$PARA_IMAGE" >/dev/null 2>&1 || true
   incus image alias rename "$tmp_alias" "$PARA_IMAGE" \
     || die "the new image is published as '$tmp_alias' but could not be renamed — recover with: incus image alias rename $tmp_alias $PARA_IMAGE"
-  local sha
-  sha="$(image_src_sha "$from_current")" || die "need sha256sum or shasum to stamp the image's provenance."
-  incus image set-property "$PARA_IMAGE" user.para.src_sha "$sha"
+  # What this image was built from, as opposed to what the Parafile names today,
+  # which is what the *next* build would use. `-i` stamps $PARA_IMAGE itself.
+  incus image set-property "$PARA_IMAGE" user.para.base "$1"
 }
 
 # Never delete the temp alias once it holds the only copy of the image.
@@ -834,17 +815,11 @@ cmd_image_status() {
   local info
   info="$(incus image info "$PARA_IMAGE" 2>/dev/null)" \
     || die "no '$PARA_IMAGE' image yet — build it with: para image build"
-  local built sha source
+  local built base
   built="$(awk -F'Uploaded: *' '/Uploaded:/{print $2; exit}' <<<"$info")"
-  sha="$(incus image get-property "$PARA_IMAGE" user.para.src_sha 2>/dev/null || true)"
-  local current=""
-  current="$(image_src_sha)" || true
-  if [ -z "$sha" ]; then source="unknown — this image predates provenance stamping"
-  elif [ -z "$current" ]; then source="cannot tell — the image inputs could not be hashed (see above)"
-  elif [ "$sha" = "$current" ]; then source="up to date"
-  else source="drifted — the image inputs changed since this build"; fi
-  printf '  image    %s\n  built    %s\n  base     %s\n  source   %s\n' \
-    "$PARA_IMAGE" "${built:-unknown}" "${PARA_IMAGE_BASE:-<unset>}" "$source"
+  base="$(incus image get-property "$PARA_IMAGE" user.para.base 2>/dev/null || true)"
+  printf '  image    %s\n  built    %s\n  base     %s\n' \
+    "$PARA_IMAGE" "${built:-unknown}" "${base:-unknown}"
 }
 
 cmd_image_rm() {

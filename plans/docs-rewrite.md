@@ -361,7 +361,7 @@ left column.
 | para validates routes / domain | `caddy validate` does, before every reload |
 | per-project keys refused from user config | allowed; `para doctor` advises |
 | `PARA_PREPULL_IMAGES` injected into `image-build.sh` | gone; a project's own `PARA_PREPULL`, invisible to the engine |
-| image stamps `user.para.uid`/`user`/`contract`/`incremental` | only `user.para.src_sha` |
+| image stamps `user.para.uid`/`user`/`contract`/`incremental` | only `user.para.base` (was `src_sha`, dropped with drift detection) |
 | `para up` refuses on uid drift | doctor's job |
 | `para image build -q` / `-v` | auto-quiet when stderr isn't a tty |
 | `--help` reports resolved config | `para doctor` does |

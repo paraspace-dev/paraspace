@@ -38,9 +38,8 @@ The command is base-agnostic plumbing:
 2. runs **`$PARA_IMAGE_BOOTSTRAP`** in it via `sh -c`, if set;
 3. pipes your **`.paraspace/image-build.sh`** into it as root under `bash -s`,
    with every `PARA_*` exported ahead of it;
-4. publishes the result as **`$PARA_IMAGE`**, stamping `user.para.src_sha` so
-   the image can tell you later whether its source has changed. A failed or
-   interrupted build leaves the existing image untouched.
+4. publishes the result as **`$PARA_IMAGE`**. A failed or interrupted build
+   leaves the existing image untouched.
 
 Both keys live in the [Parafile](./parafile.md), which is also where the
 per-distro bootstrap examples are.
@@ -60,20 +59,20 @@ is the reference: a package list, a user, and Docker set up for nesting.
 
 ## Checking it — `para image status`
 
-An image outlasts the source that built it, so:
-
 ```
 $ para image status
   image    myapp
   built    2026/07/21 14:02 UTC
   base     images:voidlinux
-  source   drifted — the image inputs changed since this build
 ```
 
-`drifted` means the `image-build.sh` payload, `$PARA_IMAGE_BOOTSTRAP` or
-`$PARA_IMAGE_BASE` changed since the build, so rebuilding would give you
-something different. `unknown` means the image predates provenance stamping, or
-was built by a plain `incus` action.
+`base` is what this image was built **from**, stamped at build time — not what
+`PARA_IMAGE_BASE` names today. After a `-i` build it is `$PARA_IMAGE` itself,
+which is how you tell an incremental image from a clean one.
+
+Rebuild when you've edited your `image-build.sh` — nothing checks for you, and
+if you leave it too long you find out because the tool you added isn't in the
+workspace.
 
 `para image rm` deletes `$PARA_IMAGE` — to reclaim space or force a fully clean
 next build. Workspaces already `up` are clones and keep running.

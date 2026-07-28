@@ -4,7 +4,7 @@ set -euo pipefail
 # Guest provisioning for the e2e fixture's base image. Runs as root inside a
 # fresh $PARA_IMAGE_BASE container — `images:alpine/edge` per the Parafile,
 # bootstrapped with `apk add --no-cache bash` (Alpine ships no bash, and para
-# runs this payload with `bash -s`) — invoked by `para image build`.
+# runs this hook with bash) — invoked by `para image build`.
 #
 # Deliberately NOT Void and NOT Docker: this is the second consumer that proves
 # `para image build` is generic. It's also what keeps the e2e tier cheap — the
@@ -23,6 +23,14 @@ set -euo pipefail
 PARA_USER="${PARA_USER:-app}"
 PARA_UID="${PARA_UID:-1000}"
 PARA_GID="${PARA_GID:-1000}"
+
+# The builder's copy of .paraspace/ lives somewhere else than the workspace's,
+# so $PARA_HOOKS has to be re-pointed at it. Assert rather than assume: pointed
+# at the workspace's $HOME path it would still read as "set", and a build hook
+# seeding from $PARA_SKEL would silently seed nothing.
+echo "==> para's context resolves in the builder"
+[ -f "$PARA_HOOKS/image-build" ] \
+  || { echo "PARA_HOOKS ($PARA_HOOKS) does not resolve in the builder" >&2; exit 1; }
 
 echo "==> packages"
 apk add --no-cache bash busybox-extras sudo >/dev/null

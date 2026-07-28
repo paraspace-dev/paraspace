@@ -3,7 +3,7 @@
 # of this project via ~/.zshrc, so edits apply everywhere.
 #
 # NOTE: the void-minimal base image installs NOTHING, so it logs you into bash and
-# this file sits unused until you add `zsh` to .paraspace/image-build.sh — at which
+# this file sits unused until you add `zsh` to .paraspace/hooks/image-build — at which
 # point the provision hook switches your login shell and this applies. It's the
 # seed of your shell config; grow it as you add tools. (templates/void-jchook is a
 # fully fleshed-out version — aliases, a git-aware prompt, editor/browser setup.)
@@ -28,7 +28,7 @@ PROMPT='%F{cyan}%m%f %F{yellow}%1~%f %# '
 export PATH="$HOME/.local/bin:$PATH"
 
 # --- where to grow -----------------------------------------------------------
-# INSTALL STUFF:  add packages to .paraspace/image-build.sh (its `pkgs=""` block),
+# INSTALL STUFF:  add packages to .paraspace/hooks/image-build (its `pkgs=""` block),
 #                 then `para image build` to rebuild the base image.
 # START THE APP:  clone it in .paraspace/hooks/provision and bring it up in
 #                 .paraspace/hooks/boot; point PARA_ROUTES (Parafile) at its port.

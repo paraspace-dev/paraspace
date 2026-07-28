@@ -13,7 +13,7 @@ than trimming down the runnable [`void-docker-gh`](../void-docker-gh) template.
 void-minimal/
   .paraspace/
     Parafile               # identity, the base image to build from, no routes
-    image-build.sh         # user + writable /tmp; the pkgs="" install block is EMPTY
+    hooks/image-build      # user + writable /tmp; the pkgs="" install block is EMPTY
     hooks/provision        # seed + link the shell rc; comments mark where a clone goes
     hooks/boot             # no-op: nothing to boot (returns 0 immediately)
     hooks/helpers          # colored output + small guards, sourced by the hooks
@@ -38,7 +38,7 @@ you have something listening, and the URL appears on the next `para up`.
 
 The scaffold tells you where each piece goes:
 
-- **`image-build.sh`** — the `pkgs=""` block is empty. Add your packages
+- **`hooks/image-build`** — the `pkgs=""` block is empty. Add your packages
   (`pkgs="zsh tmux neovim git"`, or `docker docker-compose` for a stack), then
   `para image build`. Installing `zsh` makes the provision hook switch your login
   shell to it so `skel/zshrc` applies.

@@ -18,13 +18,13 @@
 
 # The tiny Alpine base image the suite runs on: ~5.5 MB of bash + busybox httpd +
 # a $PARA_USER/$PARA_UID user. Built by `para image build` from the
-# .paraspace/image-build.sh next to this file — which is half the point of the
+# .paraspace/hooks/image-build beside it — which is half the point of the
 # fixture: it's a non-Void, Docker-free consumer, so an e2e run proves
 # image build carries no distro or Docker assumptions of its own.
 : "${PARA_IMAGE:=alpine-minimal}"
 
-# What image build builds FROM. Alpine ships no bash and para runs the payload
-# with `bash -s`, so the bootstrap has exactly one job: put bash there.
+# What image build builds FROM. Alpine ships no bash and para runs the hook
+# with `bash`, so the bootstrap has exactly one job: put bash there.
 : "${PARA_IMAGE_BASE:=images:alpine/edge}"
 : "${PARA_IMAGE_BOOTSTRAP:=apk add --no-cache bash}"
 

@@ -154,7 +154,7 @@ require_project() {
 
 # Every PARA_* in scope, as export lines. This is the one way para hands its
 # context to anything it runs for you: guest hooks, project commands, and the
-# image-build payload. A key you invent in your Parafile reaches all three.
+# image builder. A key you invent in your Parafile reaches all three.
 para_env() {
   local var
   for var in "${!PARA_@}"; do printf 'export %s=%q\n' "$var" "${!var}"; done
@@ -429,32 +429,47 @@ ws_exec() { # ws_exec <name> [<command>]
 }
 
 # ---- hooks -----------------------------------------------------------------
-# Push the project's .paraspace/ into the workspace as ~/.paraspace, alongside
-# para's context and the project's base .env. Fresh on every up, so an edit to
-# a hook takes effect without re-cloning anything.
-push_project() { # push_project <name>
-  local ct="$CT_PREFIX$1" home="/home/$PARA_USER"
-  incus exec "$ct" -- rm -rf "$home/.paraspace"
-  incus_q file push -r "$PARA_PROJECT_DIR/.paraspace" "$ct$home/"
-  if [ -f "$PARA_HOST_ENV" ]; then
-    incus_q file push --mode 0600 "$PARA_HOST_ENV" "$ct$home/.paraspace/host.env"
-  fi
-  # Below here is the guest's view of the layout, and para_env forwards whatever
-  # PARA_* is in scope — so these three reach the hooks instead of the host's.
-  # Local: the host keeps its own PARA_HOST_ENV, which the push above still needs.
+# para_env as the guest sees it: the three path keys renamed to where <dest>
+# actually put them, and the host-only ones unset rather than left pointing at
+# files that do not exist in there.
+guest_env() { # guest_env <dest>
+  # Local, because the host keeps its own PARA_HOST_ENV — push_project reads it.
   # shellcheck disable=SC2034  # all three are read by para_env's ${!PARA_@}
-  local PARA_HOOKS="$home/.paraspace/hooks" \
-        PARA_SKEL="$home/.paraspace/skel" \
-        PARA_HOST_ENV="$home/.paraspace/host.env"
-  { para_env
-    printf 'unset PARA_BIN PARA_PROJECT_DIR PARA_CONFIG PARA_CONFIG_DIR PARA_STATE_DIR\n'
-  } | incus_q file push --mode 0600 - "$ct$home/.paraspace/env"
-  incus exec "$ct" -- chown -R "$PARA_UID:$PARA_GID" "$home/.paraspace"
+  local PARA_HOOKS="$1/.paraspace/hooks" \
+        PARA_SKEL="$1/.paraspace/skel" \
+        PARA_HOST_ENV="$1/.paraspace/host.env"
+  para_env
+  printf 'unset PARA_BIN PARA_PROJECT_DIR PARA_CONFIG PARA_CONFIG_DIR PARA_STATE_DIR\n'
+}
+
+# Replace <instance>:<dest>/.paraspace with the project's, plus para's context.
+# The rm is what makes it a replace: `incus file push -r` merges into whatever
+# is already there, so a hook you deleted would otherwise survive in the guest.
+push_paraspace() { # push_paraspace <instance> <dest>
+  incus exec "$1" -- rm -rf "$2/.paraspace"
+  incus_q file push -r "$PARA_PROJECT_DIR/.paraspace" "$1$2/"
+  # The push carries your checkout's own modes, so a `umask 077` one lands 0700
+  # and a build hook that steps down to $PARA_USER can't read $PARA_SKEL. Before
+  # the env push, which keeps the 0600 it is given.
+  incus exec "$1" -- chmod -R a+rX "$2/.paraspace"
+  guest_env "$2" | incus_q file push --mode 0600 - "$1$2/.paraspace/env"
   # A hook is run by path so its shebang decides, which needs the exec bit —
   # and a checkout, a tarball or a push can all lose it.
   if [ -d "$PARA_PROJECT_DIR/.paraspace/hooks" ]; then
-    incus exec "$ct" -- chmod -R +x "$home/.paraspace/hooks"
+    incus exec "$1" -- chmod -R +x "$2/.paraspace/hooks"
   fi
+}
+
+# The workspace's copy: the tree, plus the project's base .env and the user's
+# ownership of it. Fresh on every up, so an edit to a hook takes effect without
+# re-cloning anything.
+push_project() { # push_project <name>
+  local ct="$CT_PREFIX$1" home="/home/$PARA_USER"
+  push_paraspace "$ct" "$home"
+  if [ -f "$PARA_HOST_ENV" ]; then
+    incus_q file push --mode 0600 "$PARA_HOST_ENV" "$ct$home/.paraspace/host.env"
+  fi
+  incus exec "$ct" -- chown -R "$PARA_UID:$PARA_GID" "$home/.paraspace"
 }
 
 # Run one of the project's guest hooks, if it has one. Hooks own all
@@ -739,8 +754,8 @@ cmd_image_build() {
   done
   # Everything the project itself has to get right, checked before the daemon —
   # an incomplete Parafile is more useful to hear about than an absent incus.
-  local payload="$PARA_PROJECT_DIR/.paraspace/image-build.sh"
-  [ -f "$payload" ] || die "missing provisioning payload: $payload"
+  local hook="$PARA_PROJECT_DIR/.paraspace/hooks/image-build"
+  [ -f "$hook" ] || die "missing image-build hook: $hook. See docs/image.md."
   local base="$PARA_IMAGE_BASE"
   [ "$from_current" -eq 0 ] || base="$PARA_IMAGE"
   [ -n "$base" ] \
@@ -763,20 +778,27 @@ cmd_image_build() {
   log "Launching the builder from '$base'…"
   incus_q launch "$base" "$builder" --storage "$PARA_POOL" -c security.nesting=true
   wait_ready "$builder"
-  # The payload runs under `bash -s`, and a minimal base may not ship bash (or
-  # may need its package index refreshed first). `sh` is the one interpreter
-  # every base image has, which is what this line is for.
+  # The build hook runs under bash, and a minimal base may not ship it (or may
+  # need its package index refreshed first). `sh` is the one interpreter every
+  # base image has, which is what this line is for.
   if [ "$from_current" -eq 0 ] && [ -n "$PARA_IMAGE_BOOTSTRAP" ]; then
     log "Bootstrapping the builder…"
     incus exec "$builder" -- sh -c "$PARA_IMAGE_BOOTSTRAP"
   fi
+  # The builder gets the whole .paraspace/ the way a workspace does, at /opt
+  # because /root is 0700 and a build hook that steps down to $PARA_USER has to
+  # be able to read $PARA_SKEL through it.
+  incus exec "$builder" -- mkdir -p /opt
+  push_paraspace "$builder" /opt
   log "Provisioning the image — this takes a few minutes…"
-  # Backgrounded so Ctrl-C works: a foreground `incus exec` reading a script on
-  # stdin can't be given a pty, so incus never relays SIGINT into the container
-  # and bash can't interrupt the wait. `wait` can be interrupted, which runs the
-  # INT trap, which tears the builder down.
-  { para_env; cat "$payload"; } | incus exec "$builder" -- bash -s &
+  # Backgrounded so Ctrl-C works: incus relays SIGINT only into a process it
+  # gave a pty, and this one has none. `wait` can be interrupted, which runs the
+  # INT trap, which tears the builder down. Prompting is an `up`-only promise.
+  incus exec "$builder" -- bash -c '. /opt/.paraspace/env; exec bash /opt/.paraspace/hooks/image-build' </dev/null &
   wait "$!"
+  # image_publish snapshots the whole rootfs, and the project's tree is a build
+  # input, not something every workspace should find lying around in its image.
+  incus exec "$builder" -- rm -rf /opt/.paraspace
   image_publish "$base"
   # Before the traps are cleared, so an interrupt here is still covered.
   incus delete -f "$builder"

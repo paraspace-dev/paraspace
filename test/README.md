@@ -51,7 +51,7 @@ serves a fixed sentinel over HTTP with busybox `httpd`. It is **not** a template
 the published image ~5.5 MB and the whole path Docker-free.
 
 The image is built by **`para image build`**, from the fixture's own
-[`.paraspace/image-build.sh`](fixtures/hello/.paraspace/image-build.sh)
+[`.paraspace/hooks/image-build`](fixtures/hello/.paraspace/hooks/image-build)
 (`apk add bash busybox-extras sudo`, plus a `$PARA_USER` user) on the
 `PARA_IMAGE_BASE`/`PARA_IMAGE_BOOTSTRAP` its Parafile declares
 (`images:alpine/edge` + `apk add --no-cache bash`), published as the
@@ -64,7 +64,7 @@ But the build is **cached**, and nothing invalidates that cache: an existing
 `alpine-minimal` alias is reused as-is. So in steady state most runs skip
 `para image build` entirely and prove nothing about it. **Rebuild explicitly with
 `PARA_TEST_REBUILD=1 test/run --e2e` whenever you touch the fixture's
-`image-build.sh`, its Parafile's base/bootstrap, or `cmd_image_build` itself** —
+`hooks/image-build`, its Parafile's base/bootstrap, or `cmd_image_build` itself** —
 otherwise you're testing the image you built last time. `--no-build` skips even
 the existence check.
 

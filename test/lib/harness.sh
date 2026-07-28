@@ -54,17 +54,18 @@ run_test() {
 }
 
 # Discover and run every test_* function currently defined, optionally filtered
-# by a substring of the (underscores-as-spaces) description. Returns non-zero if
-# any test failed.
+# by a regex over the (underscores-as-spaces) description. Descriptions are only
+# letters, digits and spaces, so a plain word is still a substring match.
+# Returns non-zero if any test failed.
 run_all() {
   local filter="${1:-}" fn desc
   # `$NF ~ /^test_/` anchors to functions NAMED test_* (not helpers that merely
   # contain the substring), so a `_ls_state`-style helper is never auto-run.
   for fn in $(declare -F | awk '$NF ~ /^test_/ {print $NF}'); do
     desc="${fn#test_}"; desc="${desc//_/ }"
-    if [ -n "$filter" ]; then
-      case "$desc" in *"$filter"*) ;; *) continue ;; esac
-    fi
+    # Unquoted on purpose: quoting the right-hand side of =~ makes bash 3.2
+    # match it literally, which would silently turn every regex into a substring.
+    if [ -n "$filter" ] && ! [[ "$desc" =~ $filter ]]; then continue; fi
     run_test "$fn" || break
   done
   echo

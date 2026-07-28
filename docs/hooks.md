@@ -1,12 +1,13 @@
 # Hooks
 
-Hooks are where all the provisioning lives. para runs them **inside the
-workspace**, as the workspace user (`$PARA_USER`), starting in
+Hooks are where all the provisioning lives. `provision` and `boot` run **inside
+the workspace**, as the workspace user (`$PARA_USER`), starting in
 `~/$PARA_CLONE_DIR` when it exists and `$HOME` when it doesn't — so `provision`
 starts in `$HOME` on the first `up` and in the clone every time after. Use
-absolute paths rather than relying on it.
+absolute paths rather than relying on it. `image-build` is the odd one out: it
+runs in the image builder, as root, before any workspace exists.
 
-## The two hooks
+## The three hooks
 
 ### `provision`
 
@@ -31,20 +32,37 @@ docker compose up -d --wait          # blocks until healthchecks pass
 para gates on the container agent (and `$PARA_READY_HOST`, if you set one)
 before hooks run, then trusts your boot hook's exit code.
 
-An absent hook is a visible no-op, so write only the ones you need.
+### `image-build`
 
-`provision` and `boot` are the only two para invokes — but they are not the only
-things that can live in `.paraspace/hooks/`. para syncs the whole directory and
-marks it executable, so anything else you put there is yours to source or run
-from them: a shared library, a step a long hook factors out, a script one of
-your [commands](./commands.md#project-commands) hands off to.
+Builds the base image every workspace is cloned from: packages, the workspace
+user, whatever belongs in the image rather than installed per workspace. `para
+image build` runs it in a throwaway builder, **as root**, with your whole
+`.paraspace/` pushed to `/opt/.paraspace` — so `$PARA_HOOKS` and `$PARA_SKEL`
+point in there, not at a `$HOME` no one has created yet.
+
+It gets **no tty and no stdin**: prompting is an `up`-only promise, so a package
+manager that stops to ask hangs the build. Pass `-y`. para runs it with `bash`,
+so unlike the other two its shebang is not consulted. Your `.env` is the one
+thing that does *not* follow it in — `$PARA_HOST_ENV` names a file that exists
+only in a workspace, so read secrets at `provision`, not here.
+
+What the image has to end up containing is [its own page](./image.md).
+
+An absent `provision` or `boot` is a visible no-op, so write only the ones you
+need. `image-build` is the exception: `para image build` refuses without it.
+
+`provision`, `boot` and `image-build` are the only three para invokes — but they
+are not the only things that can live in `.paraspace/hooks/`. para syncs the
+whole directory and marks it executable, so anything else you put there is yours
+to source or run from them: a shared library, a step a long hook factors out, a
+script one of your [commands](./commands.md#project-commands) hands off to.
 
 ```sh
 . "$PARA_HOOKS/helpers"        # a library to source — what the templates do
 "$PARA_HOOKS/seed-dotfiles"    # a step to run
 ```
 
-Everything here runs **by path**, so each file's own shebang decides its
+`provision` and `boot` run **by path**, so each file's own shebang decides its
 interpreter.
 
 ## How your project reaches the workspace
@@ -59,13 +77,13 @@ para's to change, and the variable is the part it promises:
 |---|---|---|
 | `~/.paraspace/hooks/` | `$PARA_HOOKS` | your hooks, plus anything they source |
 | `~/.paraspace/skel/` | `$PARA_SKEL` | your seed files (dotfiles etc.), for a hook to copy or link |
-| `~/.paraspace/host.env` | `$PARA_HOST_ENV` | your `.env` from the host, if that file exists |
+| `~/.paraspace/host.env` | `$PARA_HOST_ENV` | your `.env` from the host, if that file exists. Workspaces only — never pushed to the image builder |
 | `~/.paraspace/env` | — | para's context as export lines. Every `PARA_*` except the handful that name paths on the *host* (`PARA_BIN`, `PARA_PROJECT_DIR`, `PARA_CONFIG`, `PARA_CONFIG_DIR`, `PARA_STATE_DIR`), which are unset here rather than pointing at files that don't exist |
 | `~/.paraspace/commands/` | — | synced along, but these run on the *host* — see [Commands](./commands.md#project-commands) |
 
-para reads the `Parafile` and `image-build.sh` itself, on the host. Like
-`commands/`, they are synced into the guest as well, but nothing in the
-workspace runs them — so don't put a host-only secret in a `Parafile`.
+para reads the `Parafile` itself, on the host. Like `commands/`, it is synced
+into the guest as well, but nothing in the workspace runs it — so don't put a
+host-only secret in a `Parafile`.
 
 Files come from your **host checkout**, not the clone, and are pushed fresh on
 every `up` — so editing a hook takes effect on the next `para up` without

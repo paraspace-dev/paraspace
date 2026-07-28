@@ -20,7 +20,7 @@ void-docker-gh/
     hooks/provision        # seed+link the shared volume, clone, copy .env
     hooks/boot             # docker compose up -d --wait
     hooks/helpers          # colored output + small guards, sourced by the hooks
-    image-build.sh         # the base image (docker + git + a $PARA_USER user)
+    hooks/image-build      # the base image (docker + git + a $PARA_USER user)
     skel/zshrc             # dotfiles seeded onto the shared volume
 ```
 
@@ -55,7 +55,7 @@ name derives from. Then edit `.paraspace/`:
 - **`hooks/boot`** — the readiness contract: return 0 only once every routed
   service is actually listening (`docker compose up -d --wait` does this when your
   services have healthchecks).
-- **`image-build.sh`** — add your toolchain. Keep the image contract:
+- **`hooks/image-build`** — add your toolchain. Keep the image contract:
   docker→overlayfs, a `$PARA_USER`/`$PARA_UID` user in the `docker` group,
   bash + git.
 

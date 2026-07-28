@@ -24,9 +24,8 @@ up there.
 | Entry | Read by | Purpose |
 |---|---|---|
 | `Parafile` | `para`, host-side | the keys para reads — [reference](./parafile.md) |
-| `hooks/` | the workspace | `provision` and `boot`, plus anything they source |
+| `hooks/` | the workspace, and the image builder | `provision`, `boot` and `image-build`, plus anything they source |
 | `skel/` | your hooks | seed files (dotfiles etc.) your hooks copy or link |
-| `image-build.sh` | `para image build` | builds the base image |
 | `commands/` | `para`, host-side | your own `para` verbs — [reference](./commands.md#project-commands) |
 
 It's set-up-once plumbing, hidden like `.github`. Commit it, so every machine
@@ -40,7 +39,7 @@ place. The usual adaptation, in order:
 1. **`Parafile`** — point `PARA_ORIGIN` at your repo, list your `PARA_ROUTES`
    (one entry per port you want a URL for), and name a `PARA_IMAGE_BASE`.
    Every var is in [the Parafile reference](./parafile.md).
-2. **`image-build.sh`** — the packages your stack needs baked into the base
+2. **`hooks/image-build`** — the packages your stack needs baked into the base
    image, and the workspace user. See [The image contract](./image.md).
 3. **`hooks/provision`** — everything before boot: seed the shared volume,
    clone, render `.env`. The template's version handles the common case.
@@ -65,7 +64,7 @@ images, splitting a monorepo, and adding `para` verbs of your own.
 ## Add your own env vars
 
 Any `PARA_*` variable you set in your `Parafile` reaches the hooks, the project
-commands and `image-build.sh`. See [the Parafile](./parafile.md#your-own-keys).
+commands and `hooks/image-build`. See [the Parafile](./parafile.md#your-own-keys).
 
 ```sh
 # Custom env var

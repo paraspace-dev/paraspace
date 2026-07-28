@@ -98,7 +98,7 @@ hooks. It knows nothing about your stack. The extension points are all files in
 
 | What | Where it lives |
 |---|---|
-| how the base image is built | `.paraspace/image-build.sh` |
+| how the base image is built | `.paraspace/hooks/image-build` |
 | how a workspace is provisioned | `.paraspace/hooks/provision` |
 | how the stack boots, and when it's ready | `.paraspace/hooks/boot` |
 | **new `para` verbs** | `.paraspace/commands/<verb>` |

@@ -1222,13 +1222,11 @@ doctor_project() {
 # one that would have run: none of them will, so naming one would send you to
 # fix a file picked by glob order.
 doctor_shadowed() { # doctor_shadowed <verb>
-  local path pdir
-  if [ -f "$PARA_PROJECT_DIR/.paraspace/commands/$1" ]; then
-    d_warn "project command '$1' is shadowed by the engine verb of the same name"
-  fi
+  local path pdir owner
   while IFS= read -r path; do
     pdir="$(command_pdir "$path")"
-    d_warn "mod ${pdir##*/}'s command '$1' is shadowed by the engine verb of the same name"
+    if [ -n "$pdir" ]; then owner="mod ${pdir##*/}'s command"; else owner="project command"; fi
+    d_warn "$owner '$1' is shadowed by the engine verb of the same name"
   done < <(command_files "$1")
 }
 

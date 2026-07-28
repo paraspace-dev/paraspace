@@ -279,6 +279,23 @@ echo HIJACKED-TOO'
   assert_contains "$PARA_OUT" "the engine verb wins" "help says why it never runs"
 }
 
+test_a_shadowed_command_is_reported_to_its_own_owner() {
+  # Both owners lose to the engine verb, and each has a different file to go fix,
+  # so each is named as itself. Crediting a mod for the file you wrote sends you
+  # looking under mods/ for it — and an anonymous mod is nowhere at all.
+  local p; p="$(a_project)"
+  a_project_command "$p"       ls '#!/bin/sh
+echo MINE'
+  a_mod_command     "$p" tools ls '#!/bin/sh
+echo MOD'
+  para_in "$p" doctor
+  assert_contains "$PARA_OUT" "project command 'ls' is shadowed"     "yours is yours"     || return 1
+  assert_contains "$PARA_OUT" "mod tools's command 'ls' is shadowed" "the mod's is a mod's" || return 1
+  # Two owners, two lines: a walk that reports yours as a mod's too would name a
+  # third file, under a mod with no name.
+  assert_eq 2 "$(grep -c "is shadowed by the engine verb" <<<"$PARA_OUT")" "one line per owner"
+}
+
 test_a_mods_command_gets_para_mod_dir() {
   # A host-side command has no other way to find its own files: $PARA_HOOKS and
   # $PARA_SKEL name GUEST paths and para keeps them unset on the host.

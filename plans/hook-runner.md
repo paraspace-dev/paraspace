@@ -213,9 +213,13 @@ The model is one sentence:
 It is true by construction rather than by convention, and it is one sentence for
 both ways in: the runner's loop and a nested `"$PARA_RUN_HOOK"` are both a fresh
 process, so "what can a hook see" has the same answer however it was reached.
-There is deliberately no channel for writing back. The one case that wanted it —
-`$BROWSER` for `gh auth login` — is solved in the image: a mod's build hook
-writes `/etc/profile.d/`, which `su -` sources before any hook runs.
+There is deliberately no channel for writing back — what a hook wants a *later*
+hook to see goes through a file, and
+[mods.md](./mods.md#how-a-hook-reaches-a-later-hook) is the list of which one.
+The case that wanted it — `$BROWSER`, so the base's `authorize_key` device flow
+finds a browser — is solved in the image, because the base's `provision` runs
+*before* any mod's and no hook point comes earlier: a mod's build hook writes
+`/etc/profile.d/`, which the bash login shell para runs hooks in sources.
 
 ## The environment a hook sees
 

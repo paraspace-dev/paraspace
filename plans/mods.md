@@ -316,8 +316,10 @@ and it is chosen by **lifetime**, not by convenience:
 | To pass | Write | Read by | Lives as long as |
 |---|---|---|---|
 | "I already did this" | a sentinel beside what it guards | the same hook, next `up` | the thing it guards |
-| "the tool is here" | nothing — install it | anyone, via `command -v` | the image |
-| a shell variable (`PATH`, `$BROWSER`) | `/etc/profile.d/<mod>.sh`, from `image-build` | every login shell: later hooks, `para sh`, project commands | the image |
+| "the tool is here" | nothing — install it on `PATH` | anyone, via `command -v` | the image |
+| a variable later hooks need | an `export` line appended to `~/.paraspace/env` | every later `ws_exec`: `boot`, remaining hooks, `para sh <ws> -c …` | this `up` |
+| a variable every workspace's hooks need | `/etc/profile.d/<mod>.sh`, from `image-build` | bash login shells, which is what para runs hooks in | the image |
+| a variable the user's shell needs | the mod's `skel/` — dotfiles | that shell, per its own rules | the volume |
 | a value only this workspace knows | a file under `$HOME` | whoever needs it, when they need it | the workspace |
 | a value every workspace shares | `$PARA_SHARED/<mod>/` | every workspace of the project | the volume |
 
@@ -331,44 +333,53 @@ Three rules make those safe between mods that have never seen each other:
 - **Read defensively, never require.** A mod may not assume another mod ran, so
   reading another's artifact means degrading when it is absent — not `die`.
 
-**The one that surprises people: inside a single phase the environment doesn't
-cross — files do.** Every owner's `provision` runs in *one* `ws_exec`, and
-`GUEST_PRELUDE` sourced the environment before the runner started, so a
-`/etc/profile.d` file mod A writes during `provision` does not reach mod B's
-`provision` in the same run; it reaches the next `ws_exec` (`boot`, the next
-`up`). Every other row of the table is unaffected — mod B's hook is a fresh
-process reading the filesystem as it finds it, so a sentinel, an installed tool
-or a `$PARA_SHARED` file mod A wrote seconds earlier is right there. Two mods
-that must hand off *within* a phase do it through a file each reads at the
-moment it needs it, never through the environment.
-
-#### The gap this leaves
-
-`/etc/profile.d` is the only channel that reaches the shell, and it costs an
-image build. Fine for `dotfiles-jchook`, which owns `~/.zshrc` outright. Not
-fine for the first mod that installs a toolchain at `provision` — `mise`, a
-cargo bin dir, anything whose path the image could not have known — where "added
-the mod, ran `up`, it isn't on `PATH`" is a rebuild away from working with
-nothing saying so.
-
-The shape that closes it is three lines in `GUEST_PRELUDE`:
+**Appending to `~/.paraspace/env` is the whole of the variable channel**, and it
+needs nothing built. `push_paraspace` `rm -rf`s the tree and writes `env` fresh
+*before* provision runs, `push_project` then `chown`s it to `$PARA_USER`, and
+`GUEST_PRELUDE` sources it on every `ws_exec` that gets a command. So:
 
 ```sh
-for f in ~/.paraspace/env.d/*.sh; do
-  if [ -f "$f" ]; then . "$f"; fi
-done
+printf 'export MISE_DATA_DIR=%q\n' "$dir" >> ~/.paraspace/env
 ```
 
-`env.d/` is `/etc/profile.d` with a workspace lifetime and no root: a hook writes
-`env.d/<mod>.sh`, every later `ws_exec` sources it. It needs no cleanup rule,
-because `push_paraspace` already `rm -rf`s `.paraspace/` on every `up` — so it is
-derived state that provision rebuilds, not config that accumulates.
+reaches `boot` and every later hook, and the next `up` regenerates the file from
+scratch — appends can never accumulate, and idempotence is free. `docs/hooks.md`
+has to say so out loud, because nothing in `bin/para` does: the file is para's to
+generate and a hook's to append, and whoever next touches `guest_env` needs to
+know the second half.
 
-**Not in v1**, by the same rule as everything else here: no bundled mod needs it,
-and a mechanism with no consumer is a promise. It is written down so the first
-mod that *does* need it reaches for this instead of appending to a `~/.zshrc` it
-doesn't own — which is exactly the convention-by-imitation
-[the vocabulary section](#why-the-vocabulary-is-the-product) is about.
+**The one that surprises people: inside a single phase the environment doesn't
+cross — files do.** Every owner's `provision` runs in *one* `ws_exec`, and
+`GUEST_PRELUDE` sourced `env` before the runner started, so a line mod A appends
+during `provision` does not reach mod B's `provision` in the same run; it reaches
+the next `ws_exec` (`boot`, the next `up`). Every filesystem row is unaffected —
+mod B's hook is a fresh process reading the filesystem as it finds it, so a
+sentinel, an installed tool or a `$PARA_SHARED` file mod A wrote seconds earlier
+is right there. Two mods that must hand off *within* a phase do it through a file
+each reads at the moment it needs it, never through the environment.
+
+#### para does not configure your shell
+
+The last two rows of the table split on one fact: **para owns the shell its hooks
+run in, and not the one `para sh` gives you.** Hooks get `su - … -s /bin/bash`,
+so `/etc/profile.d` is reliable for them. An interactive `para sh` is
+`incus exec -t -- su - "$PARA_USER"` with no `-s` and no `GUEST_PRELUDE` — it is
+whatever login shell the image gave that user, which for all three bundled
+templates is **zsh** (`useradd -s "$(command -v zsh)"`, or `chsh` in
+`void-minimal`). zsh does not read `/etc/profile.d`; some distros bridge it from
+`/etc/zsh/zprofile` and some don't, and `PARA_IMAGE_BASE` is whatever the project
+names.
+
+So a mod that wants something in the user's shell ships a dotfile, the way
+`void-jchook` already does — `skel/zshrc` is where `$BROWSER` and `~/.local/bin`
+actually come from today, not `/etc/profile.d`. That is not a gap para should
+close: `para sh` deliberately hands you a real login shell rather than a
+para-wrapped one, and configuring it is a mod's `skel/` doing exactly its job.
+
+An earlier draft added a `~/.paraspace/env.d/` drop-in dir sourced by
+`GUEST_PRELUDE` to close a gap that turned out not to exist — `env` already
+carries the hook-to-hook case, and nobody wants `PARA_*` in an interactive shell.
+It is recorded here so it doesn't get reinvented.
 
 ### Mods are not reversible
 
@@ -407,8 +418,13 @@ An earlier draft had all of that machinery because both wanted the same file.
 Three wrinkles to settle rather than discover:
 
 - **`$BROWSER` fits no hook point** — `void-jchook` exports it so the base's
-  `authorize_key` device flow sees it, and a hook can't write to its caller. The
-  mod's build hook writes `/etc/profile.d/` instead.
+  `authorize_key` device flow sees it, and the base's `provision` runs *before*
+  any mod's, so there is no moment a mod could set it in. Appending to `env`
+  is too late for the same reason. The mod's build hook writes
+  `/etc/profile.d/` instead, which every hook's bash login shell sources — and
+  `skel/zshrc` keeps setting it for the interactive shell, which reads neither.
+  Two audiences, two mechanisms; it is the worked example for
+  [the channels table](#how-a-hook-reaches-a-later-hook).
 - **`ln -sfn` onto a real `~/.claude` nests inside it.** The trigger is a
   workspace where `claude` ran once and recreated it before the mod was added.
   The mod's hook does `[ -L ~/.claude ] || rm -rf ~/.claude` first.

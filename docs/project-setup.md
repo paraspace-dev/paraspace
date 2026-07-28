@@ -65,7 +65,7 @@ images, splitting a monorepo, and adding `para` verbs of your own.
 ## Add your own env vars
 
 Any `PARA_*` variable you set in your `Parafile` reaches the hooks, the project
-commands and `hooks/image-build`. See [the Parafile](./parafile.md#your-own-keys).
+commands and `hooks/image-build`. See [the Parafile](./parafile.md#your-own-vars).
 
 ```sh
 # Custom env var
@@ -91,6 +91,6 @@ Two runnable templates share one shape and vary in weight:
 Each has its own README in
 [`templates/`](https://github.com/paraspace-dev/paraspace/tree/main/templates).
 
-A template is the thing you copy once and then own. For the pieces you'd rather
-keep as a dependency — someone's dotfiles, a credential helper — `para mod add`
-vendors one into `.paraspace/mods/` instead. See [Mods](./mods.md).
+For a piece you'd rather keep as a dependency than own outright — someone's
+dotfiles, a credential helper — `para mod add` vendors one into
+`.paraspace/mods/`. See [Mods](./mods.md).

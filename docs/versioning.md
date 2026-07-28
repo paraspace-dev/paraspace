@@ -59,7 +59,8 @@ into a scratch directory to diff against a current template. Otherwise:
 | image stamped uid/user/contract/incremental | only `user.para.base` — `para image status` reports when it was built and from what |
 | `para start` / `para stop` | `para caddy start\|stop\|status` |
 | `para config-set KEY VALUE` | `para config edit` — the file is hand-edited now |
-| `para run`, `claude`, `web`, `key` | project commands in `.paraspace/commands/` |
+| `para web`, `key` | project commands in `.paraspace/commands/`, shipped by `void-docker-gh` |
+| `para run`, `claude` | gone from the engine and from every template — write your own, or see [Running coding agents](./agents.md#driving-one) |
 | `para reconcile`, `install`, `image-build`, `config-import`, `config-sync` | deleted — `up` now re-pushes `.paraspace/` every time |
 
 New since then: `PARA_READY_HOST` (wait for guest DNS to resolve a host your

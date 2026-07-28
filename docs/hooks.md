@@ -71,7 +71,7 @@ change, the variable is what it promises.
 
 | In the guest | Reach it as | What it is |
 |---|---|---|
-| `~/.paraspace/hooks/` | `$PARA_HOOKS` | your hooks, plus anything they source — a vendored component's hook sees its own, per the table below |
+| `~/.paraspace/hooks/` | `$PARA_HOOKS` | your hooks, plus anything they source — a [mod](./mods.md)'s hook sees its own, per the table below |
 | `~/.paraspace/skel/` | `$PARA_SKEL` | your seed files (dotfiles etc.), for a hook to copy or link |
 | `~/.paraspace/mods/` | — | the [mods](./mods.md) you vendored, each with its own `hooks/` and `skel/` |
 | `~/.paraspace/host.env` | `$PARA_HOST_ENV` | your `.env` from the host, if that file exists. Workspaces only — never pushed to the image builder |

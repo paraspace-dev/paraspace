@@ -58,9 +58,10 @@ test_mod_add_replaces_rather_than_merging() {
 # ----------------------------------------------------------------------- --list
 
 test_mod_add_list_names_what_this_para_ships() {
-  # Outside a project on purpose: --list answers before require_project, because
-  # "what can I install" is a question you ask before you have somewhere to put it.
-  local out; out="$(env -u PARA_PROJECT_DIR "$PARA" mod add --list 2>&1)"
+  # From OUTSIDE a project, which is the claim: --list answers before
+  # require_project, because "what can I install" comes before having somewhere
+  # to put it. Without the cd it would pass from anywhere inside this repo.
+  local out; out="$(cd "$(scratch)" && env -u PARA_PROJECT_DIR "$PARA" mod add --list 2>&1)"
   assert_contains "$out" "dotfiles-jchook" "the bundled mod is listed"
 }
 
@@ -68,9 +69,19 @@ test_mod_add_list_skips_a_stray_file() {
   # `mods/*` globs whatever is there, and the runner has the same assert from
   # the other side: a README beside the mods is not a mod.
   local pkg out; pkg="$(a_para_pkg real-mod/ NOTES.md)"
-  out="$(env -u PARA_PROJECT_DIR "$pkg" mod add --list 2>&1)"
+  out="$(cd "$(scratch)" && env -u PARA_PROJECT_DIR "$pkg" mod add --list 2>&1)"
   assert_contains     "$out" "real-mod"  "the directory is a mod" || return 1
   assert_not_contains "$out" "NOTES.md"  "a stray file is not"
+}
+
+test_mod_add_list_says_nothing_when_this_para_ships_none() {
+  # What the `[ -d ]` in bundled_names is actually for. The stray-file test
+  # above passes without it — a trailing-slash glob never matches a plain file —
+  # but an EMPTY mods/ leaves the glob unmatched, and para would print a bare
+  # `*` as though it were a mod you could install.
+  local pkg out; pkg="$(a_para_pkg)"
+  out="$(cd "$(scratch)" && env -u PARA_PROJECT_DIR "$pkg" mod add --list 2>&1)"
+  assert_eq "" "$out" "an empty mods/ lists nothing, not a literal glob"
 }
 
 # ------------------------------------------------------------------- refusals

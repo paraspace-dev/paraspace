@@ -16,26 +16,32 @@ para up demo
 | `image-build` | the Neovim toolchain, the shell tools the zshrc reaches for, Claude Code, `/etc/gitconfig` aliases, `$BROWSER`, and zsh as the login shell |
 | `provision` | seeds `skel/` onto the shared volume and links it into `$HOME` |
 
-It opens no [hook point](../../docs/hook-points.md) of its own.
+It opens no [hook point](https://paraspace.dev/docs/hook-points) of its own.
 
-**Targets [`void-docker-gh`](../../templates/void-docker-gh).** Two couplings:
+**Targets [`void-docker-gh`](https://github.com/paraspace-dev/paraspace/tree/main/templates/void-docker-gh).** Two couplings:
 the build hook is `xbps`, so another distro means rewriting the package list;
 and it installs Claude Code as `$PARA_USER`, so the base's `image-build` has to
 have created that user already — which [the image
-contract](../../docs/image.md) requires of every base anyway.
+contract](https://paraspace.dev/docs/image) requires of every base anyway.
 
 ## What it claims
 
-On the **shared volume**, seeded once each and yours after that:
-`zshrc` (replacing the one the base seeded), `tmux/`, `nvim/`, `nvim-data/`,
-`claude/`, `claude.json`, `bin/open-url`. A `dotfiles-jchook/` directory holds
-one mark per seed — delete a mark to take that seed again on the next `para up`.
+On the **shared volume**, written only if nothing is there already, and yours
+from then on: `tmux/`, `nvim/`, `nvim-data/`, `claude/`, `claude.json`,
+`bin/open-url`. If you have used this volume before, everything you had survives
+untouched — including your Claude Code login and history under `claude/`.
 
-In **`$HOME`**, as symlinks onto the above: `~/.config/tmux`, `~/.config/nvim`,
-`~/.local/share/nvim`, `~/.claude`, `~/.claude.json`. Anything real already
-sitting at one of those paths is **replaced**, because `ln -sfn` onto a real
-directory would otherwise nest the link inside it. `~/.zshrc` is the base's link,
-pointing at the file this mod replaced.
+`zshrc` is the exception, because it's the one file the base template also
+writes. This mod replaces it **once**, marked in `dotfiles-jchook/zshrc` so no
+later `para up` touches it again, and moves what was there to
+`zshrc.before-dotfiles-jchook` rather than deleting it. Delete the mark to take
+the seed again.
+
+In **`$HOME`**, as symlinks onto the above: `~/.zshrc`, `~/.config/tmux`,
+`~/.config/nvim`, `~/.local/share/nvim`, `~/.claude`, `~/.claude.json`. Anything
+real already sitting at one of those paths is **deleted**, because `ln -sfn` onto
+a real directory would otherwise nest the link inside it — so a workspace that
+predates this mod loses its local `~/.claude` in favour of the shared one.
 
 In the **image**: `/etc/gitconfig`, `/etc/claude-code/managed-settings.json`
 (`acceptEdits`, highest precedence), `/etc/profile.d/dotfiles-jchook.sh`,
@@ -60,11 +66,10 @@ everywhere at once, and plugins install **once** on first `nvim` launch.
 It's vendored — the copy under your `.paraspace/mods/` is in your git history,
 so edit `skel/` freely and `para up` pushes the change with no image rebuild.
 Adding packages or another runtime means editing `hooks/image-build` and
-rebuilding. Re-running `para mod add dotfiles-jchook` **replaces** the directory,
-so commit before you update.
+rebuilding.
 
 `para claude` and `para run` aren't here: v1 mods ship no `commands/`. Both are
 one-liners you copy into your own `.paraspace/commands/` — see
-[Running coding agents](../../docs/agents.md#driving-one).
+[Running coding agents](https://paraspace.dev/docs/agents#driving-one).
 
-More about mods: [`docs/mods.md`](../../docs/mods.md).
+More about mods: [paraspace.dev/docs/mods](https://paraspace.dev/docs/mods).

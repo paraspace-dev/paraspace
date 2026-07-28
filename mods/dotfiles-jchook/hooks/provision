@@ -15,26 +15,36 @@ skel="$PARA_SKEL"
 shared="$PARA_SHARED"
 mine="$shared/dotfiles-jchook"        # this mod's marks, named after their owner
 
-mkdir -p "$mine" "$shared/nvim-data"
+mkdir -p "$mine" "$shared/nvim-data" "$shared/bin"
 
-# Install <src> at <dest> the first time only, replacing whatever the base seeded
-# there. Once the mark exists nothing writes <dest> again, so your edits survive
-# every `para up` — and removing a mark is how you ask for the seed back.
-claim() { # claim <mark> <src> <dest>
-  if [ -e "$mine/$1" ]; then return 0; fi
-  stage "Seeding $1 onto the shared volume (one-time)"
-  rm -rf "$3"
-  cp -R "$2" "$3"
-  touch "$mine/$1"
+# Seed <src> at <dest> unless something is already there. Nothing but this mod
+# writes any of these, so "already there" means you put it there — your first
+# `para up` seeds it and no later one touches it again.
+seed() { # seed <src> <dest>
+  if [ -e "$2" ]; then return 0; fi
+  stage "Seeding ${2##*/} onto the shared volume (one-time)"
+  cp -R "$1" "$2"
 }
 
-claim zshrc  "$skel/zshrc"  "$shared/zshrc"
-claim tmux   "$skel/tmux"   "$shared/tmux"
-claim nvim   "$skel/nvim"   "$shared/nvim"
-claim claude "$skel/claude" "$shared/claude"
-claim bin    "$skel/bin"    "$shared/bin"
-
+seed "$skel/tmux"        "$shared/tmux"
+seed "$skel/nvim"        "$shared/nvim"
+seed "$skel/claude"      "$shared/claude"
+seed "$skel/bin/open-url" "$shared/bin/open-url"
 if [ ! -f "$shared/claude.json" ]; then echo '{}' > "$shared/claude.json"; fi
+
+# The one file the base already wrote, so the one that needs replacing rather
+# than seeding — and only once, behind this mod's own mark, so your later edits
+# survive every `para up`. Whatever is there moves aside instead of being
+# deleted: on a volume you have already been using, that file is yours.
+if [ ! -e "$mine/zshrc" ]; then
+  stage "Replacing the base's zshrc (one-time)"
+  if [ -e "$shared/zshrc" ]; then
+    mv "$shared/zshrc" "$shared/zshrc.before-dotfiles-jchook"
+    info "kept the old one as zshrc.before-dotfiles-jchook"
+  fi
+  cp "$skel/zshrc" "$shared/zshrc"
+  touch "$mine/zshrc"
+fi
 
 # A checkout with core.fileMode=false (or a tarball, or a zip) loses the exec
 # bit, and something else launches both of these — $BROWSER, and the statusline
@@ -53,6 +63,9 @@ relink() { # relink <target> <link>
 }
 
 mkdir -p ~/.config ~/.local/share
+# ~/.zshrc too, even though the base links it at the same target: this mod's
+# image-build makes zsh the login shell, so the link is this mod's to guarantee.
+relink "$shared/zshrc"       ~/.zshrc
 relink "$shared/tmux"        ~/.config/tmux
 relink "$shared/nvim"        ~/.config/nvim
 relink "$shared/nvim-data"   ~/.local/share/nvim

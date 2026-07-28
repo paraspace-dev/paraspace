@@ -103,7 +103,8 @@ hooks. It knows nothing about your stack. The extension points are all files in
 | how the stack boots, and when it's ready | `.paraspace/hooks/boot` |
 | **new `para` verbs** | `.paraspace/commands/<verb>` |
 
-`para claude ws1` is not a feature of para — it's a configurable command your template ships.
+`para claude ws1` is not a feature of para — it's a command you drop in
+`.paraspace/commands/`, and no bundled template ships one.
 
 ```sh
 #!/usr/bin/env bash

@@ -1142,7 +1142,10 @@ doctor_project() {
 # ---- help ------------------------------------------------------------------
 is_engine_verb() {
   case "$1" in
-    up|down|rm|ls|sh|caddy|config|image|init|mod|doctor|commands|completions|help|exec|--version) return 0 ;;
+    up|down|rm|ls|sh|caddy|config|image|init|mod|doctor|commands|completions|exec) return 0 ;;
+    # Every spelling main dispatches, or doctor stays silent about a command
+    # named for one and the reader never learns why theirs does nothing.
+    help|-h|--help|--version) return 0 ;;
     *) return 1 ;;
   esac
 }

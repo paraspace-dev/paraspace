@@ -99,6 +99,23 @@ echo SHADOWED-THE-ENGINE'
   assert_contains "$PARA_OUT" "shadowed" "doctor warns about the shadowed command"
 }
 
+test_every_verb_main_dispatches_is_an_engine_verb() {
+  # is_engine_verb is what doctor warns from, so a spelling main dispatches but
+  # is_engine_verb omits leaves a command that silently never runs and is never
+  # reported. `-h` was exactly that: main matches `""|-h|--help|help`.
+  local p verb; p="$(a_project)"
+  for verb in -h --help --version; do
+    a_project_command "$p" "$verb" '#!/bin/sh
+echo SHADOWED-THE-ENGINE'
+  done
+  para_in "$p" -h
+  assert_not_contains "$PARA_OUT" "SHADOWED-THE-ENGINE" "the engine won for -h" || return 1
+  para_in "$p" doctor
+  for verb in -h --help --version; do
+    assert_contains "$PARA_OUT" "'$verb' is shadowed" "doctor names $verb" || return 1
+  done
+}
+
 # ------------------------------------------------------------- configuration
 
 test_the_environment_overrides_the_parafile() {

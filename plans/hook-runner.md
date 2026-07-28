@@ -61,65 +61,43 @@ fi
 
 That is the feature. What is deliberate in it:
 
-- **A child process, not a sourced subshell.** `bash "$hook"` — the form
-  `cmd_image_build` already uses in the builder. An earlier draft wrote
-  `( set --; export PARA_HOOKS=…; . "$hook" )`, which is an emulation of this:
-  the parens are there to un-share the shell that `.` shares. A process does it
-  natively, and the scaffolding goes with it — `set --`, the `export`, a
-  `source=/dev/null` directive, and a comment warning the next reader that
-  `( … ) || …` disarms the hook's own `set -euo pipefail`, because bash ignores
-  errexit inside a compound command on the left of a `||` ([POSIX][posix-e], so
-  3.2 does it too). The file ends up with no shellcheck disable in it at all.
-  Verified against `koalaman/shellcheck:v0.10.0` and `.shellcheckrc`.
-- **The env crosses regardless.** `para_env` emits `export` lines and
-  `GUEST_PRELUDE` sources them into the shell that execs the runner, so every
-  `PARA_*` is in the runner's *process environment* before it starts and a child
-  inherits all of it. Sourcing never carried the context; the `env` file did.
-  The `VAR=… bash …` prefix is what re-points the two per owner.
-- **`status=$?` on its own line.** The errexit hazard above is gone, but the
-  reporting one isn't: written `if ! bash "$hook"; then status=$?`, `$?` is the
-  status of the `!` — zero — so the runner announces `hook failed` and exits 0,
-  and `run_hook`'s `|| die` never fires. **This is the line someone will later
-  "simplify"**; the comment and [the test](#test-checklist) exist to stop them.
-- **The runner sets no shell options at all** — no `set` line. Options don't
-  cross into a child either way, so a hook gets exactly what its own file sets
-  and `bash hooks/provision` still reproduces what para ran. What `set -e` would
-  cost is the runner's own error path: it would exit at the failing hook without
-  naming it. Its two possibly-unset variables carry their own defaults
-  (`${1:?}`, `${PARA_HOOK_STACK:-}`), and it contains no pipe.
-- **`PARA_HOOK_STACK` is the trace.** Each level appends the point it is about
-  to run and exports it down, so the failing level can name the whole chain —
-  `provision > clone:before > keys:setup`. Without it, a hook three points deep
-  fails with a path and no answer to "how did para get here". Every level still
-  reports as the failure unwinds, and that is not redundancy: the `stack:` line
-  names the *points*, each level's own line names the *file and owner* that
-  filled one. Only the deepest carries a complete stack, and it comes first.
-- **The stack line is suppressed at the top level** (`[ -n "$stack" ]`), where
-  it would only repeat the hook name already in the message. A `provision` that
-  opens no point fails in exactly one line, the way it does today — the tracing
-  is invisible until something actually nests.
-- **The cycle guard is one `case`**, and it exists because the stack does. A
-  point that invokes itself recursed until the container's limits bit; now it
-  stops at depth two and prints the chain. Re-entrancy is what trips it, not
-  repetition: calling one point twice in a row from one hook is two children
-  with the same parent stack, which is fine and stays fine.
+- **A child process, not a sourced subshell.** An earlier draft wrote
+  `( set --; export PARA_HOOKS=…; . "$hook" )` — an emulation of this, since the
+  parens exist to un-share what `.` shares. The process does it natively, and
+  `set --`, the `export`, a `source=/dev/null` directive and a comment about
+  `( … ) || …` disarming the hook's own `set -e` ([POSIX][posix-e]) all go with
+  it. No shellcheck disable left in the file.
+- **The env crosses regardless.** `GUEST_PRELUDE` sources `env`'s `export` lines
+  into the shell that execs the runner, so a child inherits every `PARA_*`.
+  Sourcing never carried the context; `env` did.
+- **`status=$?` on its own line.** Written `if ! bash "$hook"; then status=$?`,
+  `$?` is the status of the `!` — zero — so the runner announces `hook failed`
+  and exits 0, and `run_hook`'s `|| die` never fires. **This is the line someone
+  will later "simplify"**; [the test](#test-checklist) is what stops them.
+- **The runner sets no shell options** — no `set` line. `set -e` would cost the
+  error path: it would exit at the failing hook without naming it. Both
+  possibly-unset variables carry defaults, and there is no pipe.
+- **`PARA_HOOK_STACK` is the trace.** Each level appends the point it is about to
+  run and exports it down, so the failing level names the whole chain. Every
+  level reports as the failure unwinds, which is not redundancy: `stack:` names
+  the *points*, each level's own line names the *file* that filled one.
+  Suppressed at the top level, so a `provision` that opens no point still fails
+  in one line.
+- **The cycle guard is one `case`**, and exists only because the stack does. It
+  trips on re-entrancy, not repetition — one point invoked twice in a row is two
+  children with the same parent stack.
 - **The root comes from its own path**, never from `$PARA_HOOKS` — which it
   re-points — so a nested point doesn't enumerate `mods/<m>/mods/*`.
 - **It exports `PARA_RUN_HOOK` itself**, because in the guest `~/.paraspace` *is*
   the project's `.paraspace` while the builder's copy lives somewhere else.
 - **A `for` over a glob, not a pipe**, so a hook that prompts still has the
   caller's stdin.
-- **`ran`** keeps `docs/hooks.md`'s "an absent hook is a visible no-op" true once
-  the host stops checking. **A note, not a `warn:`** — an unfilled point is the
-  normal state, so a template that opens `clone:before` would otherwise warn on
-  every `up` of every project that has no mod for it, forever. Where absence
-  really is a bug, the check belongs where it can `die`:
-  [image build](./mods.md#image-build) keeps its on the host.
-- **The runner owns the announcing**, in para's own `==>`. The host
-  used to `log "Running hook: $1"` before a call that might run zero scripts or
-  four; only the runner knows which. The two `printf`s are the one place para's
-  output style is spelled twice — cheaper than a `helpers` the engine owns, and
-  the alternative is announcing the same event from both sides.
+- **`ran` is a note, not a `warn:`.** An unfilled point is the normal state, so
+  warning would fire on every `up` of every project without a mod for it. Where
+  absence really is a bug, [image build](./mods.md#image-build) keeps its check
+  on the host, where it can `die`.
+- **The runner announces**, in para's `==>`; the host's `log` line goes. Only
+  the runner knows whether a name resolved to zero scripts or four.
 
 [posix-e]: https://pubs.opengroup.org/onlinepubs/9699919799/utilities/V3_chap02.html#set
 
@@ -145,13 +123,10 @@ the subject ends, `image-build:after` isn't. para's own three (`provision`,
 this is a convention the reference templates set, and
 [mods.md](./mods.md#why-the-vocabulary-is-the-product) is why that matters.
 
-**A point a mod opens is named after the mod.** `dotfiles-jchook:after`, never
+**A point a mod opens is named after the mod** — `dotfiles-jchook:after`, never
 `dotfiles:after`. The project owns the bare namespace because there is one
-project; there is no limit on mods, and two of them opening `dotfiles:after`
-collide with no error and no promise about who runs first. Prefixing costs a
-word and makes the collision impossible instead of undetected. Whether a mod
-should open one at all is [an authoring rule](./mods.md#what-a-mod-may-assume),
-not a mechanism.
+project; two mods opening `dotfiles:after` collide with no error. Whether a mod
+should open one at all is [an authoring rule](./mods.md#a-mod-may-open-a-point).
 
 On the host, `run_hook` loses its existence check *and* its `log` line — the
 runner announces each hook it actually finds, and only it knows how many that
@@ -163,9 +138,8 @@ run_hook() { # run_hook <hook> <name>
 }
 ```
 
-The name is quoted in the guest command. Every caller is a literal in `bin/para`
-today, but named points make hook names a vocabulary projects write, and one
-`$1` that reaches here unquoted is a word-split at best.
+The name is quoted because named points make hook names a vocabulary projects
+write, not just para's own literals.
 
 Enumerating on the host instead would work for `provision` and `boot`, and would
 leave every named point hand-rolling its own glob in a project hook. One
@@ -200,26 +174,19 @@ Two consequences `docs/hooks.md` has to state:
   passes none and there is no caller's `$@` to inherit.
 
 `$0` is the hook's own path, so `. "$(dirname "$0")/helpers"` resolves. It names
-the same directory `$PARA_HOOKS` does, for every hook and every owner, so
-`docs/hooks.md` still teaches one spelling — but nothing breaks for a hook
-written against the old one, which is why the
-[migration below](#para_contract-stays-1) is one edit rather than two.
+the same directory `$PARA_HOOKS` does, so `docs/hooks.md` still teaches one
+spelling — but nothing breaks for a hook written against the old one, which is
+why the [migration below](#para_contract-stays-1) is one edit rather than two.
 
 The model is one sentence:
 
 > **A hook reads its environment and writes to the filesystem. It never writes
 > to its caller.**
 
-It is true by construction rather than by convention, and it is one sentence for
-both ways in: the runner's loop and a nested `"$PARA_RUN_HOOK"` are both a fresh
-process, so "what can a hook see" has the same answer however it was reached.
-There is deliberately no channel for writing back — what a hook wants a *later*
-hook to see goes through a file, and
-[mods.md](./mods.md#how-a-hook-reaches-a-later-hook) is the list of which one.
-The case that wanted it — `$BROWSER`, so the base's `authorize_key` device flow
-finds a browser — is solved in the image, because the base's `provision` runs
-*before* any mod's and no hook point comes earlier: a mod's build hook writes
-`/etc/profile.d/`, which the bash login shell para runs hooks in sources.
+True by construction, and the same answer whichever way in: the runner's loop
+and a nested `"$PARA_RUN_HOOK"` are both a fresh process. What a hook wants a
+later hook to see goes through a file —
+[mods.md](./mods.md#how-a-hook-reaches-a-later-hook) lists which one.
 
 ## The environment a hook sees
 
@@ -231,26 +198,23 @@ written *identically* to a project's:
 cp "$PARA_SKEL/zshrc" ~/.zshrc           # the mod's own skel
 ```
 
-**Two new variables, both set by the runner** rather than by `para_env`, so
-neither appears in `~/.paraspace/env`: `PARA_RUN_HOOK` (the path a hook opens a
-point with) and `PARA_HOOK_STACK` (the chain that reached this hook, for reading
-— para rewrites it at every level). Both are additive, so the contract does not
-move. No `PARA_MOD`, no `PARA_MOD_DIR` — a hook already knows where it lives via
-`$PARA_HOOKS`. `.shellcheckrc`'s `source-path=SCRIPTDIR` resolves
-`$PARA_HOOKS/helpers` by basename, so a mod's `hooks/helpers` follows for free.
+**Two new variables, set by the runner** rather than by `para_env`, so neither
+appears in `~/.paraspace/env`: `PARA_RUN_HOOK` (the path a hook opens a point
+with) and `PARA_HOOK_STACK` (the chain that reached this hook — read-only in
+practice; para rewrites it at every level). Both additive, so the contract does
+not move. No `PARA_MOD` — a hook knows where it lives via `$PARA_HOOKS`, and
+`.shellcheckrc`'s `source-path=SCRIPTDIR` resolves a mod's own `helpers` for
+free.
 
 Three sharp edges to document:
 
-- **Only exported variables reach a nested point.** `"$PARA_RUN_HOOK"
-  clone:before` is a new process, so a plain `repo_url=…` set three lines above
-  it is unset inside the hooks it runs. Export what a point is meant to see —
-  or, better, don't: the point is filling in behavior, not receiving arguments.
+- **Only exported variables reach a nested point.** It is a new process, so a
+  plain `repo_url=…` above the call is unset inside it. A point fills in
+  behavior; it does not take arguments.
 - **A hook that opens a point needs `set -e` to honor the failure.** The nested
-  runner reports and exits non-zero, so the error and its stack are always on
-  screen — but a hook without `set -e` carries on past the failed
-  `"$PARA_RUN_HOOK" …` and can still exit 0, and then `para up` reports a ready
-  workspace over a visible error. Templates ship `set -euo pipefail`; this is
-  the rule for hooks written elsewhere, and the reason the trace is loud.
+  runner reports and exits non-zero, but a hook without `set -e` carries on past
+  it and can still exit 0 — `para up` then reports a ready workspace over a
+  visible error.
 - **Don't re-source `~/.paraspace/env`.** It holds the *project's* values and
   `GUEST_PRELUDE` re-sources it on every `ws_exec`, so a hook that re-sources it
   mid-run rewinds `PARA_HOOKS`/`PARA_SKEL` — wrong file, no error.
@@ -319,46 +283,35 @@ CLI tier, against a fixture directory. **The first one is required** — it is t
 whole reason the runner is shaped the way it is:
 
 - **A hook whose *middle* command fails stops there, and the runner exits
-  non-zero.** Both halves, and they guard different rewrites. The exit status is
-  what an `if ! bash "$hook"; then status=$?` breaks — it reports 0. The absent
-  tail line is what going back to `( . "$hook" )` breaks. Naming the middle is
-  what catches the second: a hook that fails on its *last* line reports
-  correctly under a sourced shape too, so a test written that way guards
-  nothing.
+  non-zero.** Both halves guard different rewrites: the status is what
+  `if ! bash "$hook"` breaks, the absent tail line is what going back to
+  `( . "$hook" )` breaks.
 - a hook sees no arguments (`$#` is 0), not the runner's `$1`.
-- `$0` is the hook, so a hook doing `. "$(dirname "$0")/helpers"` works.
+- `$0` is the hook, so `. "$(dirname "$0")/helpers"` works.
 - resolution: project before mods, a mod with no `H` skipped, no `mods/` →
   unchanged, `hooks/helpers` never run as a hook, each hook announced.
 - a failing hook aborts the rest, its path is in the error, and a
   `helpers`-style `die` (`exit 1`) is what fails it.
 - no owner fills the name → `no 'X' hook` on stderr, exit 0.
 - a hook with no exec bit runs; `PARA_HOOKS`/`PARA_SKEL` re-pointed per hook.
-- a nested point from inside a mod hook resolves every owner, and
-  `$PARA_RUN_HOOK` is set in the hook's environment for it to have been reached
-  at all — the variable the whole named-point feature rests on.
-- a non-directory under `mods/` (a stray file, a `README`) is skipped, not
-  treated as an owner.
-- **the trace**: a failure three points deep names every level, and the deepest
-  line carries the full `stack:`. Assert the *flat* case too — a `provision`
-  that opens no point still fails in one line with no `stack:` — or the tracing
-  quietly becomes noise on the path everyone actually takes.
-- **the cycle guard**: a point that invokes itself exits 1 naming the chain,
-  rather than recursing. And its inverse, which is the one that matters: the
-  same point invoked twice *in sequence* from one hook runs twice.
-- a hook that reads stdin gets the caller's, not the hook list — the one that
-  catches a future rewrite of the loop into a pipe.
-- `npm pack --dry-run` covers `libexec/` — **its own assert**, next to separate
-  ones for `templates/` and `mods/`. One combined test says "something is
-  missing"; three say which, and `templates/` carries this exposure today with
-  no test on it at all.
+- a nested point resolves every owner, and `$PARA_RUN_HOOK` is in the hook's
+  environment for it to have been reached at all.
+- a stray file under `mods/` is skipped, not treated as an owner.
+- **the trace**: a failure three points deep names every level, deepest first
+  with the full `stack:` — and the flat case still fails in one line with no
+  `stack:`, or tracing becomes noise on the path everyone takes.
+- **the cycle guard**: a self-invoking point exits 1 naming the chain; the same
+  point invoked twice *in sequence* still runs twice.
+- a hook that reads stdin gets the caller's, not the hook list — catches a
+  future rewrite of the loop into a pipe.
+- `npm pack --dry-run` covers `libexec/`, with its own assert next to
+  `templates/` and `mods/`.
 
 e2e (run it — CI won't): a fixture mod appending its name in `provision` and in
 a named point the fixture opens; both ran, `up` still idempotent; a prompting
 hook still gets the terminal. And **`image-build` through the runner in the
-builder** — the `/opt` paths and the `su - "$PARA_USER"` step-down meet there,
-which is the only place `guest_env`'s destination argument is load-bearing and
-the only place a wrong answer is silent (a build hook reads an absent
-`$PARA_SKEL` behind a `[ -f ]` guard, seeds nothing, and says nothing).
+builder** — the only place `guest_env`'s destination argument is load-bearing,
+and the only place a wrong answer is silent.
 
 ## `PARA_CONTRACT` stays 1
 
@@ -378,11 +331,8 @@ predates both changes, and a `.paraspace/` scaffolded from it needs **one** edit
 - **`image-build.sh` → `hooks/image-build`.** Nothing refuses the old name; the
   build just runs no hook, which is what the runner's `no 'X' hook` line is for.
 
-The edit that isn't needed: `$(dirname "$0")/helpers` keeps resolving, because
-`$0` is the hook. #18 moved every tracked hook, template comment and
-`.shellcheckrc` reference to `$PARA_HOOKS` and that stays the taught spelling —
-but a hook written against the old one does not break, which is one fewer thing
-a pre-release migration has to catch by hand.
+`$(dirname "$0")/helpers` needs no edit — `$0` is the hook. `$PARA_HOOKS` stays
+the taught spelling, but a hook written against the old one doesn't break.
 
 It goes in `docs/versioning.md` under a **pre-release** heading, not a new
 contract's migration table — and its existing "hooks run by path — the shebang
@@ -394,11 +344,9 @@ bumps it.
 ## Docs
 
 `docs/hooks.md` gains the resolution rule, "a hook is a process" and its two
-consequences, `PARA_RUN_HOOK`/`PARA_HOOK_STACK` and the four sharp edges — and
-drops its "Everything here runs **by path**, so each file's own shebang decides
-its interpreter" line in favor of them. It also wants **the trace read
-end-to-end once**, on a worked nested failure: that is the page someone lands on
-at the wrong moment, and a stack is only obvious to whoever designed it.
+consequences, `PARA_RUN_HOOK`/`PARA_HOOK_STACK`, the three sharp edges, and one
+worked nested failure read end-to-end — and drops its "Everything here runs
+**by path**, so each file's own shebang decides its interpreter" line.
 `docs/versioning.md` gains two rows besides the pre-release notes above: para now
 runs `.paraspace/mods/*/hooks/*`, and `.paraspace/run-hook` joins `env` and
 `host.env` as a name para owns.

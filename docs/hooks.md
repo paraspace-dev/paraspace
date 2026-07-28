@@ -44,11 +44,9 @@ once, in a throwaway container, and every workspace is a clone of the result.
 You're **root** here, and there is no workspace yet — no `$HOME`, and the user
 you're about to create doesn't exist. `$PARA_HOOKS` and `$PARA_SKEL` still point
 at your files, so seeding from `skel/` works as it does in `provision`. Your
-`.env` is the exception: `$PARA_HOST_ENV` names a file that exists only in a
-workspace, so read secrets at `provision`, not here.
-
-**Nothing can prompt you**, so a package manager that stops to ask will hang the
-build — pass `-y`.
+`.env` is the exception: `$PARA_HOST_ENV` names a file only a workspace has, so
+read secrets at `provision`. **Nothing can prompt you** either, so a package
+manager that stops to ask will hang the build — pass `-y`.
 
 See [The image contract](./image.md) to learn what your final image must contain.
 

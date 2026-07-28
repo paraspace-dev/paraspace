@@ -39,7 +39,7 @@ A mod is a directory shaped like a `.paraspace/`:
 .paraspace/mods/dotfiles-jchook/
   README.md
   hooks/{provision,image-build,helpers}
-  skel/{zshrc,nvim,tmux,claude}
+  skel/{zshrc,nvim,tmux,claude,bin}
 ```
 
 Which is why almost nothing had to be invented for it: `para up` already pushes
@@ -75,7 +75,9 @@ written exactly like a project's — `. "$PARA_HOOKS/helpers"`, `cp
 What it must not assume:
 
 - **The project's `helpers`.** That's one template's habit, not para's contract,
-  and `$PARA_HOOKS/helpers` resolves to the mod's own copy anyway. Ship one.
+  and `$PARA_HOOKS/helpers` resolves to the mod's own copy anyway. Ship one —
+  copy it from any bundled mod or template, where they're byte-identical on
+  purpose and a test keeps them that way.
 - **Its position, or that any other mod ran.** Read another mod's artifacts
   defensively, [through a file](./hooks.md#passing-something-to-a-later-hook).
 - **A terminal.** `provision` may prompt when there's a human on both ends;
@@ -85,35 +87,49 @@ What it must not assume:
 
 ### Own your files
 
-A mod **owns what it writes**, and where it has to replace a file the base
-already wrote, it does so **once, behind its own sentinel**:
+**A mod seeds; it never replaces.** Write a file only when nothing is there, and
+never touch it again — then edits survive every `para up` forever, and `rm` plus
+one more `up` is a reliable way to take a seed back:
 
 ```sh
-mine="$PARA_SHARED/dotfiles-jchook"          # named after the owner
-mkdir -p "$mine"
-if [ ! -e "$mine/zshrc" ]; then
-  cp "$PARA_SKEL/zshrc" "$PARA_SHARED/zshrc"
-  touch "$mine/zshrc"
-fi
+seed() { if [ -e "$2" ]; then return 0; fi; cp -R "$1" "$2"; }
+seed "$PARA_SKEL/nvim" "$PARA_SHARED/nvim"
 ```
 
-The base seeds, the mod replaces, and then neither touches it again — so your
-own edits survive both, on every `para up` forever. Name everything you write
-after the mod: `$PARA_SHARED/<mod>/`, `/etc/profile.d/<mod>.sh`. **Two mods
-claiming `~/.zshrc` is a conflict para will not detect**, and naming is all that
-keeps them apart.
+That rule holds only if you seed somewhere nothing else writes. **Claim a flat
+name on the shared volume only when it's yours**; where a template already owns
+one, seed under your own directory and point the symlink there instead:
+
+```sh
+seed "$PARA_SKEL/zshrc" "$PARA_SHARED/dotfiles-jchook/zshrc"
+ln -sfn "$PARA_SHARED/dotfiles-jchook/zshrc" ~/.zshrc
+```
+
+Now nothing has to arbitrate: `~/.zshrc` is a link, mods run after the project,
+and the last link written wins. The template's file stays the template's.
+
+Name everything you write after the mod — `$PARA_SHARED/<mod>/`,
+`/etc/profile.d/<mod>.sh`. **Two mods claiming `~/.zshrc` is a conflict para
+will not detect**, and naming is all that keeps them apart.
+
+> [!WARNING]
+> A shared volume outlives every workspace on it, so assume there is real work
+> in there — an editor config someone has tuned for months, a tool's login and
+> history. `rm -rf` on a path you did not create is how a mod eats it.
 
 ## What it costs
 
 **Mods are not reversible.** Removing one doesn't undo what it wrote — the files
 on the shared volume, the symlinks in existing workspaces, the packages in the
-image. Nor does adding one reach backwards: on a shared volume that's already
-seeded, a mod writes its *new* paths and skips whatever the base already wrote,
-so you get the mod's editor with the base's shell, half-applied and silent. Undo
-it by hand, then converge:
+image. Nor does adding one reach backwards: on a volume you have already been
+using, a mod seeds only what isn't there yet, so a path you already had keeps
+whatever was in it and you get a half-applied setup with nothing said about it.
+
+To take a seed the mod skipped, move your version out of the way and converge —
+seeding guards on the destination, so the next `up` fills the gap:
 
 ```sh
-para sh feat-x -c 'rm /para/shared/zshrc'
+para sh feat-x -c 'mv /para/shared/nvim /para/shared/nvim.mine'
 para up feat-x
 ```
 

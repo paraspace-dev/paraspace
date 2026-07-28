@@ -14,21 +14,15 @@ set -euo pipefail
 
 # Where the base actually put the home, not where useradd -m would have: the
 # image contract promises the user exists, never which directory it got.
-home="$(getent passwd "${PARA_USER:?}" | cut -d: -f6)" \
-  || die "no '$PARA_USER' user — this mod runs after a base image-build that creates one. See docs/image.md."
+home="$(getent passwd "${PARA_USER:?}" | cut -d: -f6)" || home=""
+[ -n "$home" ] \
+  || die "no home for '$PARA_USER' — this mod runs after a base image-build that creates the user. See docs/image.md."
 
 stage "Toolchain the dotfiles assume"
-# Everything the base already installs (bash, git, zsh, tmux, the terminfos) is
-# left to it. Notes on the ones that aren't obvious:
-#   tree-sitter-cli : what nvim-treesitter shells out to (the bare `tree-sitter`
-#                     package is only the library).
-#   base-devel      : the C toolchain treesitter parsers and LuaSnip compile with.
-#   ripgrep/fd/bat/fzf : fzf-lua's shell-outs. Void ships fd and bat under their
-#                     upstream names, so no shim symlinks are needed.
-#   lsd/tree        : back the ls/tree aliases in skel/zshrc.
-#   zsh/tmux        : the base installs both, but they are "full ergonomics" in
-#                     docs/image.md rather than contract — and the zshrc is the
-#                     point of this mod, so it owns its own interpreter.
+# Everything skel/ reaches for, plus what builds it: tree-sitter-cli is what
+# nvim-treesitter shells out to, base-devel compiles its parsers, and zsh/tmux
+# are here rather than left to the base because docs/image.md makes them
+# ergonomics rather than contract.
 pkgs="zsh tmux just neovim nodejs tree-sitter-cli base-devel ripgrep fd bat fzf lsd tree xz"
 missing=()
 for p in $pkgs; do xbps-query "$p" >/dev/null 2>&1 || missing+=("$p"); done
@@ -57,10 +51,8 @@ printf '%s\n' '{ "permissions": { "defaultMode": "acceptEdits" }, "includeCoAuth
   > /etc/claude-code/managed-settings.json
 
 stage "git aliases"
-# git merges system -> global -> local, so the aliases everyone shares are static
-# and live here for the life of the image, while the per-user identity stays in
-# the shared volume's gitconfig that only the base's provision writes. Two owners,
-# two lifetimes, no [include], and nothing that can clobber [user].
+# System scope, so the shared volume's gitconfig keeps the per-user identity and
+# neither can clobber the other — git merges system -> global -> local.
 cat > /etc/gitconfig <<'EOF'
 [alias]
 	unstage = reset HEAD --

@@ -13,37 +13,31 @@ set -euo pipefail
 
 skel="$PARA_SKEL"
 shared="$PARA_SHARED"
-mine="$shared/dotfiles-jchook"        # this mod's marks, named after their owner
+mine="$shared/dotfiles-jchook"        # this mod's own corner, named after it
 
 mkdir -p "$mine" "$shared/nvim-data" "$shared/bin"
 
-# Seed <src> at <dest> unless something is already there. Nothing but this mod
-# writes any of these, so "already there" means you put it there — your first
-# `para up` seeds it and no later one touches it again.
+# Seed <src> at <dest> unless something is already there. Nothing else writes any
+# of these, so "already there" means you put it there — the first `para up` seeds
+# it and no later one touches it again.
 seed() { # seed <src> <dest>
   if [ -e "$2" ]; then return 0; fi
   stage "Seeding ${2##*/} onto the shared volume (one-time)"
   cp -R "$1" "$2"
 }
 
-seed "$skel/tmux"        "$shared/tmux"
-seed "$skel/nvim"        "$shared/nvim"
-seed "$skel/claude"      "$shared/claude"
+seed "$skel/tmux"         "$shared/tmux"
+seed "$skel/nvim"         "$shared/nvim"
+seed "$skel/claude"       "$shared/claude"
 seed "$skel/bin/open-url" "$shared/bin/open-url"
 if [ ! -f "$shared/claude.json" ]; then echo '{}' > "$shared/claude.json"; fi
 
-# The one file the base already wrote, so the one that needs replacing rather
-# than seeding — and only once, behind this mod's own mark, so your later edits
-# survive every `para up`. Whatever is there moves aside instead of being
-# deleted: on a volume you have already been using, that file is yours.
-if [ ! -e "$mine/zshrc" ]; then
-  stage "Replacing the base's zshrc (one-time)"
-  if [ -e "$shared/zshrc" ]; then
-    mv "$shared/zshrc" "$shared/zshrc.before-dotfiles-jchook"
-    info "kept the old one as zshrc.before-dotfiles-jchook"
-  fi
-  cp "$skel/zshrc" "$shared/zshrc"
-  touch "$mine/zshrc"
+# zshrc goes in this mod's own corner rather than at $shared/zshrc, because the
+# base template writes that name too. Nothing then has to arbitrate: ~/.zshrc is
+# a link, and the link below is what decides. The base's file stays its own.
+seed "$skel/zshrc" "$mine/zshrc"
+if [ -e "$shared/zshrc" ]; then
+  info "$shared/zshrc is the base's and is no longer linked — this mod uses dotfiles-jchook/zshrc"
 fi
 
 # A checkout with core.fileMode=false (or a tarball, or a zip) loses the exec
@@ -63,9 +57,9 @@ relink() { # relink <target> <link>
 }
 
 mkdir -p ~/.config ~/.local/share
-# ~/.zshrc too, even though the base links it at the same target: this mod's
-# image-build makes zsh the login shell, so the link is this mod's to guarantee.
-relink "$shared/zshrc"       ~/.zshrc
+# ~/.zshrc last-writer-wins over the base's link, which is the whole arbitration:
+# the runner runs mods after the project, so this one is the one that sticks.
+relink "$mine/zshrc"         ~/.zshrc
 relink "$shared/tmux"        ~/.config/tmux
 relink "$shared/nvim"        ~/.config/nvim
 relink "$shared/nvim-data"   ~/.local/share/nvim

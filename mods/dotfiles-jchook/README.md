@@ -26,16 +26,16 @@ contract](https://paraspace.dev/docs/image) requires of every base anyway.
 
 ## What it claims
 
-On the **shared volume**, written only if nothing is there already, and yours
-from then on: `tmux/`, `nvim/`, `nvim-data/`, `claude/`, `claude.json`,
-`bin/open-url`. If you have used this volume before, everything you had survives
-untouched — including your Claude Code login and history under `claude/`.
+On the **shared volume**, written only if nothing is there already and yours from
+then on: `tmux/`, `nvim/`, `nvim-data/`, `claude/`, `claude.json`,
+`bin/open-url`, and `dotfiles-jchook/zshrc`. Nothing here is ever replaced — if
+you have used this volume before, everything you had survives untouched,
+including your Claude Code login and history under `claude/`. To take a seed
+again, delete it and run `para up`.
 
-`zshrc` is the exception, because it's the one file the base template also
-writes. This mod replaces it **once**, marked in `dotfiles-jchook/zshrc` so no
-later `para up` touches it again, and moves what was there to
-`zshrc.before-dotfiles-jchook` rather than deleting it. Delete the mark to take
-the seed again.
+The zshrc lives under `dotfiles-jchook/` rather than at `zshrc` because the base
+template owns that name. Yours stays exactly where it is; this mod just points
+`~/.zshrc` at its own copy instead.
 
 In **`$HOME`**, as symlinks onto the above: `~/.zshrc`, `~/.config/tmux`,
 `~/.config/nvim`, `~/.local/share/nvim`, `~/.claude`, `~/.claude.json`. Anything

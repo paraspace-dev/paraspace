@@ -416,7 +416,7 @@ caddy_sync() {
 #              `para sh x -c … | tee`, `> file` and `$(…)`. Explicit in both
 #              directions, because incus's auto mode ignores PARA_NONINTERACTIVE.
 #   -s bash    deterministic semantics for -c, whatever login shell the image
-#              gives $PARA_USER. Hooks run by path, so their shebang decides.
+#              gives $PARA_USER. Hooks get bash from run-hook instead.
 ws_exec() { # ws_exec <name> [<command>]
   local ct="$CT_PREFIX$1"
   if [ "$#" -lt 2 ]; then

@@ -27,9 +27,10 @@ git config --global url."git@github.com:".insteadOf https://github.com/
 EOF
 ```
 
-More than one file can answer to a name — yours runs first, then any that came
-with a vendored component. **They run in no particular order**, so write each so
-it doesn't care what else filled the same point.
+More than one file can answer to a name: `hooks/<name>` runs first, then that
+same name under each `mods/<component>/hooks/`. **The components run in no
+particular order**, so write each one so it doesn't care what else filled the
+point. This is how every hook name resolves, `provision` and `boot` included.
 
 ## Naming
 

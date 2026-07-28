@@ -323,10 +323,13 @@ test_image_build_accepts_a_hook_from_a_mod() {
   mkdir -p "$p/.paraspace/mods/tools/hooks"
   printf 'true\n' > "$p/.paraspace/mods/tools/hooks/image-build"
   para_in "$p" image build
-  case "$PARA_OUT" in
-    *"no 'image-build' hook"*) echo "  a mod's image-build hook was not counted" >&2; return 1 ;;
-  esac
-  return 0
+  assert_not_contains "$PARA_OUT" "no 'image-build' hook" "a mod's hook was counted" || return 1
+  # Reaching the daemon is the positive half: have_hook runs before
+  # require_incus, so a fence that was never called means it refused after all.
+  if [ ! -s "$PARA_FENCE/calls" ]; then
+    echo "  para stopped before reaching the daemon" >&2
+    return 1
+  fi
 }
 
 test_image_rejects_an_unknown_subcommand() {

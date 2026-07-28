@@ -39,11 +39,11 @@ run_the_hook() {
 # --------------------------------------------------------------- the contract
 
 test_run_hook_stops_at_a_failing_middle_command() {
-  # THE test. Both halves guard a different rewrite of the loop body:
-  #   - the missing tail line catches `( . "$hook" )`, where bash ignores the
-  #     hook's own `set -e` inside a compound command left of `||`;
-  #   - the non-zero status catches `if ! bash "$hook"; then status=$?`, which
-  #     reports the status of `!` — zero — so `run_hook`'s `|| die` never fires.
+  # THE test, and what it guards is the status: `if ! bash "$hook"; then
+  # status=$?` reports the status of the `!` — zero — so the runner prints
+  # `hook failed` and exits 0, and `run_hook`'s `|| die` never fires.
+  # The missing tail line is a weaker guard than it looks: a sourced hook that
+  # sets its own `-e` still stops, because the `set` builtin re-arms errexit.
   # The MIDDLE matters: a hook that fails on its last line reports correctly
   # under both broken shapes, so a test written that way guards nothing.
   local root; root="$(a_paraspace)"
@@ -67,6 +67,43 @@ test_run_hook_propagates_the_hooks_exit_status() {
   assert_eq 3 "$HOOK_RC" "the hook's own exit status reached the caller"
 }
 
+test_run_hook_fails_on_a_helpers_style_die() {
+  # How a hook actually fails: helpers' die(), from a function, after a source.
+  # The bare `exit 3` above is the top-level case only — this is the one every
+  # bundled template's hooks reach for.
+  local root; root="$(a_paraspace)"
+  printf '%s\n' 'die() { echo "error: $*" >&2; exit 1; }' > "$root/hooks/helpers"
+  a_hook "$root" provision "$(printf '%s\n' '#!/usr/bin/env bash' 'set -euo pipefail' \
+    '. "$PARA_HOOKS/helpers"' 'die "no origin configured"' 'echo TAIL_RAN')"
+  run_the_hook "$root" provision
+  assert_eq 1 "$HOOK_RC" "a helpers-style die failed the run" || return 1
+  assert_contains "$HOOK_OUT" "no origin configured" "the hook's own message survived" || return 1
+  assert_not_contains "$HOOK_OUT" "TAIL_RAN" "die ended the hook there"
+}
+
+test_run_hook_aborts_the_remaining_owners_on_failure() {
+  # A failure stops the whole run where it happened. Without this, a mod's hook
+  # runs on top of a project provision that already failed.
+  local root; root="$(a_paraspace alpha)"
+  a_hook "$root"            provision "$(printf '%s\n' '#!/usr/bin/env bash' 'exit 4')"
+  a_hook "$root/mods/alpha" provision "$(printf '%s\n' 'echo alpha >> "$PWD/order"')"
+  ( cd "$(dirname "$root")" && run_the_hook "$root" provision
+    assert_eq 4 "$HOOK_RC" "the failing owner's status reached the caller" || exit 1
+    assert_contains "$HOOK_OUT" "hooks/provision" "the error names the failing hook" || exit 1
+    if [ -f order ]; then echo "  a later owner ran after a failure" >&2; exit 1; fi )
+}
+
+test_run_hook_announces_each_hook_it_runs() {
+  # The only record of who did what in a run. Owner-relative, so the project's
+  # hook and a mod's hook of the same name don't read identically.
+  local root; root="$(a_paraspace alpha)"
+  a_hook "$root"            provision "$(printf '%s\n' 'true')"
+  a_hook "$root/mods/alpha" provision "$(printf '%s\n' 'true')"
+  run_the_hook "$root" provision
+  assert_contains "$HOOK_OUT" "hook: hooks/provision" "the project's hook was announced" || return 1
+  assert_contains "$HOOK_OUT" "hook: mods/alpha/hooks/provision" "the mod's hook was announced"
+}
+
 test_run_hook_runs_every_owner_project_first() {
   local root; root="$(a_paraspace alpha beta)"
   a_hook "$root"           provision "$(printf '%s\n' 'echo project >> "$PWD/order"')"
@@ -81,9 +118,9 @@ test_run_hook_runs_every_owner_project_first() {
 }
 
 test_run_hook_reports_an_absent_hook_without_failing() {
-  # An absent hook is a visible no-op — and `warn:`, not a note, because nothing
-  # else stands between a project that never renamed image-build.sh and a
-  # published image with no provisioning in it.
+  # An unfilled hook is the normal state, so it reports as a note rather than a
+  # warning — refusing where absence is a bug is the host's job, which is what
+  # cmd_image_build's own check is for.
   local root; root="$(a_paraspace)"
   run_the_hook "$root" provision
   assert_eq 0 "$HOOK_RC" "an absent hook is not a failure" || return 1

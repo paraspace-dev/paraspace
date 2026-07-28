@@ -25,8 +25,12 @@ _SCRATCH_LIST="$(mktemp "${TMPDIR:-/tmp}/para-scratch.XXXXXX")"
 # SUBSHELL — so an array appended to here would be discarded, and the cleanup
 # below would silently never remove anything (it didn't, for a long time; the
 # machine had a thousand leaked dirs). A file survives the subshell.
+# The trailing slash matters: macOS sets TMPDIR with one, and a path that
+# reaches a test as `…/T//x` never compares equal to the same path a `cd`+`pwd`
+# has normalized — which is how run-hook reports its own root.
 scratch() { # scratch — a throwaway dir, auto-removed at end of test
-  local d; d="$(mktemp -d "${TMPDIR:-/tmp}/para-t.XXXXXX")"
+  local tmp="${TMPDIR:-/tmp}" d
+  d="$(mktemp -d "${tmp%/}/para-t.XXXXXX")"
   printf '%s\n' "$d" >> "$_SCRATCH_LIST"
   printf '%s\n' "$d"
 }

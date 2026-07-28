@@ -306,6 +306,16 @@ test_image_build_refuses_without_a_base_image() {
   assert_backend_untouched
 }
 
+test_image_build_refuses_without_an_image_build_hook() {
+  # The whole migration story for image-build.sh -> hooks/image-build: the old
+  # name is not recognized, so a project still shipping it has to hear which
+  # path para wanted rather than build an image with no provisioning in it.
+  local p; p="$(a_project)"
+  printf 'true\n' > "$p/.paraspace/image-build.sh"
+  assert_refuses "$p" "missing image-build hook" image build || return 1
+  assert_backend_untouched
+}
+
 test_image_rejects_an_unknown_subcommand() {
   local p; p="$(a_project)"
   para_in "$p" image not-a-subcommand

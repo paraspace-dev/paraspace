@@ -36,10 +36,10 @@ The command is base-agnostic plumbing:
 
 1. launches a builder from **`$PARA_IMAGE_BASE`** with `security.nesting=true`;
 2. runs **`$PARA_IMAGE_BOOTSTRAP`** in it via `sh -c`, if set;
-3. pushes your whole **`.paraspace/`** to `/opt/.paraspace` in the builder, the
-   same way `para up` pushes it to `~/.paraspace` in a workspace — so
-   `$PARA_HOOKS`, `$PARA_SKEL` and every other `PARA_*` name real paths in
-   there;
+3. pushes your whole **`.paraspace/`** to `/opt/.paraspace` in the builder, near
+   enough to the way `para up` pushes it to `~/.paraspace` that `$PARA_HOOKS`
+   and `$PARA_SKEL` name real paths in there — your `.env` is the exception, so
+   `$PARA_HOST_ENV` names a file the builder does not have;
 4. runs **`.paraspace/hooks/image-build`** as root, with no tty and no stdin;
 5. removes `/opt/.paraspace` and publishes the result as **`$PARA_IMAGE`**. A
    failed or interrupted build leaves the existing image untouched.
@@ -57,7 +57,7 @@ Two caveats:
   Apple Silicon).
 - `-i` / `--from-current` layers onto the existing `$PARA_IMAGE` instead of a
   pristine base, and skips the bootstrap. A fast iterative rebuild while you're
-  tuning the payload; it assumes your payload is idempotent, and you should do
+  tuning the hook; it assumes your hook is idempotent, and you should do
   one clean build before relying on the result.
 
 The templates'

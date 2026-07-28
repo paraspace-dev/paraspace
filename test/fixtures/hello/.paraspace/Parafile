@@ -23,8 +23,8 @@
 # image build carries no distro or Docker assumptions of its own.
 : "${PARA_IMAGE:=alpine-minimal}"
 
-# What image build builds FROM. Alpine ships no bash and para runs the payload
-# with `bash -s`, so the bootstrap has exactly one job: put bash there.
+# What image build builds FROM. Alpine ships no bash and para runs the hook
+# with `bash`, so the bootstrap has exactly one job: put bash there.
 : "${PARA_IMAGE_BASE:=images:alpine/edge}"
 : "${PARA_IMAGE_BOOTSTRAP:=apk add --no-cache bash}"
 

@@ -49,7 +49,7 @@ into a scratch directory to diff against a current template. Otherwise:
 | `$PROJECT_ROOT` while the `Parafile` is sourced | `$PARA_PROJECT_DIR` — same value, and it reaches hooks too |
 | `$PARA_ROUTES` comma-separated | space-separated: `for r in $PARA_ROUTES` |
 | `parse_routes` / `route_ports` helpers | delete them; `${r##*:}` is the port |
-| hooks run as `bash <path>` | run by path — the shebang decides, so keep it executable |
+| hooks run as `bash <path>` | `provision` and `boot` run by path — the shebang decides, so keep it executable; `image-build` runs as `bash <path>` |
 | `.env` seeded to `~/.para/host.env` | `~/.paraspace/host.env`, pushed only if the file exists |
 | `PARA_HOST_ENV` unset/empty/set three-way | defaults to the project's `.env`; used if present |
 | unset `PARA_ROUTES` was refused | unset means empty means no HTTP; `para doctor` mentions it |
@@ -75,12 +75,12 @@ migration nobody has made would be a version number describing nothing. Each one
 is listed here, and each is a hand edit to a `.paraspace/` scaffolded before it.
 
 - **`.paraspace/image-build.sh` → `.paraspace/hooks/image-build`.** One rule for
-  every hook: `para` runs it by name out of `hooks/`. `git mv` it. Nothing
-  refuses the old name — `para image build` says `missing image-build hook` and
-  names the path it wanted.
+  every hook: `para` runs it by name out of `hooks/`. `git mv` it. The old name
+  is not recognized, and nothing reads it — `para image build` says
+  `missing image-build hook` and names the path it wanted.
 - The builder now gets your **whole `.paraspace/`** at `/opt/.paraspace`, so a
   build hook reads `$PARA_HOOKS` and `$PARA_SKEL` like any other hook, and gets
-  no stdin. A payload that piped its own input, or that ran a package manager
+  no stdin. A build hook that piped its own input, or that ran a package manager
   without `-y`, has to stop.
 
 At 1.0 this section closes and anything that breaks a `.paraspace/` bumps the

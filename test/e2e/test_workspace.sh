@@ -62,6 +62,17 @@ test_guest_paths_are_injected() {
   assert_eq "unset" "$host" "PARA_PROJECT_DIR is not leaked into the guest"
 }
 
+# shellcheck disable=SC2016  # the guest expands this, not us
+test_image_carries_no_project_tree() {
+  # image build pushes .paraspace/ to /opt to build from, then removes it before
+  # publishing. Without that one line every workspace cloned from the image finds
+  # the project's whole tree in there — including the generated env, so every
+  # PARA_* and whatever the user's config carries.
+  local found
+  found="$("$PARA" sh "$PARA_WS" -c 'if [ -e /opt/.paraspace ]; then echo leaked; fi' 2>/dev/null)"
+  assert_eq "" "$found" "the published image has no /opt/.paraspace"
+}
+
 test_workspace_is_listed_and_running() {
   local names; names="$("$PARA" ls --names 2>/dev/null)"
   assert_contains "$names" "$PARA_WS" "ls --names includes the workspace" || return 1

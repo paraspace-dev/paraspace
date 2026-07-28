@@ -28,7 +28,7 @@ typically three vars are required:
 | `PARA_PROJECT` | the directory name, slugified (`My.App` → `my-app`) | project identity: workspace ownership, `para ls` scoping, the shared-volume name |
 | `PARA_IMAGE` | `$PARA_PROJECT` | the image `para up` launches and `para image build` publishes |
 | `PARA_IMAGE_BASE` | — | the Incus image `para image build` builds *from* |
-| `PARA_IMAGE_BOOTSTRAP` | — | one `sh -c` line run in the builder before your payload |
+| `PARA_IMAGE_BOOTSTRAP` | — | one `sh -c` line run in the builder before your `image-build` hook |
 | `PARA_ROUTES` | empty | `[sub:]port` entries, one Caddy site each |
 | `PARA_DOMAIN` | `paraspace.dev` | wildcard domain workspaces are served under |
 | `PARA_VOLUME` | `para-home-$PARA_PROJECT` | the shared home volume's name |
@@ -83,7 +83,7 @@ default, so your distro can't change under you when para updates.
 
 The bootstrap is one `sh -c` line run in the builder before your
 `.paraspace/hooks/image-build`. Its job is to leave **bash** in the image (para
-runs the payload with `bash -s`) and refresh the package index if the base
+runs it with `bash`) and refresh the package index if the base
 needs it — `xbps-install -Syu xbps bash` on Void, `apk add --no-cache bash` on
 Alpine, `apt-get update` on Debian. Leave it unset if your base needs nothing.
 

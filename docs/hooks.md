@@ -42,11 +42,14 @@ point in there, not at a `$HOME` no one has created yet.
 
 It gets **no tty and no stdin**: prompting is an `up`-only promise, so a package
 manager that stops to ask hangs the build. Pass `-y`. para runs it with `bash`,
-so unlike the other two its shebang is not consulted.
+so unlike the other two its shebang is not consulted. Your `.env` is the one
+thing that does *not* follow it in — `$PARA_HOST_ENV` names a file that exists
+only in a workspace, so read secrets at `provision`, not here.
 
 What the image has to end up containing is [its own page](./image.md).
 
-An absent hook is a visible no-op, so write only the ones you need.
+An absent `provision` or `boot` is a visible no-op, so write only the ones you
+need. `image-build` is the exception: `para image build` refuses without it.
 
 `provision`, `boot` and `image-build` are the only three para invokes — but they
 are not the only things that can live in `.paraspace/hooks/`. para syncs the
@@ -74,7 +77,7 @@ para's to change, and the variable is the part it promises:
 |---|---|---|
 | `~/.paraspace/hooks/` | `$PARA_HOOKS` | your hooks, plus anything they source |
 | `~/.paraspace/skel/` | `$PARA_SKEL` | your seed files (dotfiles etc.), for a hook to copy or link |
-| `~/.paraspace/host.env` | `$PARA_HOST_ENV` | your `.env` from the host, if that file exists |
+| `~/.paraspace/host.env` | `$PARA_HOST_ENV` | your `.env` from the host, if that file exists. Workspaces only — never pushed to the image builder |
 | `~/.paraspace/env` | — | para's context as export lines. Every `PARA_*` except the handful that name paths on the *host* (`PARA_BIN`, `PARA_PROJECT_DIR`, `PARA_CONFIG`, `PARA_CONFIG_DIR`, `PARA_STATE_DIR`), which are unset here rather than pointing at files that don't exist |
 | `~/.paraspace/commands/` | — | synced along, but these run on the *host* — see [Commands](./commands.md#project-commands) |
 

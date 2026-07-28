@@ -481,15 +481,29 @@ run_hook() { # run_hook <hook> <name>
   ws_exec "$2" "exec ~/.paraspace/run-hook '$1'" || die "the '$1' hook failed (above)."
 }
 
+# Every owner of a .paraspace tree, most specific first: the project, then each
+# mod it vendored. Hooks, skel and commands all resolve down this list, and
+# libexec/run-hook walks the same one on the guest side.
+#
+# The glob is `mods/*`, never `mods/*/hooks/x` — bash sorts a multi-component
+# glob with strcoll, which ignores `/` under en_US and orders mods/m2 before
+# mods/m. One component keeps the order the same in every locale.
+owners() {
+  printf '%s\n' "$PARA_PROJECT_DIR/.paraspace"
+  local d
+  for d in "$PARA_PROJECT_DIR"/.paraspace/mods/*; do
+    if [ -d "$d" ]; then printf '%s\n' "$d"; fi
+  done
+}
+
 # Does any owner fill <hook>? Resolution is the runner's job, but refusing is
 # the host's: the runner's note prints inside a container, minutes in, and the
 # caller has already committed by then.
 have_hook() { # have_hook <hook>
-  local f
-  for f in "$PARA_PROJECT_DIR/.paraspace/hooks/$1" \
-           "$PARA_PROJECT_DIR"/.paraspace/mods/*/hooks/"$1"; do
-    if [ -f "$f" ]; then return 0; fi
-  done
+  local d
+  while IFS= read -r d; do
+    if [ -f "$d/hooks/$1" ]; then return 0; fi
+  done < <(owners)
   return 1
 }
 
@@ -971,46 +985,39 @@ cmd_mod() {
 # every PARA_* exported and its arguments passed through. Engine verbs always
 # win, and a project's own commands/ wins over any mod's. docs/commands.md.
 project_commands() {
-  local file
-  for file in "$PARA_PROJECT_DIR"/.paraspace/commands/* \
-              "$PARA_PROJECT_DIR"/.paraspace/mods/*/commands/*; do
-    if [ -f "$file" ]; then printf '%s\n' "${file##*/}"; fi
-  done | sort -u
+  local d f
+  while IFS= read -r d; do
+    for f in "$d"/commands/*; do
+      if [ -f "$f" ]; then printf '%s\n' "${f##*/}"; fi
+    done
+  done < <(owners) | sort -u
 }
 
-# Every mod that defines <verb>, one path per line. The project's own command is
-# never in here: it wins outright, so only mods can collide with each other.
-#
-# All three of these glob `mods/*` and test the file underneath, rather than
-# globbing `mods/*/commands/<verb>` in one go — bash sorts a multi-component
-# glob by strcoll, which ignores `/` in en_US and puts mods/m2 before mods/m.
-# libexec/run-hook walks the guest side the same way for the same reason.
-mod_commands() { # mod_commands <verb>
+# Every command file answering to <verb>, in owner order.
+command_files() { # command_files <verb>
   local d
-  for d in "$PARA_PROJECT_DIR"/.paraspace/mods/*; do
+  while IFS= read -r d; do
     if [ -f "$d/commands/$1" ]; then printf '%s\n' "$d/commands/$1"; fi
-  done
+  done < <(owners)
 }
 
 # The file `para <verb>` runs, or nothing: yours first, then each mod's.
 command_path() { # command_path <verb>
-  local mine="$PARA_PROJECT_DIR/.paraspace/commands/$1" d
-  if [ -f "$mine" ]; then printf '%s\n' "$mine"; return 0; fi
-  for d in "$PARA_PROJECT_DIR"/.paraspace/mods/*; do
+  local d
+  while IFS= read -r d; do
     if [ -f "$d/commands/$1" ]; then printf '%s\n' "$d/commands/$1"; return 0; fi
-  done
+  done < <(owners)
   return 1
 }
 
 # Does more than one mod define <verb>? Nothing promises an order between them,
 # so dispatch refuses rather than pick — see run_project_command. Your own
-# commands/ settles it, which is why finding one here means "no conflict".
+# commands/ settles it, which is why finding one here means "no conflict", and
+# why everything command_files then returns belongs to a mod.
 command_conflict() { # command_conflict <verb>
   if [ -f "$PARA_PROJECT_DIR/.paraspace/commands/$1" ]; then return 1; fi
-  local d n=0
-  for d in "$PARA_PROJECT_DIR"/.paraspace/mods/*; do
-    if [ -f "$d/commands/$1" ]; then n=$((n + 1)); fi
-  done
+  local f n=0
+  while IFS= read -r f; do n=$((n + 1)); done < <(command_files "$1")
   [ "$n" -gt 1 ]
 }
 
@@ -1035,7 +1042,7 @@ run_project_command() {
   # of them would be a coin toss the reader cannot see the result of.
   if command_conflict "$verb"; then
     die "more than one mod defines '$verb' — rm one of these, or shadow it with your own .paraspace/commands/$verb:
-$(mod_commands "$verb")"
+$(command_files "$verb")"
   fi
   # PARA_HOOKS and PARA_SKEL name paths inside a workspace, so an inherited pair
   # would point a host command at directories that do not exist here. PARA_MOD_DIR
@@ -1220,7 +1227,7 @@ doctor_shadowed() { # doctor_shadowed <verb>
   while IFS= read -r path; do
     owner="$(command_owner "$path")"
     d_warn "mod ${owner##*/}'s command '$1' is shadowed by the engine verb of the same name"
-  done < <(mod_commands "$1")
+  done < <(command_files "$1")
 }
 
 # ---- help ------------------------------------------------------------------

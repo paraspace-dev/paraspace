@@ -27,6 +27,7 @@ up there.
 | `hooks/` | the workspace, and the image builder | `provision`, `boot` and `image-build`, plus anything they source |
 | `skel/` | your hooks | seed files (dotfiles etc.) your hooks copy or link |
 | `commands/` | `para`, host-side | your own `para` verbs — [reference](./commands.md#project-commands) |
+| `mods/` | the workspace, and the image builder | reusable pieces you vendored with `para mod add` — [reference](./mods.md) |
 
 It's set-up-once plumbing, hidden like `.github`. Commit it, so every machine
 and every teammate gets the same workspaces.
@@ -76,19 +77,20 @@ commands and `hooks/image-build`. See [the Parafile](./parafile.md#your-own-keys
 Anything your team types often can become a `para` verb: drop an executable in
 `.paraspace/commands/` and `para <name>` runs it on the host with every `PARA_*`
 exported. `void-docker-gh` ships `web` and `key` as examples to keep or delete
-(`void-jchook` adds `claude` and `run`; `void-minimal` ships none). See
-[Commands](./commands.md#project-commands).
+(`void-minimal` ships none). See [Commands](./commands.md#project-commands).
 
 ## Templates
 
-Three runnable templates share one shape and vary in weight:
+Two runnable templates share one shape and vary in weight:
 
 - **`void-docker-gh`** — the `para init` default: a small, complete Docker demo
   that exercises the whole mechanism.
 - **`void-minimal`** — the barest box. Installs and runs nothing, with comments
   marking where your stack goes.
-- **`void-jchook`** — a full personal dev environment (zsh, tmux, Neovim,
-  Claude Code) on the same demo.
 
 Each has its own README in
 [`templates/`](https://github.com/paraspace-dev/paraspace/tree/main/templates).
+
+A template is the thing you copy once and then own. For the pieces you'd rather
+keep as a dependency — someone's dotfiles, a credential helper — `para mod add`
+vendors one into `.paraspace/mods/` instead. See [Mods](./mods.md).

@@ -51,6 +51,7 @@
     "README.md",
     "LICENSE",
     "docs",
+    "mods",
     "templates"
   ],
   "publishConfig": {

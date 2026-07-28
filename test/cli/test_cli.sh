@@ -379,21 +379,22 @@ test_a_scaffolded_project_takes_its_identity_from_the_directory() {
   assert_contains "$out" "my-app" "the directory name became the project slug"
 }
 
-test_template_helpers_do_not_drift() {
-  # hooks/helpers is byte-identical across the bundled templates on purpose, and
-  # cannot be factored into a shared overlay: it has to sit BESIDE the hooks that
-  # source it (shellcheck follows `. "$PARA_HOOKS/helpers"` by basename, through
-  # .shellcheckrc's source-path=SCRIPTDIR), para pushes .paraspace/ into a
-  # workspace whole, and each template dir is documented as runnable on its own.
+test_bundled_helpers_do_not_drift() {
+  # hooks/helpers is byte-identical across everything this package ships — the
+  # templates and the mods — on purpose, and cannot be factored into a shared
+  # overlay: it has to sit BESIDE the hooks that source it (shellcheck follows
+  # `. "$PARA_HOOKS/helpers"` by basename, through .shellcheckrc's
+  # source-path=SCRIPTDIR), para pushes .paraspace/ into a workspace whole, and
+  # a mod resolves $PARA_HOOKS to its OWN directory — so it must ship one.
   local repo ref="" f rc=0 n=0
   repo="$(cd "$(dirname "$PARA")/.." && pwd)"
-  for f in "$repo"/templates/*/.paraspace/hooks/helpers; do
+  for f in "$repo"/templates/*/.paraspace/hooks/helpers "$repo"/mods/*/hooks/helpers; do
     [ -f "$f" ] || continue
     n=$((n + 1))
     if [ -z "$ref" ]; then ref="$f"; continue; fi
     cmp -s "$ref" "$f" || { echo "  drift: ${f#"$repo"/} differs from ${ref#"$repo"/}" >&2; rc=1; }
   done
-  [ "$n" -ge 2 ] || { echo "  expected at least two template helpers, found $n" >&2; return 1; }
+  [ "$n" -ge 3 ] || { echo "  expected at least three bundled helpers, found $n" >&2; return 1; }
   return "$rc"
 }
 

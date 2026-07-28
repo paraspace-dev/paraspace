@@ -4,9 +4,9 @@
 same surface with room to explain. It comes in two halves: the **engine verbs**
 below, which are fixed, and the **project commands** your own repo adds.
 
-Only `para up` and `para image …` must run inside a project (a `.paraspace/`
-directory, found from `$PWD` upward). Everything else — including `para init`,
-which is how you *create* one — works from anywhere.
+Only `para up`, `para image …` and `para mod add` must run inside a project (a
+`.paraspace/` directory, found from `$PWD` upward). Everything else — including
+`para init`, which is how you *create* one — works from anywhere.
 
 ## Workspaces
 
@@ -75,6 +75,7 @@ it (`--force` overwrites); `path` prints its location — both for scripting.
 | Command | What it does |
 |---|---|
 | `para init [<template>] [--list] [-f\|--force] [--full]` | scaffold `.paraspace/` from a bundled template (default `void-docker-gh`), skipping files that already exist; `--full` copies the whole template tree, not just `.paraspace/` |
+| `para mod add <name>` | vendor a bundled [mod](./mods.md) into `.paraspace/mods/<name>/`, replacing it if it's already there. `--list` in place of a name prints what this `para` ships |
 | `para image build [-i\|--from-current]` | build and publish the project's base image; `-i` layers onto the current one for fast iteration — see [The image contract](./image.md) |
 | `para image status` | when `$PARA_IMAGE` was built, and from what base |
 | `para image rm` | delete `$PARA_IMAGE`. Running workspaces are clones and keep running |
@@ -132,5 +133,8 @@ you don't want:
 | Template | Commands |
 |---|---|
 | `void-docker-gh` (the `para init` default) | `key`, `web` |
-| `void-jchook` | `claude`, `key`, `run`, `web` |
 | `void-minimal` | none |
+
+A [mod](./mods.md) can't add a verb — `para <verb>` resolves only against the
+project's `commands/`, so a mod that wants to give you one says so in its README
+and you copy the file in.

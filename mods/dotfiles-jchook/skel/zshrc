@@ -1,5 +1,5 @@
-# para shared zshrc — seeded once into the para-home volume from .paraspace/skel/,
-# then yours to mutate (para never overwrites it after the first seed).
+# para shared zshrc — seeded once onto the shared volume by the dotfiles-jchook
+# mod, then yours to mutate (nothing overwrites it after the first seed).
 # This single file is shared by EVERY workspace via ~/.zshrc -> /para/shared/zshrc,
 # so edits here apply everywhere immediately. Keep it portable.
 
@@ -45,12 +45,12 @@ else
 fi
 
 # --- browser -----------------------------------------------------------------
-# No browser inside the container: point $BROWSER at a helper (seeded by this
-# template's hooks/provision
-# onto the shared volume) so tools that try to "open" a URL (notably
+# No browser inside the container: point $BROWSER at the helper this mod seeds
+# onto the shared volume, so tools that try to "open" a URL (notably
 # `gh auth login`'s device flow, `gh ... --web`) succeed and print the URL with
 # guidance instead of erroring with "xdg-open … not found in $PATH". Open the URL
-# it prints on your own machine.
+# it prints on your own machine. The mod's image-build sets the same value in
+# /etc/profile.d, which is what reaches the hooks.
 export BROWSER=${BROWSER:-/para/shared/bin/open-url}
 
 # --- aliases -----------------------------------------------------------------
@@ -80,8 +80,8 @@ alias .....='cd ../../../..'
 alias ......='cd ../../../../..'
 alias .......='cd ../../../../../..'
 
-# git — `gu`/`gg`/`ggg` map to git aliases seeded in the gitconfig this
-# template's hooks/provision writes
+# git — `gu`/`gg`/`ggg` map to the aliases this mod's image-build writes into
+# /etc/gitconfig
 alias g='git'
 alias ga='git add'
 alias gc='git commit'

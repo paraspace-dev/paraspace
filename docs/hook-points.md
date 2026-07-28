@@ -28,9 +28,9 @@ EOF
 ```
 
 More than one file can answer to a name: `hooks/<name>` runs first, then that
-same name under each `mods/<component>/hooks/`. **The components run in no
-particular order**, so write each one so it doesn't care what else filled the
-point. This is how every hook name resolves, `provision` and `boot` included.
+same name under each [mod](./mods.md)'s `hooks/`. **Mods run in no particular
+order**, so write each one so it doesn't care what else filled the point. This
+is how every hook name resolves, `provision` and `boot` included.
 
 ## Naming
 

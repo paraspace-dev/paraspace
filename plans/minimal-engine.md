@@ -439,11 +439,13 @@ What writing it settled, beyond the design above:
   `-i/--from-current` and the `user.para.src_sha` drift report stay — the drift
   report has since been dropped. Its config checks now run before it touches the
   daemon.
-- **Templates ship the offloaded verbs**: `void-docker-gh` and `void-jchook`
-  carry `commands/web` and `commands/key`; `void-jchook` adds `commands/claude`
-  and `commands/run`. All four are one-liners over `para sh`, because that is
-  where the terminal handling lives. Templates no longer bake `PARA_PROJECT` —
-  the engine derives it from the directory name.
+- **Templates ship the offloaded verbs**: `void-docker-gh` carries
+  `commands/web` and `commands/key`. Both are one-liners over `para sh`, because
+  that is where the terminal handling lives. (`commands/claude` and
+  `commands/run` went with `void-jchook` when
+  [mods](./mods.md) replaced it — v1 mods ship no `commands/`, so they live in
+  `docs/agents.md` as snippets to copy.) Templates no longer bake
+  `PARA_PROJECT` — the engine derives it from the directory name.
 - **The Caddyfile is machine-wide by construction.** It's generated from incus,
   so it lists every para workspace on the box regardless of which project (or
   which sandbox) generated it. Recorded in `test/README.md`.

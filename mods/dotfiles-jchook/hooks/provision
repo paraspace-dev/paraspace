@@ -1,0 +1,60 @@
+#!/usr/bin/env bash
+set -euo pipefail
+# dotfiles-jchook — provision. Runs INSIDE the workspace, after the project's own
+# provision, so the shared volume is already seeded and the clone already exists.
+#
+# Puts a personal dev environment on the shared volume and links it into $HOME:
+# zsh, tmux, Neovim (the config only — plugins, parsers and LSP servers install
+# themselves once, at first launch, into the shared volume every workspace uses),
+# and Claude Code's config. Each file is seeded ONCE and is yours after that:
+# edit it on the volume and every workspace of the project sees the edit.
+
+. "$PARA_HOOKS/helpers"
+
+skel="$PARA_SKEL"
+shared="$PARA_SHARED"
+mine="$shared/dotfiles-jchook"        # this mod's marks, named after their owner
+
+mkdir -p "$mine" "$shared/nvim-data"
+
+# Install <src> at <dest> the first time only, replacing whatever the base seeded
+# there. Once the mark exists nothing writes <dest> again, so your edits survive
+# every `para up` — and removing a mark is how you ask for the seed back.
+claim() { # claim <mark> <src> <dest>
+  if [ -e "$mine/$1" ]; then return 0; fi
+  stage "Seeding $1 onto the shared volume (one-time)"
+  rm -rf "$3"
+  cp -R "$2" "$3"
+  touch "$mine/$1"
+}
+
+claim zshrc  "$skel/zshrc"  "$shared/zshrc"
+claim tmux   "$skel/tmux"   "$shared/tmux"
+claim nvim   "$skel/nvim"   "$shared/nvim"
+claim claude "$skel/claude" "$shared/claude"
+claim bin    "$skel/bin"    "$shared/bin"
+
+if [ ! -f "$shared/claude.json" ]; then echo '{}' > "$shared/claude.json"; fi
+
+# A checkout with core.fileMode=false (or a tarball, or a zip) loses the exec
+# bit, and something else launches both of these — $BROWSER, and the statusline
+# Claude Code shells out to.
+for f in "$shared/bin/open-url" "$shared/claude/statusline.sh"; do
+  if [ -f "$f" ]; then chmod +x "$f"; fi
+done
+
+# ---- link it into $HOME ----------------------------------------------------
+# `ln -sfn` onto a REAL directory nests the link inside it instead of replacing
+# it, and every tool below recreates its own config dir the first time it runs —
+# so a workspace that predates this mod has one of those sitting there.
+relink() { # relink <target> <link>
+  if [ ! -L "$2" ]; then rm -rf "$2"; fi
+  ln -sfn "$1" "$2"
+}
+
+mkdir -p ~/.config ~/.local/share
+relink "$shared/tmux"        ~/.config/tmux
+relink "$shared/nvim"        ~/.config/nvim
+relink "$shared/nvim-data"   ~/.local/share/nvim
+relink "$shared/claude"      ~/.claude
+relink "$shared/claude.json" ~/.claude.json

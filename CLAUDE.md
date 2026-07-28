@@ -12,22 +12,26 @@ MIT-licensed npm package (`paraspace`)**, published from a `v*` tag by
 
 The README is the funnel (install, quick start, pointers); `docs/` is the
 authoritative spec — the `Parafile` schema (`docs/parafile.md`), the hook +
-image contracts (`docs/hooks.md`, `docs/image.md`), the command surface
-(`docs/commands.md`), the architecture (`docs/how-it-works.md`), and the case
-para makes for itself (`docs/why.md`). Don't duplicate any of that here or in
-commit messages; link to it.
+image contracts (`docs/hooks.md`, `docs/hook-points.md`, `docs/image.md`), the
+vendoring model (`docs/mods.md`), the command surface (`docs/commands.md`), the
+architecture (`docs/how-it-works.md`), and the case para makes for itself
+(`docs/why.md`). Don't duplicate any of that here or in commit messages; link
+to it.
 
 ## The generic-mechanism boundary
 
 para is a **thin generic mechanism** — the incus/Caddy/volume/lifecycle engine,
 like `docker compose`. It bakes in **nothing** about *how* a workspace is
 provisioned: the real provision and boot logic lives in a consumer's
-`.paraspace/` dir (`Parafile` + `hooks/`), which para runs but never contains.
+`.paraspace/` dir (`Parafile` + `hooks/` + vendored `mods/`), which para runs
+but never contains. The `mods/` and `templates/` this package ships are
+*content* under that boundary, not engine — `para mod add` only copies them.
 
 ## Contract version
 
 The para↔project interface is versioned (`PARA_CONTRACT`, currently **1**) — the
-`.paraspace/` dir a project ships: its `Parafile`, its `hooks/`, and its
+`.paraspace/` dir a project ships: its `Parafile`, its `hooks/`, its `mods/`
+(vendored `hooks/`+`skel/` para also runs), and its
 `commands/` (host-side verbs that become `para <verb>`). A **breaking** change to
 injected env, the hook names/semantics, the `~/.paraspace` layout in the guest,
 or the `Parafile` vars must bump `PARA_CONTRACT`; additive changes don't.
@@ -46,8 +50,8 @@ seam, decide breaking-vs-additive deliberately and update both the constant and
   2,244-line predecessor; it is the reference for **House style**, below, and
   new code should read like it.
 - **ShellCheck is the static gate**, run via `bin/lint` (or `npm run lint`) — CI
-  runs the same on every push/PR. It lints the CLI plus the templates' hooks
-  and the `test/` scripts (discovered by shebang). Hook sources
+  runs the same on every push/PR. It lints the CLI, the runner, the templates'
+  and `mods/`' hooks, and the `test/` scripts (discovered by shebang). Hook sources
   resolve via `.shellcheckrc` (`source-path`), so prefer that over per-file
   directives. **Run `bin/lint` before finishing any change here** — it's the
   static gate.
@@ -146,11 +150,11 @@ one was a mess that a full rewrite had to clean up.
   section nobody reads. `para ls` needs incus reachable; an interactive
   `para sh` needs util-linux `su`; images are per-arch; the first
   `para image build` takes minutes.
-- **Never document template policy as engine behavior.** The generic-mechanism
-  boundary applies to prose: `para claude` is a file a template ships
-  (`void-jchook`, not the `void-docker-gh` default), and every page that shows
-  it says so. Blurring it teaches people to file engine bugs about their own
-  hooks.
+- **Never document template or mod policy as engine behavior.** The
+  generic-mechanism boundary applies to prose: `para claude` is a file *you*
+  drop in `commands/` — no bundled template ships it, and a mod can't — and
+  every page that shows it says so. Blurring it teaches people to file engine
+  bugs about their own hooks.
 - **Show the command.** A page earns its keep with the line the reader can
   paste. Prose that surrounds no command is usually rationale in disguise.
 - **Don't restate defaults.** A doc — or a Parafile — that repeats a default is

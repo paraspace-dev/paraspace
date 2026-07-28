@@ -62,11 +62,14 @@ test_guest_paths_are_injected() {
   assert_eq "unset" "$host" "PARA_PROJECT_DIR is not leaked into the guest" || return 1
 
   # PARA_MOD_DIR is the one most likely to actually BE in scope: para exports it
-  # for a mod's own command, and such a command calling back into `para sh` is
-  # the ordinary way to write one. Exported here to reproduce exactly that.
+  # for a mod's own command, and such a command calling back into para is the
+  # ordinary way to write one. It has to be exported across the **up** to test
+  # anything — `para sh` never regenerates ~/.paraspace/env, so putting it on an
+  # `sh` proves only that incus doesn't forward the host environment.
   local mod
-  mod="$(env PARA_MOD_DIR=/on/the/host "$PARA" sh "$PARA_WS" -c 'echo "${PARA_MOD_DIR-unset}"' 2>/dev/null)"
-  assert_eq "unset" "$mod" "PARA_MOD_DIR is not leaked into the guest"
+  env PARA_MOD_DIR=/on/the/host "$PARA" up "$PARA_WS" >/dev/null 2>&1 || return 1
+  mod="$("$PARA" sh "$PARA_WS" -c 'echo "${PARA_MOD_DIR-unset}"' 2>/dev/null)"
+  assert_eq "unset" "$mod" "PARA_MOD_DIR is not baked into the guest env"
 }
 
 # shellcheck disable=SC2016  # the guest expands this, not us
@@ -167,6 +170,24 @@ test_project_commands_extend_para() {
 
   # An unknown verb is still an error, not a silent no-op.
   assert_fails "$PARA" definitely-not-a-verb
+}
+
+test_a_mods_command_extends_para_too() {
+  # The other half of the mod contract, and the half the CLI tier can only test
+  # against hand-written mods: a vendored mod's commands/ becomes a real verb on
+  # a real project, resolved past the project's own commands/ and past the
+  # push_paraspace round trip. The fixture mod ships `modhello`.
+  local out
+  out="$("$PARA" modhello "$PARA_WS" 2>/dev/null)"
+  assert_contains "$out" "mod-command-ok"                 "the mod's verb ran on the host" || return 1
+  assert_contains "$out" "dir=$FIXTURE_DIR/.paraspace/mods/e2e-mod" \
+    "PARA_MOD_DIR names the mod's own directory, not the project's" || return 1
+  assert_contains "$out" "skel=unset"                     "and guest paths stay unset out here" || return 1
+  assert_contains "$out" "mod-command-reached-the-guest"  "PARA_BIN composes from a mod's command" || return 1
+
+  # Listed, and credited to the mod — a verb you didn't write says where it came from.
+  assert_contains "$("$PARA" commands 2>/dev/null)" "modhello" "para commands lists it" || return 1
+  assert_contains "$("$PARA" --help 2>&1)" "[e2e-mod]" "para --help names the owning mod"
 }
 
 # shellcheck disable=SC2016  # the guest expands this, not us

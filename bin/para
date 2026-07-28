@@ -987,38 +987,41 @@ mod_commands() { # mod_commands <verb>
   done
 }
 
-# The file `para <verb>` runs, or nothing.
+# The file `para <verb>` runs, or nothing. Same walk have_hook does: yours
+# first, then each mod's.
 command_path() { # command_path <verb>
-  local mine="$PARA_PROJECT_DIR/.paraspace/commands/$1" mods
-  if [ -f "$mine" ]; then printf '%s\n' "$mine"; return 0; fi
-  mods="$(mod_commands "$1")"
-  [ -n "$mods" ] || return 1
-  printf '%s\n' "${mods%%$'\n'*}"          # the first line
+  local f
+  for f in "$PARA_PROJECT_DIR/.paraspace/commands/$1" \
+           "$PARA_PROJECT_DIR"/.paraspace/mods/*/commands/"$1"; do
+    if [ -f "$f" ]; then printf '%s\n' "$f"; return 0; fi
+  done
+  return 1
 }
 
-# The mods that collide over <verb>, or nothing. Two of them is a conflict
-# because nothing promises an order between mods — see run_project_command.
+# Does more than one mod define <verb>? Nothing promises an order between them,
+# so dispatch refuses rather than pick — see run_project_command. Your own
+# commands/ settles it, which is why finding one here means "no conflict".
 command_conflict() { # command_conflict <verb>
   if [ -f "$PARA_PROJECT_DIR/.paraspace/commands/$1" ]; then return 1; fi
-  local mods; mods="$(mod_commands "$1")"
-  case "$mods" in
-    *$'\n'*) printf '%s\n' "$mods" ;;      # more than one line
-    *) return 1 ;;
-  esac
+  local dir n=0
+  for dir in "$PARA_PROJECT_DIR"/.paraspace/mods/*/commands; do
+    if [ -f "$dir/$1" ]; then n=$((n + 1)); fi
+  done
+  [ "$n" -gt 1 ]
 }
 
-# Which mod a resolved command came from, or nothing when it is the project's.
+# The mod directory a resolved command came from, or nothing when it is yours.
 command_owner() { # command_owner <path>
-  local rel="${1#"$PARA_PROJECT_DIR"/.paraspace/mods/}"
-  if [ "$rel" = "$1" ]; then return 0; fi
-  printf '%s' "${rel%%/*}"
+  case "$1" in
+    "$PARA_PROJECT_DIR"/.paraspace/mods/*) printf '%s' "${1%/commands/*}" ;;
+  esac
 }
 
 # The "# summary: …" line a project command may carry, for `para --help`.
 command_summary() { sed -n '1,5s/^# summary: *//p' "$1"; }
 
 run_project_command() {
-  local verb="$1" script owner both
+  local verb="$1" script owner
   shift
   # A verb names a file in commands/, never a path out of it.
   case "$verb" in */*|.|..) die "unknown command '$verb' — see 'para --help'." ;; esac
@@ -1026,19 +1029,17 @@ run_project_command() {
   require_project   # commands are part of the contract, so honour the pin
   # Refuse rather than pick: para promises no order between mods, so running one
   # of them would be a coin toss the reader cannot see the result of.
-  if both="$(command_conflict "$verb")"; then
-    die "two mods define '$verb' — delete one, or shadow it with your own .paraspace/commands/$verb:
-$both"
+  if command_conflict "$verb"; then
+    die "more than one mod defines '$verb' — delete one, or shadow it with your own .paraspace/commands/$verb:
+$(mod_commands "$verb")"
   fi
-  # A mod's command has no other way to find its own files: $PARA_HOOKS and
-  # $PARA_SKEL are guest-side, and $PARA_PROJECT_DIR is the project, not the mod.
+  # PARA_HOOKS and PARA_SKEL name paths inside a workspace, so an inherited pair
+  # would point a host command at directories that do not exist here. PARA_MOD_DIR
+  # is the host-side answer, and only a mod's own command gets one.
   owner="$(command_owner "$script")"
-  if [ -n "$owner" ]; then
-    # shellcheck disable=SC2034  # read by the export below, via ${!PARA_@}
-    PARA_MOD_DIR="$PARA_PROJECT_DIR/.paraspace/mods/$owner"
-  else
-    unset PARA_MOD_DIR   # yours: it owns no mod directory, inherited or not
-  fi
+  unset PARA_HOOKS PARA_SKEL PARA_MOD_DIR
+  # shellcheck disable=SC2034  # read by the export below, via ${!PARA_@}
+  if [ -n "$owner" ]; then PARA_MOD_DIR="$owner"; fi
   export "${!PARA_@}"
   exec "$script" "$@"
 }
@@ -1191,12 +1192,19 @@ doctor_project() {
   if [ -n "$PARA_ROUTES" ]; then d_ok "routes: $PARA_ROUTES"; else d_warn "no PARA_ROUTES — this project publishes no HTTP"; fi
   if incus image info "$PARA_IMAGE" >/dev/null 2>&1; then d_ok "image '$PARA_IMAGE' exists"
   else d_bad "no image '$PARA_IMAGE' — para image build"; fi
-  # A project command that shadows an engine verb never runs, and a verb two
-  # mods both define refuses at dispatch until you break the tie.
-  local verb
+  # A command that shadows an engine verb never runs, and a verb more than one
+  # mod defines refuses at dispatch until you break the tie. An engine verb wins
+  # over both, so it is reported instead of the tie, not as well as it.
+  local verb owner label
   while IFS= read -r verb; do
-    if is_engine_verb "$verb"; then d_warn "project command '$verb' is shadowed by the engine verb of the same name"; fi
-    if command_conflict "$verb" >/dev/null; then d_bad "two mods define '$verb' — 'para $verb' refuses until one is removed"; fi
+    owner="$(command_owner "$(command_path "$verb")")"
+    label="project command"
+    if [ -n "$owner" ]; then label="mod ${owner##*/}'s command"; fi
+    if is_engine_verb "$verb"; then
+      d_warn "$label '$verb' is shadowed by the engine verb of the same name"
+    elif command_conflict "$verb"; then
+      d_bad "more than one mod defines '$verb' — 'para $verb' refuses until one is removed"
+    fi
   done < <(project_commands)
 }
 
@@ -1253,7 +1261,16 @@ usage_project_commands() {
   while IFS= read -r verb; do
     path="$(command_path "$verb")" || continue
     owner="$(command_owner "$path")"
-    printf '  %-25s %s%s\n' "$verb" "$(command_summary "$path")" "${owner:+  [$owner]}"
+    # Two ways a verb that exists never runs, both of them para doctor's report:
+    # the engine owns the name, or more than one mod claims it. Either way there
+    # is no owner worth crediting and no summary worth advertising.
+    if is_engine_verb "$verb"; then
+      printf '  %-25s %s\n' "$verb" "never runs — the engine verb wins (para doctor)"
+    elif command_conflict "$verb"; then
+      printf '  %-25s %s\n' "$verb" "never runs — more than one mod defines it (para doctor)"
+    else
+      printf '  %-25s %s%s\n' "$verb" "$(command_summary "$path")" "${owner:+ [${owner##*/}]}"
+    fi
   done <<<"$list"
 }
 

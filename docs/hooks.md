@@ -73,7 +73,7 @@ change, the variable is what it promises.
 |---|---|---|
 | `~/.paraspace/hooks/` | `$PARA_HOOKS` | your hooks, plus anything they source — a [mod](./mods.md)'s hook sees its own, per the table below |
 | `~/.paraspace/skel/` | `$PARA_SKEL` | your seed files (dotfiles etc.), for a hook to copy or link |
-| `~/.paraspace/mods/` | — | the [mods](./mods.md) you vendored, each with its own `hooks/` and `skel/` |
+| `~/.paraspace/mods/` | — | the [mods](./mods.md) you vendored, each with its own `hooks/`, `skel/` and `commands/` |
 | `~/.paraspace/host.env` | `$PARA_HOST_ENV` | your `.env` from the host, if that file exists. Workspaces only — never pushed to the image builder |
 | `~/.paraspace/env` | — | para's context as export lines. Every `PARA_*` except the handful that name paths on the *host* (`PARA_BIN`, `PARA_PROJECT_DIR`, `PARA_CONFIG`, `PARA_CONFIG_DIR`, `PARA_STATE_DIR`), which are unset here rather than pointing at files that don't exist |
 | `~/.paraspace/commands/` | — | synced along, but these run on the *host* — see [Commands](./commands.md#project-commands) |

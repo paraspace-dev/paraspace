@@ -27,7 +27,7 @@ up there.
 | `hooks/` | the workspace, and the image builder | `provision`, `boot` and `image-build`, plus anything they source |
 | `skel/` | your hooks | seed files (dotfiles etc.) your hooks copy or link |
 | `commands/` | `para`, host-side | your own `para` verbs — [reference](./commands.md#project-commands) |
-| `mods/` | the workspace, and the image builder | reusable pieces you vendored with `para mod add` — [reference](./mods.md) |
+| `mods/` | `para` host-side, the workspace, and the image builder | reusable pieces you vendored with `para mod add`, hooks and verbs both — [reference](./mods.md) |
 
 It's set-up-once plumbing, hidden like `.github`. Commit it, so every machine
 and every teammate gets the same workspaces.

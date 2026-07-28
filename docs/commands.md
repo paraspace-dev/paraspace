@@ -136,7 +136,6 @@ you don't want:
 | `void-docker-gh` (the `para init` default) | `key`, `web` |
 | `void-minimal` | none |
 
-A [mod](./mods.md) you vendored can add verbs too, and they're listed the same
-way with the mod named beside them. Yours wins over any mod's; two mods claiming
-one verb is refused rather than settled silently — [the rules are
+A [mod](./mods.md) you vendored can add verbs too, listed the same way with the
+mod named beside them — [the precedence rules are
 there](./mods.md#verbs-a-mod-brings).

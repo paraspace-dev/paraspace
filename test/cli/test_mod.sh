@@ -44,18 +44,26 @@ test_mod_add_vendors_a_bundled_mod() {
   assert test -f "$p/.paraspace/mods/dotfiles-jchook/README.md"
 }
 
-test_mod_add_makes_a_mods_commands_runnable_and_says_so() {
-  # A command honours its shebang, so unlike a hook it needs the exec bit — a
-  # checkout with core.fileMode=false has none to copy, and `exec` would fail
-  # with a bare "permission denied" naming a file the reader never installed.
+test_mod_add_says_which_verbs_a_mod_brought() {
+  # The reader is told, because these run on the HOST with their privileges —
+  # the one thing about a mod that isn't confined to a throwaway container.
   local p; p="$(a_project)"
   para_in "$p" mod add dotfiles-jchook
-  assert test -x "$p/.paraspace/mods/dotfiles-jchook/commands/claude" || return 1
-  assert test -x "$p/.paraspace/mods/dotfiles-jchook/commands/run"    || return 1
-  # And the reader is told, because these run on the HOST with their privileges
-  # — the one thing about a mod that isn't confined to a throwaway container.
   assert_contains "$PARA_OUT" "YOUR machine" "the warning names where they run" || return 1
   assert_contains "$PARA_OUT" "claude, run"  "and which verbs landed"
+}
+
+test_mod_add_repairs_an_exec_bit_the_checkout_lost() {
+  # A command honours its shebang, so unlike a hook it needs the exec bit, and
+  # `exec` on a 644 file dies with a bare "permission denied" naming a path the
+  # reader never installed. The SOURCE has to be non-executable to prove this:
+  # every bundled mod's commands are 100755 in git, so cp -R carries the bit and
+  # a test using one passes with the chmod deleted.
+  local pkg d; pkg="$(a_para_pkg nx/commands/deploy)"
+  d="$(a_project)"
+  assert test ! -x "$(dirname "$pkg")/../mods/nx/commands/deploy" || return 1
+  env PARA_PROJECT_DIR="$d" "$pkg" mod add nx >/dev/null 2>&1
+  assert test -x "$d/.paraspace/mods/nx/commands/deploy"
 }
 
 test_mod_add_is_quiet_about_a_mod_with_no_commands() {
@@ -139,6 +147,7 @@ test_mod_names_an_unknown_mod_and_an_unknown_subcommand() {
   # Two different mistakes, two different messages, both pointing somewhere.
   local p; p="$(a_project)"
   para_in "$p" mod add no-such-mod
+  [ "$PARA_RC" -ne 0 ] || { echo "  an unknown mod was accepted" >&2; return 1; }
   assert_contains "$PARA_OUT" "no such mod"    "an unknown mod names --list" || return 1
   assert_contains "$PARA_OUT" "--list"         "and the command that lists them" || return 1
   para_in "$p" mod rm dotfiles-jchook
@@ -160,7 +169,8 @@ test_mod_is_registered_everywhere() {
   assert_contains "$out" "config image init mod" "completion knows the verb" || return 1
   assert_contains "$out" "mod)"                  "and completes its arguments" || return 1
 
-  # is_engine_verb: a project command called `mod` must never shadow the engine.
+  # main()'s `mod)` case: a project command called `mod` must never shadow the
+  # engine. (is_engine_verb is what makes doctor say so, asserted just below.)
   a_project_command "$p" mod '#!/bin/sh
 echo SHADOWED-THE-ENGINE'
   para_in "$p" mod add --list
@@ -221,12 +231,48 @@ echo BETA'
   assert_contains "$PARA_OUT" "mods/alpha/commands/deploy" "the refusal names one" || return 1
   assert_contains "$PARA_OUT" "mods/beta/commands/deploy"  "and the other"        || return 1
 
-  # --help must survive it. A conflict is a project you have to go fix, and
-  # help is what you run when you're lost — killing it there would be hostile.
+  # --help must survive it, and must not advertise it. A conflict is a project
+  # you have to go fix, and help is what you run when you're lost — killing it
+  # there would be hostile, but crediting one mod for a verb that refuses is
+  # worse than saying nothing.
   para_in "$p" --help
   assert_eq 0 "$PARA_RC" "help still works with a contested verb" || return 1
+  assert_contains     "$PARA_OUT" "never runs" "help says the verb won't run" || return 1
+  assert_not_contains "$PARA_OUT" "[alpha]"    "and credits neither mod"      || return 1
   para_in "$p" doctor
-  assert_contains "$PARA_OUT" "two mods define 'deploy'" "doctor reports it before you trip"
+  assert_contains "$PARA_OUT" "more than one mod defines 'deploy'" "doctor reports it before you trip"
+}
+
+test_a_third_mod_does_not_make_it_two() {
+  # The message counts, so it must not say "two" when three collide — an error
+  # that misdescribes the world sends you looking for the wrong thing.
+  local p m; p="$(a_project)"
+  for m in alpha beta gamma; do
+    a_mod_command "$p" "$m" deploy '#!/bin/sh
+echo RAN'
+  done
+  para_in "$p" deploy
+  assert_contains     "$PARA_OUT" "more than one mod" "the refusal does not miscount" || return 1
+  assert_not_contains "$PARA_OUT" "two mods"          "no stale count in the message" || return 1
+  assert_contains     "$PARA_OUT" "mods/gamma/commands/deploy" "and it names all of them"
+}
+
+test_an_engine_verb_beats_a_mods_command() {
+  # An engine verb wins over every owner, so a mod claiming one must be reported
+  # as shadowed — NOT as a mod-vs-mod tie, which would be a false claim that
+  # `para ls` refuses, and would make `para doctor` fail over nothing.
+  local p; p="$(a_project)"
+  a_mod_command "$p" rogue  ls '#!/bin/sh
+echo HIJACKED'
+  a_mod_command "$p" rogue2 ls '#!/bin/sh
+echo HIJACKED-TOO'
+  para_in "$p" ls
+  assert_not_contains "$PARA_OUT" "HIJACKED" "the engine verb ran" || return 1
+  para_in "$p" doctor
+  assert_contains     "$PARA_OUT" "mod rogue2's command 'ls' is shadowed" "doctor names the mod that lost" || return 1
+  assert_not_contains "$PARA_OUT" "more than one mod defines 'ls'" "and does not claim a refusal that never happens" || return 1
+  para_in "$p" --help
+  assert_contains "$PARA_OUT" "the engine verb wins" "help says why it never runs"
 }
 
 test_a_mods_command_gets_para_mod_dir() {
@@ -244,6 +290,18 @@ echo "at:$PARA_MOD_DIR"'
 echo "at:${PARA_MOD_DIR-<unset>}"'
   PARA_OUT="$(env PARA_PROJECT_DIR="$p" PARA_MOD_DIR=/leaked "$PARA" whoami 2>&1)"
   assert_contains "$PARA_OUT" "at:<unset>" "a project command owns no mod dir"
+}
+
+test_a_command_never_sees_guest_paths() {
+  # PARA_HOOKS and PARA_SKEL name directories inside a WORKSPACE. On the host
+  # they name nothing, so an inherited pair would point a command at paths that
+  # don't exist — and docs/hooks.md promises they are unset here.
+  local p; p="$(a_project)"
+  a_project_command "$p" probe '#!/bin/sh
+echo "hooks=[${PARA_HOOKS-unset}] skel=[${PARA_SKEL-unset}]"'
+  PARA_OUT="$(env PARA_PROJECT_DIR="$p" PARA_HOOKS=/host/evil PARA_SKEL=/host/evil2 "$PARA" probe 2>&1)"
+  assert_contains "$PARA_OUT" "hooks=[unset]" "PARA_HOOKS does not reach a host command" || return 1
+  assert_contains "$PARA_OUT" "skel=[unset]"  "nor does PARA_SKEL"
 }
 
 # ------------------------------------------------------------------ packaging

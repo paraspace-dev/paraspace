@@ -99,12 +99,7 @@ test_a_mod_fills_the_same_hooks_the_project_does() {
 
   # And a point the PROJECT opened, which para never learns the name of. It runs
   # mid-provision, so it lands between the two lines above.
-  assert_contains "$seen" "mod-clone-before" "the mod filled the fixture's own hook point" || return 1
-
-  # Baked at build time, not written per workspace: this is the mod's
-  # image-build hook having run in the builder, through the same resolution.
-  local marker; marker="$("$PARA" sh "$PARA_WS" -c 'cat /etc/para-mod-marker' 2>/dev/null)"
-  assert_eq "e2e-mod-was-here" "$marker" "the mod's image-build hook reached the image"
+  assert_contains "$seen" "mod-clone-before" "the mod filled the fixture's own hook point"
 }
 
 test_workspace_is_listed_and_running() {
@@ -224,6 +219,20 @@ test_image_build_status_and_rm_lifecycle() {
   assert_contains "$out" "$img"               "status names the image"          || rc=1
   assert_contains "$out" "images:alpine/edge" "status reports the stamped base" || rc=1
   assert_not_contains "$out" "unknown"        "status resolved built and base"  || rc=1
+
+  # The mod's image-build hook ran in the builder, resolved the same way a
+  # workspace's are. Asserted against THIS image, not the shared alpine-minimal:
+  # that one is cached across runs and can predate the fixture's mods/.
+  local ct="imgtest-$$" marker=""
+  if incus launch "$img" "$ct" >/dev/null 2>&1; then
+    eventually 30 incus exec "$ct" -- true || rc=1
+    marker="$(incus exec "$ct" -- cat /etc/para-mod-marker 2>/dev/null)"
+    incus delete -f "$ct" >/dev/null 2>&1 || true
+  else
+    echo "  could not launch a container from '$img'" >&2
+    rc=1
+  fi
+  assert_eq "e2e-mod-was-here" "$marker" "the mod's image-build hook reached the image" || rc=1
 
   # rm deletes it — verify the image is actually gone afterwards.
   env PARA_IMAGE="$img" "$PARA" image rm >/dev/null 2>&1 \

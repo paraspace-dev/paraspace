@@ -20,7 +20,9 @@ set -euo pipefail
 #     --keep      leave workspaces + the temp XDG tree for inspection
 #     --no-build  reuse the existing alpine-minimal image (skip the image build)
 #     --failfast  stop at the first failing test
-#     FILTER      run only tests whose description contains this substring
+#     FILTER      run only tests whose description matches this regex, e.g.
+#                 'umask|perms' or '^image build'. Descriptions are the test
+#                 function names with test_ dropped and underscores as spaces
 # ============================================================================
 
 HERE="$(cd "$(dirname "$0")" && pwd)"

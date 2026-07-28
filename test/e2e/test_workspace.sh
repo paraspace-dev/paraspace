@@ -133,6 +133,39 @@ test_project_commands_extend_para() {
   assert_fails "$PARA" definitely-not-a-verb
 }
 
+# shellcheck disable=SC2016  # the guest expands this, not us
+test_the_pushed_env_stays_private() {
+  # push_paraspace widens the tree so a build hook can read $PARA_SKEL after a
+  # `su -`, and pushes env at 0600 afterwards. Swap those two and every PARA_*
+  # the Parafile carries — tokens included — goes world-readable in the guest.
+  local mode; mode="$("$PARA" sh "$PARA_WS" -c 'stat -c %a ~/.paraspace/env' 2>/dev/null)"
+  assert_eq "600" "$mode" "the generated env is readable only by its owner"
+}
+
+# shellcheck disable=SC2016  # the builder expands these, not us
+test_image_build_reads_skel_after_a_restrictive_umask() {
+  # push_paraspace hands the builder the host checkout's own modes, so a tree
+  # written under `umask 077` lands 0700 and the $PARA_USER a build hook steps
+  # down to cannot read $PARA_SKEL through it — which is the whole stated reason
+  # the tree goes to /opt rather than root's 0700 $HOME.
+  local img="para-umasktest-$$" proj rc=0
+  proj="$(scratch)/hello"
+  ( umask 077
+    cp -R "$FIXTURE_DIR" "$proj"
+    mkdir -p "$proj/.paraspace/skel"
+    printf 'skel-readable\n' > "$proj/.paraspace/skel/marker" )
+  # The su - spelling docs/hooks.md teaches, appended after the fixture's hook
+  # has created the user. Single-quoted: these expand in the builder, not here.
+  { printf '%s\n' 'echo "==> PARA_SKEL readable after su -"'
+    printf '%s\n' 'su - "$PARA_USER" -c "cat $PARA_SKEL/marker" >/dev/null'
+  } >> "$proj/.paraspace/hooks/image-build"
+
+  env PARA_PROJECT_DIR="$proj" PARA_IMAGE="$img" "$PARA" image build >/dev/null 2>&1 \
+    || { echo "  a build hook could not read \$PARA_SKEL as \$PARA_USER" >&2; rc=1; }
+  incus image delete "$img" >/dev/null 2>&1 || true
+  return "$rc"
+}
+
 test_image_build_status_and_rm_lifecycle() {
   # The full `para image` seam on its OWN throwaway alias, so it never disturbs
   # the shared 'alpine-minimal' the other tests ride on. One build — cheap here

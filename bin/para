@@ -448,6 +448,10 @@ guest_env() { # guest_env <dest>
 push_paraspace() { # push_paraspace <instance> <dest>
   incus exec "$1" -- rm -rf "$2/.paraspace"
   incus_q file push -r "$PARA_PROJECT_DIR/.paraspace" "$1$2/"
+  # The push carries your checkout's own modes, so a `umask 077` one lands 0700
+  # and a build hook that steps down to $PARA_USER can't read $PARA_SKEL. Before
+  # the env push, which keeps the 0600 it is given.
+  incus exec "$1" -- chmod -R a+rX "$2/.paraspace"
   guest_env "$2" | incus_q file push --mode 0600 - "$1$2/.paraspace/env"
   # A hook is run by path so its shebang decides, which needs the exec bit —
   # and a checkout, a tarball or a push can all lose it.

@@ -270,7 +270,10 @@ echo HIJACKED-TOO'
   para_in "$p" ls
   assert_not_contains "$PARA_OUT" "HIJACKED" "the engine verb ran" || return 1
   para_in "$p" doctor
-  assert_contains     "$PARA_OUT" "mod rogue2's command 'ls' is shadowed" "doctor names the mod that lost" || return 1
+  # BOTH of them. Naming only the one that "would have run" picks a file by glob
+  # order — which is locale-dependent — to report about a verb where neither runs.
+  assert_contains     "$PARA_OUT" "mod rogue's command 'ls' is shadowed"  "doctor names one loser" || return 1
+  assert_contains     "$PARA_OUT" "mod rogue2's command 'ls' is shadowed" "and the other"          || return 1
   assert_not_contains "$PARA_OUT" "more than one mod defines 'ls'" "and does not claim a refusal that never happens" || return 1
   para_in "$p" --help
   assert_contains "$PARA_OUT" "the engine verb wins" "help says why it never runs"

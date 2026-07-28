@@ -20,6 +20,16 @@ shared="$PARA_SHARED"
 # into nothing and run as a silent no-op.
 mkdir -p "$HOME/$PARA_CLONE_DIR"
 
+# Record that the project's own hook ran, before anything a mod appends. The
+# suite reads the whole file back to prove the resolution order.
+: > "$HOME/owners-seen"
+printf 'project-provision\n' >> "$HOME/owners-seen"
+
+# A hook point of the fixture's own — para has never heard the name. A real
+# template opens one where it has an ordering constraint; this one exists so the
+# e2e tier covers a point a project opens, not just the three para invokes.
+"$PARA_RUN_HOOK" clone:before
+
 # Seed the shared volume once. Whatever lands here is visible to EVERY workspace
 # of this project (para attaches para-home-<project> at /para/shared to all of
 # them), which is exactly what test_shared asserts.

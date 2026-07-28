@@ -55,11 +55,12 @@ fi
 ```
 
 - **`bash "$hook"`, not `( . "$hook" )`.** The subshell draft needed `set --`,
-  an `export` and a `source=/dev/null`, and left the hook one refactor from
-  silent success: bash disables errexit everywhere inside a compound command on
-  the left of a `||`, *including the hook's own `set -euo pipefail`*
-  ([POSIX][posix-e], so 3.2 too). A process needs none of it and gets `$0`
-  right. No shellcheck disable left in the file.
+  an `export` and a `source=/dev/null` to get `$@`, the environment and the
+  linter right, and still gets `$0` wrong. A process needs none of it and
+  isolates the hook for free. No shellcheck disable left in the file.
+  (An earlier draft justified this by errexit — that a sourced hook's own
+  `set -euo pipefail` is ignored left of a `||`. It isn't: the `set` builtin
+  re-arms it, verified on 3.2. The reasons above are the real ones.)
 - **`status=$?` on its own line.** `if ! bash "$hook"; then status=$?` captures
   the status of the `!` — zero — so the runner prints `hook failed` and exits 0,
   and `run_hook`'s `|| die` never fires. **The line someone will "simplify"**;
@@ -207,8 +208,8 @@ function would follow.
 CLI tier, against a fixture directory. **The first is required.**
 
 - **A hook whose *middle* command fails stops there, and the runner exits
-  non-zero.** The two halves guard different rewrites: the status is what
-  `if ! bash "$hook"` breaks, the absent tail line is what `( . "$hook" )` does.
+  non-zero.** The status is the half that matters — it is what
+  `if ! bash "$hook"` breaks.
 - a hook sees no arguments (`$#` is 0), not the runner's `$1`.
 - `$0` is the hook, so `$(dirname "$0")/helpers` works.
 - resolution: project before mods, a mod with no `H` skipped, no `mods/` →
@@ -230,8 +231,9 @@ CLI tier, against a fixture directory. **The first is required.**
   and `mods/`.
 
 e2e (run it — CI won't): a fixture mod appending its name in `provision` and in
-a point the fixture opens; both ran, `up` still idempotent; a prompting hook
-still gets the terminal. And **`image-build` through the runner in the builder**
+a point the fixture opens; both ran, `up` still idempotent. Not the prompting
+hook — the Alpine fixture can't drive a pty, so that one is unreachable in this
+tier and belongs to a manual check. And **`image-build` through the runner in the builder**
 — the only place `guest_env`'s destination argument is load-bearing, and the
 only place a wrong answer is silent.
 

@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+set -euo pipefail
+# A mod's provision hook. Vendored under .paraspace/mods/, it fills the same
+# name the project's own hook does, and para runs both — the project's first.
+#
+# It is written identically to a project hook: $PARA_HOOKS and $PARA_SKEL name
+# THIS mod's directories, so `. "$PARA_HOOKS/helpers"` below reaches the mod's
+# own copy and not the project's. That is the whole point of the layout.
+
+. "$PARA_HOOKS/helpers"
+
+# Appended, not overwritten: the e2e suite reads this back to prove both owners
+# ran, and in which order.
+printf 'mod-provision %s\n' "$(basename "$(dirname "$PARA_HOOKS")")" >> "$HOME/owners-seen"
+
+stage "Provisioned (e2e-mod)"

@@ -73,6 +73,35 @@ test_image_carries_no_project_tree() {
   assert_eq "" "$found" "the published image has no /opt/.paraspace"
 }
 
+test_a_stray_hook_stack_does_not_stop_the_hooks() {
+  # para_env forwards every PARA_* the caller exported — including one that only
+  # the runner is supposed to set. Inherited, PARA_HOOK_STACK reads as "we are
+  # already inside that hook", so the cycle guard fires on the first hook of
+  # every `up` and the workspace converges having run nothing.
+  #
+  # Exporting it for the `up` is the whole test: without it this asserts nothing,
+  # because the suite's own environment never has the variable set.
+  local out
+  out="$(PARA_HOOK_STACK=provision "$PARA" up "$PARA_WS" 2>&1)" \
+    || { echo "  'para up' failed with a stray PARA_HOOK_STACK exported" >&2
+         echo "$out" | tail -5 >&2; return 1; }
+  assert_not_contains "$out" "hook cycle" "no bogus cycle from an inherited stack" || return 1
+  assert_contains     "$out" "hook: hooks/provision" "the provision hook still ran"
+}
+
+test_a_mod_fills_the_same_hooks_the_project_does() {
+  # The multi-owner rule, end to end: one hook name resolves to the project's
+  # hook and then each mods/*/hooks/<name>. The fixture ships one mod, and the
+  # runner is the only thing that makes any of this happen.
+  local seen; seen="$("$PARA" sh "$PARA_WS" -c 'cat ~/owners-seen' 2>/dev/null)"
+  assert_eq "project-provision" "$(head -n1 <<<"$seen")" "the project's hook ran first" || return 1
+  assert_contains "$seen" "mod-provision e2e-mod" "the mod's provision ran too" || return 1
+
+  # And a point the PROJECT opened, which para never learns the name of. It runs
+  # mid-provision, so it lands between the two lines above.
+  assert_contains "$seen" "mod-clone-before" "the mod filled the fixture's own hook point"
+}
+
 test_workspace_is_listed_and_running() {
   local names; names="$("$PARA" ls --names 2>/dev/null)"
   assert_contains "$names" "$PARA_WS" "ls --names includes the workspace" || return 1
@@ -190,6 +219,20 @@ test_image_build_status_and_rm_lifecycle() {
   assert_contains "$out" "$img"               "status names the image"          || rc=1
   assert_contains "$out" "images:alpine/edge" "status reports the stamped base" || rc=1
   assert_not_contains "$out" "unknown"        "status resolved built and base"  || rc=1
+
+  # The mod's image-build hook ran in the builder, resolved the same way a
+  # workspace's are. Asserted against THIS image, not the shared alpine-minimal:
+  # that one is cached across runs and can predate the fixture's mods/.
+  local ct="imgtest-$$" marker=""
+  if incus launch "$img" "$ct" >/dev/null 2>&1; then
+    eventually 30 incus exec "$ct" -- true || rc=1
+    marker="$(incus exec "$ct" -- cat /etc/para-mod-marker 2>/dev/null)"
+    incus delete -f "$ct" >/dev/null 2>&1 || true
+  else
+    echo "  could not launch a container from '$img'" >&2
+    rc=1
+  fi
+  assert_eq "e2e-mod-was-here" "$marker" "the mod's image-build hook reached the image" || rc=1
 
   # rm deletes it — verify the image is actually gone afterwards.
   env PARA_IMAGE="$img" "$PARA" image rm >/dev/null 2>&1 \

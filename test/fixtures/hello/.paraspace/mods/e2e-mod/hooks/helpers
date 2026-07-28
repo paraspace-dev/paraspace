@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+# Shared helpers for the hello fixture's hooks. Sourced, not executed:
+#   . "$PARA_HOOKS/helpers"
+# A trimmed copy of the templates' helpers — just enough to narrate the hooks.
+
+if [ -t 2 ]; then
+  _hd=$'\033[36;1m'; _er=$'\033[31m'; _off=$'\033[0m'
+else
+  _hd='' _er='' _off=''
+fi
+
+stage() { printf '%s==> %s%s\n'   "$_hd" "$*" "$_off" >&2; }
+info()  { printf '    %s\n'        "$*"               >&2; }
+die()   { printf '%serror:%s %s\n' "$_er" "$_off" "$*" >&2; exit 1; }

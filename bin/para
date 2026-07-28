@@ -416,7 +416,7 @@ caddy_sync() {
 #              `para sh x -c … | tee`, `> file` and `$(…)`. Explicit in both
 #              directions, because incus's auto mode ignores PARA_NONINTERACTIVE.
 #   -s bash    deterministic semantics for -c, whatever login shell the image
-#              gives $PARA_USER. Hooks run by path, so their shebang decides.
+#              gives $PARA_USER. Hooks get bash from run-hook instead.
 ws_exec() { # ws_exec <name> [<command>]
   local ct="$CT_PREFIX$1"
   if [ "$#" -lt 2 ]; then
@@ -430,8 +430,8 @@ ws_exec() { # ws_exec <name> [<command>]
 
 # ---- hooks -----------------------------------------------------------------
 # para_env as the guest sees it: the three path keys renamed to where <dest>
-# actually put them, and the host-only ones unset rather than left pointing at
-# files that do not exist in there.
+# actually put them, and the ones that must not cross unset rather than left
+# pointing at host files — or, for PARA_HOOK_STACK, at a lie.
 guest_env() { # guest_env <dest>
   # Local, because the host keeps its own PARA_HOST_ENV — push_project reads it.
   # shellcheck disable=SC2034  # all three are read by para_env's ${!PARA_@}
@@ -439,7 +439,11 @@ guest_env() { # guest_env <dest>
         PARA_SKEL="$1/.paraspace/skel" \
         PARA_HOST_ENV="$1/.paraspace/host.env"
   para_env
-  printf 'unset PARA_BIN PARA_PROJECT_DIR PARA_CONFIG PARA_CONFIG_DIR PARA_STATE_DIR\n'
+  # para_env forwards every PARA_* in scope, including whatever the caller
+  # happened to export. PARA_HOOK_STACK is the runner's to build from empty:
+  # inherited, it reads as "we are already inside that hook" and every run
+  # trips the cycle guard instead of running anything.
+  printf 'unset PARA_BIN PARA_PROJECT_DIR PARA_CONFIG PARA_CONFIG_DIR PARA_STATE_DIR PARA_HOOK_STACK\n'
 }
 
 # Replace <instance>:<dest>/.paraspace with the project's, plus para's context.
@@ -453,11 +457,9 @@ push_paraspace() { # push_paraspace <instance> <dest>
   # the env push, which keeps the 0600 it is given.
   incus exec "$1" -- chmod -R a+rX "$2/.paraspace"
   guest_env "$2" | incus_q file push --mode 0600 - "$1$2/.paraspace/env"
-  # A hook is run by path so its shebang decides, which needs the exec bit —
-  # and a checkout, a tarball or a push can all lose it.
-  if [ -d "$PARA_PROJECT_DIR/.paraspace/hooks" ]; then
-    incus exec "$1" -- chmod -R +x "$2/.paraspace/hooks"
-  fi
+  # After the tree, so a project shipping its own .paraspace/run-hook can't
+  # shadow para's. Both the workspace and the builder run hooks through it.
+  incus_q file push --mode 0755 "$(pkg_root)/libexec/run-hook" "$1$2/.paraspace/run-hook"
 }
 
 # The workspace's copy: the tree, plus the project's base .env and the user's
@@ -472,15 +474,23 @@ push_project() { # push_project <name>
   incus exec "$ct" -- chown -R "$PARA_UID:$PARA_GID" "$home/.paraspace"
 }
 
-# Run one of the project's guest hooks, if it has one. Hooks own all
-# provisioning; para only decides when they run. docs/hooks.md.
+# Run <hook> for every owner that has one — the project, then each mod. The
+# runner announces what it finds, because only it knows how many that is.
+# Hooks own all provisioning; para only decides when they run. docs/hooks.md.
 run_hook() { # run_hook <hook> <name>
-  if [ ! -f "$PARA_PROJECT_DIR/.paraspace/hooks/$1" ]; then
-    log "No '$1' hook — skipping."
-    return
-  fi
-  log "Running hook: $1"
-  ws_exec "$2" "exec ~/.paraspace/hooks/$1" || die "the '$1' hook failed."
+  ws_exec "$2" "exec ~/.paraspace/run-hook '$1'" || die "the '$1' hook failed (above)."
+}
+
+# Does any owner fill <hook>? Resolution is the runner's job, but refusing is
+# the host's: the runner's note prints inside a container, minutes in, and the
+# caller has already committed by then.
+have_hook() { # have_hook <hook>
+  local f
+  for f in "$PARA_PROJECT_DIR/.paraspace/hooks/$1" \
+           "$PARA_PROJECT_DIR"/.paraspace/mods/*/hooks/"$1"; do
+    if [ -f "$f" ]; then return 0; fi
+  done
+  return 1
 }
 
 # The per-workspace half of the hook environment. Everything else a hook sees
@@ -754,8 +764,8 @@ cmd_image_build() {
   done
   # Everything the project itself has to get right, checked before the daemon —
   # an incomplete Parafile is more useful to hear about than an absent incus.
-  local hook="$PARA_PROJECT_DIR/.paraspace/hooks/image-build"
-  [ -f "$hook" ] || die "missing image-build hook: $hook. See docs/image.md."
+  have_hook image-build \
+    || die "no 'image-build' hook — .paraspace/hooks/image-build (renamed from image-build.sh). See docs/image.md."
   local base="$PARA_IMAGE_BASE"
   [ "$from_current" -eq 0 ] || base="$PARA_IMAGE"
   [ -n "$base" ] \
@@ -794,7 +804,7 @@ cmd_image_build() {
   # Backgrounded so Ctrl-C works: incus relays SIGINT only into a process it
   # gave a pty, and this one has none. `wait` can be interrupted, which runs the
   # INT trap, which tears the builder down. Prompting is an `up`-only promise.
-  incus exec "$builder" -- bash -c '. /opt/.paraspace/env; exec bash /opt/.paraspace/hooks/image-build' </dev/null &
+  incus exec "$builder" -- bash -c '. /opt/.paraspace/env; exec /opt/.paraspace/run-hook image-build' </dev/null &
   wait "$!"
   # image_publish snapshots the whole rootfs, and the project's tree is a build
   # input, not something every workspace should find lying around in its image.
@@ -902,7 +912,7 @@ cmd_init() {
     fi
     mkdir -p "$(dirname "$dest")"
     cp "$file" "$dest"
-    case "$rel" in .paraspace/hooks/*|.paraspace/commands/*|*.sh) chmod +x "$dest" ;; esac
+    case "$rel" in .paraspace/commands/*|*.sh) chmod +x "$dest" ;; esac
     printf '  add: %s\n' "$rel" >&2
     added=$((added + 1))
   done < <(find "$root" -type f)

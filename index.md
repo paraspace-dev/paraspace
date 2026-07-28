@@ -20,8 +20,8 @@ features:
       width: 32
       height: 32
       wrap: true
-    title: Real isolation
-    details: Each workspace runs in an unpriveleged system container. Boot up is fast, system memory and compute are shared, and you can run containerized stacks inside it. Set your coding agent to YOLO mode and enjoy peace of mind.
+    title: Sandboxed
+    details: Set your coding agent to YOLO mode and enjoy peace of mind. Each workspace runs in an unpriveleged system container. Boot up is fast, system memory and compute are shared, and you can run containerized stacks inside it.
   - icon:
       light: /icons/key-light.svg
       dark: /icons/key-dark.svg
@@ -44,16 +44,16 @@ features:
       width: 32
       height: 32
       wrap: true
-    title: A URL per workspace
-    details: <code>https://fix-login.paraspace.dev</code> the moment it's up — no DNS to set up, local TLS & CA trust is automatic. Your stack keeps its usual ports, so hot reload and WebSockets need no configuration.
+    title: Workspace subdomains
+    details: <code>https://fix-login.paraspace.dev</code> the moment it's up — no DNS to set up; local TLS & CA trust is automatic. Your stack keeps its usual ports, so hot reload and WebSockets need no configuration.
   - icon:
       light: /icons/rocket-light.svg
       dark: /icons/rocket-dark.svg
       width: 32
       height: 32
       wrap: true
-    title: A thin engine
-    details: Your project has total control over virtually every aspect of the parallel workspace lifecycle, from building the image and booting the stack, to custom verbs and execution hooks.
+    title: Thin wrapper
+    details: It's just bash. Your project has total control over virtually every aspect of the parallel workspace lifecycle, from building the image and booting the stack, to custom verbs and execution hooks.
   - icon:
       light: /icons/console-light.svg
       dark: /icons/console-dark.svg
@@ -61,7 +61,7 @@ features:
       height: 32
       wrap: true
     title: A real terminal
-    details: No iframes, no web terminal. <code>para sh</code> is a real pty on your own machine, so tmux, Neovim and Claude Code behave and support custom dotfiles per box. Each workspace feels like an extension of your normal environment.
+    details: No iframes, no web terminal. <code>para sh</code> is a real pty on your own machine, so tmux, Neovim and Claude Code behave well and support custom dotfiles per box. Each workspace feels like an extension of your normal environment.
 ---
 
 ## Install

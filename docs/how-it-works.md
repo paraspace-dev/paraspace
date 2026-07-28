@@ -1,8 +1,8 @@
 # How it works
 
-`para` is glue over two things you can already run: [Incus] for the containers
-and [Caddy] for the URLs. This page is the mental model — what exists on your
-machine once workspaces are up, and which part owns what.
+`para` is a thin wrapper around [Incus] for the containers, [Caddy] for the
+URLs, and your project-level config for everything else. Here is the mental model
+to understand how workspaces are organized and which part owns what.
 
 For the argument about *why* this shape, see [Why ParaSpace](./why.md).
 
@@ -38,7 +38,7 @@ There are two doors into a workspace: its URL, and `para sh`.
 
 ## The pieces
 
-- **One host Caddy** terminates TLS for the `*.<domain>` wildcard and
+- **Host-level Caddy** terminates TLS for the `*.<domain>` wildcard and
   reverse-proxies each workspace's routes to its container IP. It is generated
   from Incus, so a single Caddy is correct across every project on the machine
   — see [Workspace URLs](./urls.md).
@@ -51,7 +51,7 @@ There are two doors into a workspace: its URL, and `para sh`.
   lives in the project's `.paraspace/` directory, never in `para` — see the
   [hook contract](./hooks.md).
 
-There is no para daemon and no para database: a workspace records its own
+There is no ParaSpace daemon or database: a workspace records its own
 identity on its container, so `incus` is the only thing that has to remember
 anything. `para up` starts what it needs, including Caddy — which, besides the
 Incus daemon, is the only para-related process on your host.

@@ -162,6 +162,24 @@ test_project_commands_extend_para() {
   assert_fails "$PARA" definitely-not-a-verb
 }
 
+test_a_mods_command_extends_para_too() {
+  # The other half of the mod contract, and the half the CLI tier can only test
+  # against hand-written mods: a vendored mod's commands/ becomes a real verb on
+  # a real project, resolved past the project's own commands/ and past the
+  # push_paraspace round trip. The fixture mod ships `modhello`.
+  local out
+  out="$("$PARA" modhello "$PARA_WS" 2>/dev/null)"
+  assert_contains "$out" "mod-command-ok"                 "the mod's verb ran on the host" || return 1
+  assert_contains "$out" "dir=$FIXTURE_DIR/.paraspace/mods/e2e-mod" \
+    "PARA_MOD_DIR names the mod's own directory, not the project's" || return 1
+  assert_contains "$out" "skel=unset"                     "and guest paths stay unset out here" || return 1
+  assert_contains "$out" "mod-command-reached-the-guest"  "PARA_BIN composes from a mod's command" || return 1
+
+  # Listed, and credited to the mod — a verb you didn't write says where it came from.
+  assert_contains "$("$PARA" commands 2>/dev/null)" "modhello" "para commands lists it" || return 1
+  assert_contains "$("$PARA" --help 2>&1)" "[e2e-mod]" "para --help names the owning mod"
+}
+
 # shellcheck disable=SC2016  # the guest expands this, not us
 test_the_pushed_env_stays_private() {
   # push_paraspace widens the tree so a build hook can read $PARA_SKEL after a

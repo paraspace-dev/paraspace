@@ -9,7 +9,7 @@ forking a whole template to get it:
 
 ```sh
 para mod add dotfiles-jchook
-para image build            # only if the mod fills image-build — most do
+para image build            # if the mod fills image-build — its README says
 para up feat-x
 ```
 
@@ -25,11 +25,12 @@ you run it, and it shows up in your own git history like any other file. `para
 up` never goes looking for it.
 
 Adding the same mod again **replaces** the directory — that's the update path,
-so commit before you run it. Removing one is `rm -rf .paraspace/mods/<name>`,
-and `ls .paraspace/mods/` is the list. There is no `para mod rm`, `ls` or
-`update`, because the filesystem and git already do all three.
+so commit first. There is no `para mod rm`, `ls` or `update`, because
+`rm -rf .paraspace/mods/<name>`, `ls .paraspace/mods/` and `add` already are.
 
-> v1 installs **bundled mods only**. `para mod add <git-url>` is not built yet.
+> [!NOTE]
+> `para mod add` installs the mods this `para` ships. A git URL is not
+> supported yet.
 
 ## What's in one
 
@@ -40,29 +41,50 @@ A mod is a directory shaped like a `.paraspace/`:
   README.md
   hooks/{provision,image-build,helpers}
   skel/{zshrc,nvim,tmux,claude,bin}
+  commands/{claude,run}
 ```
 
-Which is why almost nothing had to be invented for it: `para up` already pushes
-your whole `.paraspace/` into the workspace, so a mod arrives with it and its
-hooks run there like yours do.
+`para up` pushes your whole `.paraspace/` into the workspace, so a mod arrives
+with it and its hooks run there like yours do.
 
-Two entries a mod does **not** have. There is no `Parafile` — mods are never
-sourced on the host, so a mod's knobs are ordinary `PARA_*` variables it
-defaults in its own hook and documents in its README. And there is no
-`commands/`: `para <verb>` resolves only against the project's, so a mod that
-wants to ship you a verb has to tell you to copy it in.
+The one entry a mod does **not** have is a `Parafile` — mods are never sourced
+on the host, so a mod's knobs are ordinary `PARA_*` variables it defaults in its
+own hook and documents in its README.
 
-## Which of a mod's hooks run
+## Verbs a mod brings
 
-`provision`, `boot` and `image-build` run for every owner, every time — para
-runs each name through the project's hook first, then each mod's, in
+A mod's `commands/` become `para <verb>` like the project's own — see
+[Commands](./commands.md#project-commands) for what a command is, and note that
+one runs on your host rather than in a workspace, so `para mod add` warns you
+when a mod ships any. Past the engine's own verbs, two rules settle a name:
+
+- **Your own `commands/` beats any mod's.** Dropping a file in
+  `.paraspace/commands/<verb>` is how you override one you don't like.
+- **More than one mod defining a verb is refused**, naming every file — para
+  promises no order between mods. Delete one, or shadow it with your own.
+
+`para --help` names the mod each verb came from, and marks a verb that can't run;
+`para doctor` reports why before you trip over it.
+
+A mod's command reaches its own files through **`$PARA_MOD_DIR`** — e.g.
+`cp -R "$PARA_MOD_DIR/skel/nvim" ~/.config/nvim`. `$PARA_HOOKS` and `$PARA_SKEL`
+are no help: they name paths inside a workspace, and para keeps them unset on the
+host so a command can't be handed one that doesn't exist.
+
+## Hooks a mod fills
+
+`provision`, `boot` and `image-build` run every time — para runs each name
+through the project's hook first, then each mod's, in
 [no promised order](./hook-points.md#filling-one).
 
 Any other name is a [hook point](./hook-points.md), and a mod filling one
-**only runs where that point is opened**. No bundled template opens any, so a
-mod that fills `clone:before` does nothing until you add that one line to your
-own `provision`. A mod's README says which names it fills; if one of them isn't
-`provision`, `boot` or `image-build`, that's the line you owe it.
+**only runs where that point is opened**. No bundled template opens any, so if a
+mod's README says it fills `clone:before`, that line is yours to add:
+
+```sh
+# .paraspace/hooks/provision — wherever the ordering actually matters
+"$PARA_RUN_HOOK" clone:before
+```
 
 ## Writing one
 
@@ -132,6 +154,10 @@ seeding guards on the destination, so the next `up` fills the gap:
 para sh feat-x -c 'mv /para/shared/nvim /para/shared/nvim.mine'
 para up feat-x
 ```
+
+**A link into `$HOME` is not a seed.** `ln -sfn` onto a real directory nests
+inside it, so a mod that links `~/.claude` deletes what a workspace already had
+there. Its README lists every path it claims; read that before the first `up`.
 
 **A mod with an `image-build` hook does nothing until you rebuild.** Add the
 mod, run `para up`, and the dotfiles are there but the editor they configure

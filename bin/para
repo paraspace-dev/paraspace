@@ -443,7 +443,7 @@ guest_env() { # guest_env <dest>
   # happened to export. PARA_HOOK_STACK is the runner's to build from empty:
   # inherited, it reads as "we are already inside that hook" and every run
   # trips the cycle guard instead of running anything.
-  printf 'unset PARA_BIN PARA_PROJECT_DIR PARA_CONFIG PARA_CONFIG_DIR PARA_STATE_DIR PARA_HOOK_STACK\n'
+  printf 'unset PARA_BIN PARA_PROJECT_DIR PARA_CONFIG PARA_CONFIG_DIR PARA_STATE_DIR PARA_HOOK_STACK PARA_MOD_DIR\n'
 }
 
 # Replace <instance>:<dest>/.paraspace with the project's, plus para's context.
@@ -474,22 +474,37 @@ push_project() { # push_project <name>
   incus exec "$ct" -- chown -R "$PARA_UID:$PARA_GID" "$home/.paraspace"
 }
 
-# Run <hook> for every owner that has one — the project, then each mod. The
-# runner announces what it finds, because only it knows how many that is.
+# Run <hook> everywhere it is defined — the project, then each mod. The runner
+# announces what it finds, because only it knows how many that is.
 # Hooks own all provisioning; para only decides when they run. docs/hooks.md.
 run_hook() { # run_hook <hook> <name>
   ws_exec "$2" "exec ~/.paraspace/run-hook '$1'" || die "the '$1' hook failed (above)."
 }
 
-# Does any owner fill <hook>? Resolution is the runner's job, but refusing is
-# the host's: the runner's note prints inside a container, minutes in, and the
-# caller has already committed by then.
-have_hook() { # have_hook <hook>
-  local f
-  for f in "$PARA_PROJECT_DIR/.paraspace/hooks/$1" \
-           "$PARA_PROJECT_DIR"/.paraspace/mods/*/hooks/"$1"; do
-    if [ -f "$f" ]; then return 0; fi
+# Every directory shaped like a .paraspace — the project's own, then each mod it
+# vendored, most specific first. Each holds its own hooks/, skel/ and commands/,
+# so every name para resolves runs down this list; libexec/run-hook walks
+# the same one on the guest side.
+#
+# The glob is `mods/*`, never `mods/*/hooks/x` — bash sorts a multi-component
+# glob with strcoll, which ignores `/` under en_US and orders mods/m2 before
+# mods/m. One component keeps the order the same in every locale.
+paraspace_dirs() {
+  printf '%s\n' "$PARA_PROJECT_DIR/.paraspace"
+  local pdir
+  for pdir in "$PARA_PROJECT_DIR"/.paraspace/mods/*; do
+    if [ -d "$pdir" ]; then printf '%s\n' "$pdir"; fi
   done
+}
+
+# Does the project or any of its mods fill <hook>? Resolution is the runner's
+# job, but refusing is the host's: the runner's note prints inside a container,
+# minutes in, and the caller has already committed by then.
+have_hook() { # have_hook <hook>
+  local pdir
+  while IFS= read -r pdir; do
+    if [ -f "$pdir/hooks/$1" ]; then return 0; fi
+  done < <(paraspace_dirs)
   return 1
 }
 
@@ -955,31 +970,89 @@ cmd_mod() {
   mkdir -p "$dest"
   cp -R "$src/." "$dest"
   log "Vendored '$name' into .paraspace/mods/$name — read it, commit it, then: para up <name>"
+  # A command honours its shebang, so unlike a hook it needs the exec bit, and a
+  # checkout with core.fileMode=false has none to copy. Same repair cmd_init makes.
+  local f verbs=""
+  for f in "$dest"/commands/*; do
+    if [ -f "$f" ]; then chmod +x "$f"; verbs="${verbs:+$verbs, }${f##*/}"; fi
+  done
+  [ -z "$verbs" ] \
+    || warn "it adds para verbs that run on YOUR machine with your privileges ($verbs) — read .paraspace/mods/$name/commands/ before you run them."
 }
 
 # ---- project commands ------------------------------------------------------
-# A project extends para by dropping an executable in .paraspace/commands/:
-# `para <verb>` then runs it on the HOST, with every PARA_* exported and its
-# arguments passed through. Engine verbs always win. docs/commands.md.
+# A project extends para by dropping an executable in .paraspace/commands/, and
+# a mod it vendored may ship its own: `para <verb>` runs it on the HOST, with
+# every PARA_* exported and its arguments passed through. Engine verbs always
+# win, and a project's own commands/ wins over any mod's. docs/commands.md.
 project_commands() {
-  local file
-  for file in "$PARA_PROJECT_DIR"/.paraspace/commands/*; do
-    if [ -f "$file" ]; then printf '%s\n' "${file##*/}"; fi
-  done
+  local pdir f
+  while IFS= read -r pdir; do
+    for f in "$pdir"/commands/*; do
+      if [ -f "$f" ]; then printf '%s\n' "${f##*/}"; fi
+    done
+  done < <(paraspace_dirs) | sort -u
+}
+
+# Every command file answering to <verb>, in resolution order.
+command_files() { # command_files <verb>
+  local pdir
+  while IFS= read -r pdir; do
+    if [ -f "$pdir/commands/$1" ]; then printf '%s\n' "$pdir/commands/$1"; fi
+  done < <(paraspace_dirs)
+}
+
+# The file `para <verb>` runs, or nothing: yours first, then each mod's.
+command_path() { # command_path <verb>
+  local pdir
+  while IFS= read -r pdir; do
+    if [ -f "$pdir/commands/$1" ]; then printf '%s\n' "$pdir/commands/$1"; return 0; fi
+  done < <(paraspace_dirs)
+  return 1
+}
+
+# Does more than one mod define <verb>? Nothing promises an order between them,
+# so dispatch refuses rather than pick — see run_project_command. Your own
+# commands/ settles it, which is why finding one here means "no conflict", and
+# why everything command_files then returns belongs to a mod.
+command_conflict() { # command_conflict <verb>
+  if [ -f "$PARA_PROJECT_DIR/.paraspace/commands/$1" ]; then return 1; fi
+  local f n=0
+  while IFS= read -r f; do n=$((n + 1)); done < <(command_files "$1")
+  [ "$n" -gt 1 ]
+}
+
+# The mod's .paraspace dir a resolved command came from, or nothing when the
+# command is the project's own.
+command_pdir() { # command_pdir <path>
+  case "$1" in
+    "$PARA_PROJECT_DIR"/.paraspace/mods/*) printf '%s' "${1%/commands/*}" ;;
+  esac
 }
 
 # The "# summary: …" line a project command may carry, for `para --help`.
 command_summary() { sed -n '1,5s/^# summary: *//p' "$1"; }
 
 run_project_command() {
-  local verb="$1" script="$PARA_PROJECT_DIR/.paraspace/commands/$1"
+  local verb="$1" script pdir
   shift
   # A verb names a file in commands/, never a path out of it.
   case "$verb" in */*|.|..) die "unknown command '$verb' — see 'para --help'." ;; esac
-  if [ -z "$PARA_PROJECT_DIR" ] || [ ! -f "$script" ]; then
-    die "unknown command '$verb' — see 'para --help'."
-  fi
+  script="$(command_path "$verb")" || die "unknown command '$verb' — see 'para --help'."
   require_project   # commands are part of the contract, so honour the pin
+  # Refuse rather than pick: para promises no order between mods, so running one
+  # of them would be a coin toss the reader cannot see the result of.
+  if command_conflict "$verb"; then
+    die "more than one mod defines '$verb' — rm one of these, or shadow it with your own .paraspace/commands/$verb:
+$(command_files "$verb")"
+  fi
+  # PARA_HOOKS and PARA_SKEL name paths inside a workspace, so an inherited pair
+  # would point a host command at directories that do not exist here. PARA_MOD_DIR
+  # is the host-side answer, and only a mod's own command gets one.
+  pdir="$(command_pdir "$script")"
+  unset PARA_HOOKS PARA_SKEL PARA_MOD_DIR
+  # shellcheck disable=SC2034  # read by the export below, via ${!PARA_@}
+  if [ -n "$pdir" ]; then PARA_MOD_DIR="$pdir"; fi
   export "${!PARA_@}"
   exec "$script" "$@"
 }
@@ -1132,11 +1205,29 @@ doctor_project() {
   if [ -n "$PARA_ROUTES" ]; then d_ok "routes: $PARA_ROUTES"; else d_warn "no PARA_ROUTES — this project publishes no HTTP"; fi
   if incus image info "$PARA_IMAGE" >/dev/null 2>&1; then d_ok "image '$PARA_IMAGE' exists"
   else d_bad "no image '$PARA_IMAGE' — para image build"; fi
-  # A project command that shadows an engine verb never runs.
+  # A command that shadows an engine verb never runs, and a verb more than one
+  # mod defines refuses at dispatch until you break the tie. An engine verb wins
+  # over both, so it is reported instead of the tie, not as well as it.
   local verb
   while IFS= read -r verb; do
-    if is_engine_verb "$verb"; then d_warn "project command '$verb' is shadowed by the engine verb of the same name"; fi
+    if is_engine_verb "$verb"; then
+      doctor_shadowed "$verb"
+    elif command_conflict "$verb"; then
+      d_bad "more than one mod defines '$verb' — 'para $verb' refuses until one is removed"
+    fi
   done < <(project_commands)
+}
+
+# Everything that defines a verb the engine already owns. All of them, not the
+# one that would have run: none of them will, so naming one would send you to
+# fix a file picked by glob order.
+doctor_shadowed() { # doctor_shadowed <verb>
+  local path pdir owner
+  while IFS= read -r path; do
+    pdir="$(command_pdir "$path")"
+    if [ -n "$pdir" ]; then owner="mod ${pdir##*/}'s command"; else owner="project command"; fi
+    d_warn "$owner '$1' is shadowed by the engine verb of the same name"
+  done < <(command_files "$1")
 }
 
 # ---- help ------------------------------------------------------------------
@@ -1171,7 +1262,7 @@ usage() {
 	  init [<template>]         scaffold .paraspace/ into the current directory
 	  mod add <name>            vendor a bundled mod into .paraspace/mods/
 	  image <build|status|rm>   the base image workspaces launch from
-	  commands                  list this project's own commands
+	  commands                  the verbs this project adds, its mods' included
 	  completions <bash|zsh>    source <(para completions bash)
 	  --version                 the installed paraspace version
 	EOF
@@ -1182,14 +1273,26 @@ usage() {
 	EOF
 }
 
-# A project's own verbs, listed so nothing it added runs invisibly.
+# A project's own verbs, listed so nothing it added runs invisibly — including
+# the ones a mod brought, which is why each row names the mod it came from.
 usage_project_commands() {
-  local list verb
+  local list verb path pdir
   list="$(project_commands)"
   [ -n "$list" ] || return 0
-  printf '\nPROJECT COMMANDS (%s/.paraspace/commands)\n' "$PARA_PROJECT_DIR"
+  printf '\nPROJECT COMMANDS (%s/.paraspace)\n' "$PARA_PROJECT_DIR"
   while IFS= read -r verb; do
-    printf '  %-25s %s\n' "$verb" "$(command_summary "$PARA_PROJECT_DIR/.paraspace/commands/$verb")"
+    path="$(command_path "$verb")" || continue
+    pdir="$(command_pdir "$path")"
+    # Two ways a verb that exists never runs, both of them para doctor's report:
+    # the engine owns the name, or more than one mod claims it. Either way there
+    # is nothing worth crediting and no summary worth advertising.
+    if is_engine_verb "$verb"; then
+      printf '  %-25s %s\n' "$verb" "never runs — the engine verb wins (para doctor)"
+    elif command_conflict "$verb"; then
+      printf '  %-25s %s\n' "$verb" "never runs — more than one mod defines it (para doctor)"
+    else
+      printf '  %-25s %s%s\n' "$verb" "$(command_summary "$path")" "${pdir:+ [${pdir##*/}]}"
+    fi
   done <<<"$list"
 }
 
@@ -1218,7 +1321,12 @@ cmd_completions() {
 	    image)       COMPREPLY=( $(compgen -W "build status rm" -- "$cur") ) ;;
 	    completions) COMPREPLY=( $(compgen -W "bash zsh" -- "$cur") ) ;;
 	    init)        COMPREPLY=( $(compgen -W "--list --full --force" -- "$cur") ) ;;
-	    mod)         COMPREPLY=( $(compgen -W "add $(para mod add --list 2>/dev/null)" -- "$cur") ) ;;
+	    # Two levels, so the position decides: the subcommand, then what add takes.
+	    mod)         if [ "$COMP_CWORD" -eq 2 ]; then
+	                   COMPREPLY=( $(compgen -W "add" -- "$cur") )
+	                 else
+	                   COMPREPLY=( $(compgen -W "--list $(para mod add --list 2>/dev/null)" -- "$cur") )
+	                 fi ;;
 	    ls)          COMPREPLY=( $(compgen -W "--all --names" -- "$cur") ) ;;
 	    # Everything else — including every project command — takes a workspace.
 	    *)           [ "$COMP_CWORD" -eq 2 ] \

@@ -8,9 +8,10 @@
 # The project is a COPY of the tracked fixture with one more mod in it: adding a
 # mod to test/fixtures/ would dirty the working tree and hand bin/lint the
 # installed copy to lint.
+# shellcheck disable=SC2016  # the guest expands these, not us
 
-# A copy of the hello fixture carrying one extra mod, whose provision seeds in
-# the two shapes a mod seeds in. Echoes the project dir.
+# A copy of the hello fixture carrying one extra mod, whose provision seeds a
+# path of its own and one the base already wrote. Echoes the project dir.
 _a_project_with_a_late_mod() {
   local proj; proj="$(scratch)/hello"
   cp -R "$FIXTURE_DIR" "$proj"
@@ -29,10 +30,13 @@ EOF
   printf '%s\n' "$proj"
 }
 
-# para_do, but against a project dir other than the sandbox's fixture.
+# para_do, but against a project dir other than the sandbox's fixture. It also
+# exports a bogus PARA_MOD_DIR, because para sets that for a mod's own command
+# and such a command calling back into `para up` is the ordinary way to write
+# one — so this is the real path by which a host directory could reach a guest.
 _up_with_project() { # _up_with_project <project-dir> <workspace>
   local out line
-  if ! out="$(env PARA_PROJECT_DIR="$1" "$PARA" up "$2" 2>&1)"; then
+  if ! out="$(env PARA_PROJECT_DIR="$1" PARA_MOD_DIR=/on/the/host "$PARA" up "$2" 2>&1)"; then
     printf '    para up %s failed:\n' "$2" >&2
     while IFS= read -r line; do printf '    | %s\n' "$line" >&2; done <<<"$out"
     return 1
@@ -49,6 +53,13 @@ test_a_mod_added_to_a_seeded_volume_is_half_applied() {
     >/dev/null 2>&1 || return 1
 
   _up_with_project "$proj" "$ws" || return 1
+
+  # The `up` above carried a host PARA_MOD_DIR; guest_env must have dropped it.
+  # It has to ride an `up` to test anything — `para sh` never regenerates
+  # ~/.paraspace/env, so asserting on an `sh` proves only that incus doesn't
+  # forward the host environment.
+  got="$("$PARA" sh "$ws" -c 'echo "${PARA_MOD_DIR-unset}"' 2>/dev/null)"
+  assert_eq "unset" "$got" "PARA_MOD_DIR is not baked into the guest env" || rc=1
 
   # The mod's own new path lands: there was nothing there to skip.
   got="$("$PARA" sh "$ws" -c 'cat /para/shared/late-mod-marker' 2>/dev/null)"

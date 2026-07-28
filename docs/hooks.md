@@ -73,9 +73,9 @@ change, the variable is what it promises.
 |---|---|---|
 | `~/.paraspace/hooks/` | `$PARA_HOOKS` | your hooks, plus anything they source — a [mod](./mods.md)'s hook sees its own, per the table below |
 | `~/.paraspace/skel/` | `$PARA_SKEL` | your seed files (dotfiles etc.), for a hook to copy or link |
-| `~/.paraspace/mods/` | — | the [mods](./mods.md) you vendored, each with its own `hooks/` and `skel/` |
+| `~/.paraspace/mods/` | — | the [mods](./mods.md) you vendored, each with its own `hooks/`, `skel/` and `commands/` |
 | `~/.paraspace/host.env` | `$PARA_HOST_ENV` | your `.env` from the host, if that file exists. Workspaces only — never pushed to the image builder |
-| `~/.paraspace/env` | — | para's context as export lines. Every `PARA_*` except the handful that name paths on the *host* (`PARA_BIN`, `PARA_PROJECT_DIR`, `PARA_CONFIG`, `PARA_CONFIG_DIR`, `PARA_STATE_DIR`), which are unset here rather than pointing at files that don't exist |
+| `~/.paraspace/env` | — | para's context as export lines. Every `PARA_*` except the handful that name paths on the *host* (`PARA_BIN`, `PARA_PROJECT_DIR`, `PARA_CONFIG`, `PARA_CONFIG_DIR`, `PARA_STATE_DIR`, `PARA_MOD_DIR`), which are unset here rather than pointing at files that don't exist |
 | `~/.paraspace/commands/` | — | synced along, but these run on the *host* — see [Commands](./commands.md#project-commands) |
 | `~/.paraspace/run-hook` | `$PARA_RUN_HOOK` | para's hook runner — call it to open a [hook point](./hook-points.md) |
 
@@ -106,7 +106,7 @@ arrays fare no better. Pass a delimited string and split it in the hook, the way
 | `PARA_DOMAIN` | the wildcard domain it's served under |
 | `PARA_PROJECT` | the project identity slug |
 | `PARA_SHARED` | the shared volume's mount point (`/para/shared`) |
-| `PARA_HOOKS`, `PARA_SKEL` | the `hooks/` and `skel/` of whoever owns the running hook. Guest-side only — on the host these two are unset, and `commands/` use `$PARA_PROJECT_DIR` |
+| `PARA_HOOKS`, `PARA_SKEL` | the `hooks/` and `skel/` of whoever owns the running hook. Guest-side only — on the host these two are unset, and [commands](./commands.md#project-commands) use `$PARA_PROJECT_DIR` or `$PARA_MOD_DIR` |
 | `PARA_RUN_HOOK` | para's hook runner — see [Hook points](./hook-points.md) |
 | `PARA_HOOK_STACK` | the points para is currently inside, for the failure trace. para rewrites it at every level, so it is yours to read, never to set |
 | `PARA_CLONE_DIR`, `PARA_CLONE_BRANCH`, `PARA_ORIGIN` | what to clone, and where |

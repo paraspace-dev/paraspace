@@ -48,9 +48,10 @@ para sh fix-login                      # a shell in the clone
 para sh fix-login -c 'npm test'        # one command, exits with its status
 ```
 
-A one-line project command turns that into a verb. No bundled template ships
-these — and a [mod](./mods.md) can't add a verb either — so copy them into your
-own `.paraspace/commands/` if you want them:
+A one-line project command turns that into a verb. `para mod add
+dotfiles-jchook` brings both of the ones below with it; no bundled *template*
+ships them, so write them into your own `.paraspace/commands/` if you'd rather
+not take the [mod](./mods.md):
 
 ```sh
 # .paraspace/commands/claude — "para claude <ws>"
@@ -68,7 +69,9 @@ exec "$PARA_BIN" sh "$1" -c "
 ```
 
 They stay one-liners because `para sh` owns the terminal handling — see
-[Commands](./commands.md#project-commands).
+[Commands](./commands.md#project-commands). The mod's copies are the same
+one-liners with the argument quoting filled in, so `para claude ws -p 'write a
+test'` reaches Claude Code as one argument instead of four.
 
 For the agent to feel like home, put your dotfiles in `.paraspace/skel/` and
 have your provision hook link them in — or vendor a mod that brings its own

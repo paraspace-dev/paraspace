@@ -71,6 +71,15 @@ a_project_command() {
   chmod +x "$1/.paraspace/commands/$2"
 }
 
+# a_mod_command <project> <mod> <verb> <body> — the same, from a vendored mod.
+# The twin of a_project_command, so a test about which one wins reads as two
+# lines that differ only in the owner.
+a_mod_command() {
+  mkdir -p "$1/.paraspace/mods/$2/commands"
+  printf '%s\n' "$4" > "$1/.paraspace/mods/$2/commands/$3"
+  chmod +x "$1/.paraspace/mods/$2/commands/$3"
+}
+
 # a_scaffolded_project [<template>] — what `para init` actually produces, for
 # tests that must exercise the shipped templates rather than a hand-written
 # Parafile. Echoes the project dir.

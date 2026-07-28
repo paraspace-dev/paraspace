@@ -2,7 +2,8 @@
 
 `para --help` is always current for the build you're running; this page is the
 same surface with room to explain. It comes in two halves: the **engine verbs**
-below, which are fixed, and the **project commands** your own repo adds.
+below, which are fixed, and the **project commands** your repo adds — its own,
+and any a [mod](./mods.md) brought with it.
 
 Only `para up`, `para image …` and `para mod add` must run inside a project (a
 `.paraspace/` directory, found from `$PWD` upward). Everything else — including
@@ -79,7 +80,7 @@ it (`--force` overwrites); `path` prints its location — both for scripting.
 | `para image build [-i\|--from-current]` | build and publish the project's base image; `-i` layers onto the current one for fast iteration — see [The image contract](./image.md) |
 | `para image status` | when `$PARA_IMAGE` was built, and from what base |
 | `para image rm` | delete `$PARA_IMAGE`. Running workspaces are clones and keep running |
-| `para commands` | list this project's own commands, one per line |
+| `para commands` | list the verbs this project adds, its mods' included, one per line |
 | `para completions <bash\|zsh>` | print a completion script |
 
 ```sh
@@ -104,9 +105,10 @@ xdg-open "$url"
 ```
 
 Save that as `.paraspace/commands/web`, make it executable, and `para web ws1`
-works. Two variables exist for exactly this: **`PARA_BIN`** (the path to this
-`para`, so a command can call back without relying on `$PATH`) and
-**`PARA_PROJECT_DIR`**.
+works. Three variables exist for exactly this: **`PARA_BIN`** (the path to this
+`para`, so a command can call back without relying on `$PATH`),
+**`PARA_PROJECT_DIR`**, and — only when the command came from a
+[mod](./mods.md) — **`PARA_MOD_DIR`**, the directory that mod was vendored into.
 
 Because [`para sh`](#running-one-command) owns all the terminal handling,
 commands that drive something inside a workspace stay one-liners:
@@ -135,6 +137,6 @@ you don't want:
 | `void-docker-gh` (the `para init` default) | `key`, `web` |
 | `void-minimal` | none |
 
-A [mod](./mods.md) can't add a verb — `para <verb>` resolves only against the
-project's `commands/`, so a mod that wants to give you one says so in its README
-and you copy the file in.
+A [mod](./mods.md) you vendored can add verbs too, listed the same way with the
+mod named beside them — [the precedence rules are
+there](./mods.md#verbs-a-mod-brings).

@@ -4,35 +4,25 @@ Guidance for Claude Code working in this repo.
 
 ## What this is
 
-ParaSpace is the
-`para` tool: parallel dev workspaces, each an unprivileged Incus system
-container with its own clone, Docker stack, bridge IP, and
+ParaSpace is the `para` tool: parallel dev workspaces, each an unprivileged
+Incus system container with its own clone, Docker stack, bridge IP, and
 `https://<name>.<domain>` URL. **It is a standalone, self-contained,
 MIT-licensed npm package (`paraspace`)**, published from a `v*` tag by
 `.github/workflows/publish.yml`.
 
-**Read [`README.md`](./README.md) and [`docs/`](./docs/README.md) first.** The
-README is the funnel (install, quick start, pointers); `docs/` is the
+The README is the funnel (install, quick start, pointers); `docs/` is the
 authoritative spec — the `Parafile` schema (`docs/parafile.md`), the hook +
 image contracts (`docs/hooks.md`, `docs/image.md`), the command surface
 (`docs/commands.md`), the architecture (`docs/how-it-works.md`), and the case
 para makes for itself (`docs/why.md`). Don't duplicate any of that here or in
 commit messages; link to it.
 
-## The generic-mechanism boundary (the one rule that matters)
+## The generic-mechanism boundary
 
-para is a **generic mechanism** — the incus/Caddy/volume/lifecycle engine, like
-`docker compose`. It bakes in **nothing** about *how* a workspace is provisioned.
-Everything project-specific lives in a consumer's `.paraspace/` dir (`Parafile` +
-`hooks/`), which para runs but never contains. When working here:
-
-- **Never leak project specifics into `bin/para`.** No project ports,
-  repo URLs, `.env` vars, compose knowledge, or refinance/domain concepts. If
-  something is project policy, it belongs in a `.paraspace/hooks/` script, exposed
-  to para only through the versioned contract (`PARA_*` env, hook names, the
-  `Parafile` vars). The templates under `templates/` are the reference consumers
-  (`void-docker-gh` is the `para init` default; `void-minimal`/`void-jchook` are
-  siblings) — keep them minimal and runnable.
+para is a **thin generic mechanism** — the incus/Caddy/volume/lifecycle engine,
+like `docker compose`. It bakes in **nothing** about *how* a workspace is
+provisioned: the real provision and boot logic lives in a consumer's
+`.paraspace/` dir (`Parafile` + `hooks/`), which para runs but never contains.
 
 ## Contract version
 
@@ -48,7 +38,7 @@ seam, decide breaking-vs-additive deliberately and update both the constant and
 
 ## Code + conventions
 
-- **Pure shell.** `bin/para` is one ~1,200-line bash script (`set -euo
+- **Pure shell.** `bin/para` is one relatively lean bash script (`set -euo
   pipefail`), organized as small helpers + `cmd_*` handlers dispatched from
   `main()`: terse helpers, `log/warn/die/need`, lowercase function names,
   POSIX-ish where practical. It is the minimal-engine rewrite
@@ -82,6 +72,8 @@ The bar is that someone who knows bash but not para can read any function top to
 bottom and be right about what it does. `bin/para` is the reference. The rules
 below are not aesthetic preferences — each one is a mess the rewrite cleaned up.
 
+- **Prefer the elegant tool.** Favor designs whose usefulness falls out of a few
+  well-chosen primitives.
 - **No bash gymnastics.** If a line needs a comment warning you about bash,
   write the line that doesn't need one. A reader should never need a manual for
   the *mechanism* of a line — only, occasionally, for the domain.

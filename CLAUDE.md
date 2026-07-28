@@ -130,9 +130,13 @@ one was a mess that a full rewrite had to clean up.
   smell; "here is how you get unstuck" is the target.
 - **Behavior, not the reasoning that produced it.** A reference entry says what
   a thing does, what it defaults to, who reads it, and what breaks if you get
-  it wrong. Why it was *designed* that way goes in `plans/`, with a link if it
-  earns one. (`parafile.md` spent forty lines justifying route validation the
-  engine no longer performs — that is what this rule is for.)
+  it wrong. Why it was *designed* that way goes in `plans/`, and the page does
+  not link to it. (`parafile.md` spent forty lines justifying route validation
+  the engine no longer performs — that is what this rule is for.)
+- **A doc links to other docs.** `plans/` is a working note that gets deleted,
+  and it ships in neither the tarball nor the site — a link to one is a dead
+  link for every reader who isn't in the repo. If a page needs something a plan
+  says, the page says it.
 - **One home per fact**, and everywhere else links to it. `PARA_ROUTES` was
   explained on four pages and they disagreed. Invariants and gotchas count as
   facts: don't re-explain one (machine-global workspace names, say) on every

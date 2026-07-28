@@ -1321,7 +1321,12 @@ cmd_completions() {
 	    image)       COMPREPLY=( $(compgen -W "build status rm" -- "$cur") ) ;;
 	    completions) COMPREPLY=( $(compgen -W "bash zsh" -- "$cur") ) ;;
 	    init)        COMPREPLY=( $(compgen -W "--list --full --force" -- "$cur") ) ;;
-	    mod)         COMPREPLY=( $(compgen -W "add $(para mod add --list 2>/dev/null)" -- "$cur") ) ;;
+	    # Two levels, so the position decides: the subcommand, then what add takes.
+	    mod)         if [ "$COMP_CWORD" -eq 2 ]; then
+	                   COMPREPLY=( $(compgen -W "add" -- "$cur") )
+	                 else
+	                   COMPREPLY=( $(compgen -W "--list $(para mod add --list 2>/dev/null)" -- "$cur") )
+	                 fi ;;
 	    ls)          COMPREPLY=( $(compgen -W "--all --names" -- "$cur") ) ;;
 	    # Everything else — including every project command — takes a workspace.
 	    *)           [ "$COMP_CWORD" -eq 2 ] \

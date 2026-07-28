@@ -179,6 +179,34 @@ echo SHADOWED-THE-ENGINE'
   assert_contains "$PARA_OUT" "shadowed" "doctor warns about the shadowed command"
 }
 
+# _completions_after <word>... — what bash would offer after those words. Always
+# called in a subshell, so sourcing the script and putting para on $PATH (which
+# the generated script calls by name) stays in here.
+_completions_after() {
+  # shellcheck source=/dev/null  # generated, and the point of the test
+  . <("$PARA" completions bash)
+  PATH="$(dirname "$PARA"):$PATH"
+  COMP_WORDS=( "$@" "" ); COMP_CWORD="$#"
+  _para
+  printf '%s' "${COMPREPLY[*]:-}"
+}
+
+test_mod_completes_one_level_at_a_time() {
+  # `para mod` takes a subcommand, `para mod add` takes a mod name — one flat
+  # word list offers both at both positions, so it answers `para mod add <TAB>`
+  # with "add". Drive the function: the assert above greps the script's text and
+  # passes either way.
+  local reply
+  reply="$(_completions_after para mod)"
+  assert_eq "add" "$reply" "para mod <TAB> offers the subcommand alone" || return 1
+
+  reply="$(_completions_after para mod add)"
+  assert_contains "$reply" "dotfiles-jchook" "para mod add <TAB> names what para ships" || return 1
+  assert_contains "$reply" "--list"          "and the flag that lists them"             || return 1
+  # Word-exact: a mod whose name merely contains "add" is not this bug.
+  case " $reply " in *" add "*) echo "  'add' is offered again where a name goes" >&2; return 1 ;; esac
+}
+
 # -------------------------------------------------------------- a mod's verbs
 
 test_a_mods_command_becomes_a_verb() {

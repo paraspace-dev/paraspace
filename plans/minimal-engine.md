@@ -443,8 +443,8 @@ What writing it settled, beyond the design above:
   `commands/web` and `commands/key`. Both are one-liners over `para sh`, because
   that is where the terminal handling lives. (`commands/claude` and
   `commands/run` went with `void-jchook` when
-  [mods](./mods.md) replaced it — v1 mods ship no `commands/`, so they live in
-  `docs/agents.md` as snippets to copy.) Templates no longer bake
+  [mods](./mods.md) replaced it, and they ride along with the mod that installs
+  the tool they drive.) Templates no longer bake
   `PARA_PROJECT` — the engine derives it from the directory name.
 - **The Caddyfile is machine-wide by construction.** It's generated from incus,
   so it lists every para workspace on the box regardless of which project (or

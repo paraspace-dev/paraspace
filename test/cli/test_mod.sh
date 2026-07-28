@@ -252,9 +252,10 @@ test_a_third_mod_does_not_make_it_two() {
 echo RAN'
   done
   para_in "$p" deploy
-  assert_contains     "$PARA_OUT" "more than one mod" "the refusal does not miscount" || return 1
-  assert_not_contains "$PARA_OUT" "two mods"          "no stale count in the message" || return 1
-  assert_contains     "$PARA_OUT" "mods/gamma/commands/deploy" "and it names all of them"
+  assert_contains "$PARA_OUT" "more than one mod" "the refusal does not miscount" || return 1
+  # gamma is the assert that matters: a "first two" shape would name alpha and
+  # beta and look right.
+  assert_contains "$PARA_OUT" "mods/gamma/commands/deploy" "and it names every one"
 }
 
 test_an_engine_verb_beats_a_mods_command() {

@@ -183,7 +183,9 @@ consumes all of `.paraspace/`, an honest hash covers all of it — and then repo
 `drifted` after a `Parafile` comment or an edit to a guest-only hook, which is
 most commits. It can't be narrowed by rule either: `PARA_PREPULL_IMAGES`
 genuinely *is* an image input. `image status` still reports when the image was
-built and from what.
+built and from what: a `user.para.base` stamp replaces the hash, since the base
+is one fact fixed at build time rather than a signature over a tree that keeps
+moving.
 
 ## What a mod may assume
 

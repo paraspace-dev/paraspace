@@ -359,7 +359,8 @@ tear the builder down, background `incus exec … & wait` so Ctrl-C works, `-q`
 when stderr isn't a TTY, `PARA_IMAGE_BOOTSTRAP` via `sh -c` before the payload.
 Dropped: the `user.para.uid` / `user.para.user` / `user.para.contract` /
 `user.para.incremental` stamps and the `up`-time drift refusal built on them
-(doctor's job). Kept: `user.para.src_sha` and `image status`'s drift report.
+(doctor's job). Kept: `user.para.src_sha` and `image status`'s drift report —
+both dropped since, for `user.para.base` ([mods.md](./mods.md#drift-detection-goes-away)).
 
 ## Line budget
 
@@ -435,8 +436,9 @@ What writing it settled, beyond the design above:
 - **`image build` lost `-q`/`-v`** (it auto-quiets when stderr isn't a TTY, the
   only case that mattered) and lost the `user.para.uid`/`user`/`contract`/
   `incremental` stamps with the `up`-time drift refusal built on them.
-  `-i/--from-current` and the `user.para.src_sha` drift report stay. Its config
-  checks now run before it touches the daemon.
+  `-i/--from-current` and the `user.para.src_sha` drift report stay — the drift
+  report has since been dropped. Its config checks now run before it touches the
+  daemon.
 - **Templates ship the offloaded verbs**: `void-docker-gh` and `void-jchook`
   carry `commands/web` and `commands/key`; `void-jchook` adds `commands/claude`
   and `commands/run`. All four are one-liners over `para sh`, because that is

@@ -66,5 +66,8 @@ stage "\$BROWSER for a box with no browser"
 # which is what para runs hooks in, so the base's own gh flow gets it too.
 printf 'export BROWSER=%s\n' "$PARA_SHARED/bin/open-url" > /etc/profile.d/dotfiles-jchook.sh
 
-# The zshrc is the point of this mod, so make sure it is the login shell.
-chsh -s "$(command -v zsh)" "$PARA_USER"
+# The zshrc is the point of this mod, so make sure it is the login shell. Void
+# merges sbin into bin and root finds /usr/sbin/zsh first — real, but not a
+# spelling /etc/shells lists, so chsh warns. Record the resolved path instead.
+login_shell="$(readlink -f "$(command -v zsh)")"
+chsh -s "$login_shell" "$PARA_USER"

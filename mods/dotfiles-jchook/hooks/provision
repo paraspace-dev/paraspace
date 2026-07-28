@@ -1,0 +1,67 @@
+#!/usr/bin/env bash
+set -euo pipefail
+# dotfiles-jchook — provision. Runs INSIDE the workspace, after the project's own
+# provision, so the shared volume is already seeded and the clone already exists.
+#
+# Puts a personal dev environment on the shared volume and links it into $HOME:
+# zsh, tmux, Neovim (the config only — plugins, parsers and LSP servers install
+# themselves once, at first launch, into the shared volume every workspace uses),
+# and Claude Code's config. Each file is seeded ONCE and is yours after that:
+# edit it on the volume and every workspace of the project sees the edit.
+
+. "$PARA_HOOKS/helpers"
+
+skel="$PARA_SKEL"
+shared="$PARA_SHARED"
+mine="$shared/dotfiles-jchook"        # this mod's own corner, named after it
+
+mkdir -p "$mine" "$shared/nvim-data" "$shared/bin"
+
+# Seed <src> at <dest> unless something is already there. Nothing else writes any
+# of these, so "already there" means you put it there — the first `para up` seeds
+# it and no later one touches it again.
+seed() { # seed <src> <dest>
+  if [ -e "$2" ]; then return 0; fi
+  stage "Seeding ${2##*/} onto the shared volume (one-time)"
+  cp -R "$1" "$2"
+}
+
+seed "$skel/tmux"         "$shared/tmux"
+seed "$skel/nvim"         "$shared/nvim"
+seed "$skel/claude"       "$shared/claude"
+seed "$skel/bin/open-url" "$shared/bin/open-url"
+if [ ! -f "$shared/claude.json" ]; then echo '{}' > "$shared/claude.json"; fi
+
+# zshrc goes in this mod's own corner rather than at $shared/zshrc, because the
+# base template writes that name too. Nothing then has to arbitrate: ~/.zshrc is
+# a link, and the link below is what decides. The base's file stays its own.
+seed "$skel/zshrc" "$mine/zshrc"
+if [ -e "$shared/zshrc" ]; then
+  info "$shared/zshrc is the base's and is no longer linked — this mod uses dotfiles-jchook/zshrc"
+fi
+
+# A checkout with core.fileMode=false (or a tarball, or a zip) loses the exec
+# bit, and something else launches both of these — $BROWSER, and the statusline
+# Claude Code shells out to.
+for f in "$shared/bin/open-url" "$shared/claude/statusline.sh"; do
+  if [ -f "$f" ]; then chmod +x "$f"; fi
+done
+
+# ---- link it into $HOME ----------------------------------------------------
+# `ln -sfn` onto a REAL directory nests the link inside it instead of replacing
+# it, and every tool below recreates its own config dir the first time it runs —
+# so a workspace that predates this mod has one of those sitting there.
+relink() { # relink <target> <link>
+  if [ ! -L "$2" ]; then rm -rf "$2"; fi
+  ln -sfn "$1" "$2"
+}
+
+mkdir -p ~/.config ~/.local/share
+# ~/.zshrc last-writer-wins over the base's link, which is the whole arbitration:
+# the runner runs mods after the project, so this one is the one that sticks.
+relink "$mine/zshrc"         ~/.zshrc
+relink "$shared/tmux"        ~/.config/tmux
+relink "$shared/nvim"        ~/.config/nvim
+relink "$shared/nvim-data"   ~/.local/share/nvim
+relink "$shared/claude"      ~/.claude
+relink "$shared/claude.json" ~/.claude.json

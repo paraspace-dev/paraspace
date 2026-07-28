@@ -52,9 +52,9 @@ the key, prints it, and **pauses** so you can authorize it:
 `para up` is idempotent, so if a first clone fails with
 `Permission denied (publickey)`, authorize the key and re-run.
 
-`void-docker-gh` and `void-jchook` also ship a
+`void-docker-gh` also ships a
 [project command](./commands.md#project-commands) that re-prints it — a file in
-their `.paraspace/commands/`, not a `para` built-in:
+its `.paraspace/commands/`, not a `para` built-in:
 
 ```sh
 para key
@@ -62,7 +62,7 @@ para key
 
 ### Letting `gh` do it
 
-Set `PARA_GH_AUTH=1` in those templates' `Parafile` and the hook takes a
+Set `PARA_GH_AUTH=1` in that template's `Parafile` and the hook takes a
 `gh auth login` path instead, uploading the key for you — useful for private
 repos. The [Cookbook](./cookbook.md#authenticate-gh-during-provisioning) shows
 how that hook is written.

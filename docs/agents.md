@@ -48,9 +48,9 @@ para sh fix-login                      # a shell in the clone
 para sh fix-login -c 'npm test'        # one command, exits with its status
 ```
 
-A one-line project command turns that into a verb. `void-jchook` ships these
-two; `para init` scaffolds `void-docker-gh`, which doesn't, so copy them in if
-you want them:
+A one-line project command turns that into a verb. No bundled template ships
+these — and a [mod](./mods.md) can't add a verb either — so copy them into your
+own `.paraspace/commands/` if you want them:
 
 ```sh
 # .paraspace/commands/claude — "para claude <ws>"
@@ -71,8 +71,10 @@ They stay one-liners because `para sh` owns the terminal handling — see
 [Commands](./commands.md#project-commands).
 
 For the agent to feel like home, put your dotfiles in `.paraspace/skel/` and
-have your provision hook link them in. The agent's own config (`CLAUDE.md`,
-`AGENTS.md`) travels with the repo, so it's already in the clone.
+have your provision hook link them in — or vendor a mod that brings its own
+(`para mod add dotfiles-jchook` installs Claude Code, an editor and a shell in
+one step). The agent's own config (`CLAUDE.md`, `AGENTS.md`) travels with the
+repo, so it's already in the clone.
 
 ## Working across several
 

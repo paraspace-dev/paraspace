@@ -27,7 +27,14 @@ export default defineConfig({
     { rel: 'preload', href, as: 'font', type: 'font/woff2', crossorigin: '' },
   ]),
 
-  srcExclude: ['README.md', 'CLAUDE.md', 'templates/**', 'plans/**', 'test/**'],
+  srcExclude: [
+    'README.md',
+    'CLAUDE.md',
+    'templates/**',
+    'mods/**',
+    'plans/**',
+    'test/**',
+  ],
 
   // docs/README.md is the docs index on GitHub and npm; serve it at /docs/.
   rewrites: {
@@ -73,6 +80,7 @@ export default defineConfig({
             { text: 'The Parafile', link: '/docs/parafile' },
             { text: 'Hooks', link: '/docs/hooks' },
             { text: 'Hook points', link: '/docs/hook-points' },
+            { text: 'Mods', link: '/docs/mods' },
             { text: 'The image contract', link: '/docs/image' },
             { text: 'Contract versioning', link: '/docs/versioning' },
             { text: 'Internals', link: '/docs/internals' },

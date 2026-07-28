@@ -8,10 +8,12 @@ boot before pointing it at your own project. The **`gh`** in the name is the git
 auth on offer: para prints its ssh key for you to add by hand, or (`PARA_GH_AUTH=1`)
 lets the GitHub CLI upload it for you — the path a private repo needs.
 
-This is what `para init` scaffolds by default. Its siblings:
-[`void-minimal`](../void-minimal) (the barest box — installs and runs nothing,
-just comments showing where to start) and [`void-jchook`](../void-jchook) (this
-same demo carrying a full personal dev environment — zsh, tmux, Neovim, Claude Code).
+This is what `para init` scaffolds by default. Its sibling is
+[`void-minimal`](../void-minimal) — the barest box, installing and running
+nothing, just comments showing where to start. To carry a full personal dev
+environment (zsh, tmux, Neovim, Claude Code) on top of this one, add the
+[`dotfiles-jchook`](../../mods/dotfiles-jchook) mod rather than forking:
+`para mod add dotfiles-jchook`.
 
 ```
 void-docker-gh/

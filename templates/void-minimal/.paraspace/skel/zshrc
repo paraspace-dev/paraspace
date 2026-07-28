@@ -5,8 +5,8 @@
 # NOTE: the void-minimal base image installs NOTHING, so it logs you into bash and
 # this file sits unused until you add `zsh` to .paraspace/hooks/image-build — at which
 # point the provision hook switches your login shell and this applies. It's the
-# seed of your shell config; grow it as you add tools. (templates/void-jchook is a
-# fully fleshed-out version — aliases, a git-aware prompt, editor/browser setup.)
+# seed of your shell config; grow it as you add tools. (The dotfiles-jchook mod
+# is a fully fleshed-out one — aliases, a git-aware prompt, editor/browser setup.)
 
 # --- history (per-workspace: home is not shared) -----------------------------
 HISTFILE=~/.zsh_history

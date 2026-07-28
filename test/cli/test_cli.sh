@@ -99,6 +99,23 @@ echo SHADOWED-THE-ENGINE'
   assert_contains "$PARA_OUT" "shadowed" "doctor warns about the shadowed command"
 }
 
+test_every_verb_main_dispatches_is_an_engine_verb() {
+  # is_engine_verb is what doctor warns from, so a spelling main dispatches but
+  # is_engine_verb omits leaves a command that silently never runs and is never
+  # reported. `-h` was exactly that: main matches `""|-h|--help|help`.
+  local p verb; p="$(a_project)"
+  for verb in -h --help --version; do
+    a_project_command "$p" "$verb" '#!/bin/sh
+echo SHADOWED-THE-ENGINE'
+  done
+  para_in "$p" -h
+  assert_not_contains "$PARA_OUT" "SHADOWED-THE-ENGINE" "the engine won for -h" || return 1
+  para_in "$p" doctor
+  for verb in -h --help --version; do
+    assert_contains "$PARA_OUT" "'$verb' is shadowed" "doctor names $verb" || return 1
+  done
+}
+
 # ------------------------------------------------------------- configuration
 
 test_the_environment_overrides_the_parafile() {
@@ -379,21 +396,22 @@ test_a_scaffolded_project_takes_its_identity_from_the_directory() {
   assert_contains "$out" "my-app" "the directory name became the project slug"
 }
 
-test_template_helpers_do_not_drift() {
-  # hooks/helpers is byte-identical across the bundled templates on purpose, and
-  # cannot be factored into a shared overlay: it has to sit BESIDE the hooks that
-  # source it (shellcheck follows `. "$PARA_HOOKS/helpers"` by basename, through
-  # .shellcheckrc's source-path=SCRIPTDIR), para pushes .paraspace/ into a
-  # workspace whole, and each template dir is documented as runnable on its own.
+test_bundled_helpers_do_not_drift() {
+  # hooks/helpers is byte-identical across everything this package ships — the
+  # templates and the mods — on purpose, and cannot be factored into a shared
+  # overlay: it has to sit BESIDE the hooks that source it (shellcheck follows
+  # `. "$PARA_HOOKS/helpers"` by basename, through .shellcheckrc's
+  # source-path=SCRIPTDIR), para pushes .paraspace/ into a workspace whole, and
+  # a mod resolves $PARA_HOOKS to its OWN directory — so it must ship one.
   local repo ref="" f rc=0 n=0
   repo="$(cd "$(dirname "$PARA")/.." && pwd)"
-  for f in "$repo"/templates/*/.paraspace/hooks/helpers; do
+  for f in "$repo"/templates/*/.paraspace/hooks/helpers "$repo"/mods/*/hooks/helpers; do
     [ -f "$f" ] || continue
     n=$((n + 1))
     if [ -z "$ref" ]; then ref="$f"; continue; fi
     cmp -s "$ref" "$f" || { echo "  drift: ${f#"$repo"/} differs from ${ref#"$repo"/}" >&2; rc=1; }
   done
-  [ "$n" -ge 2 ] || { echo "  expected at least two template helpers, found $n" >&2; return 1; }
+  [ "$n" -ge 3 ] || { echo "  expected at least three bundled helpers, found $n" >&2; return 1; }
   return "$rc"
 }
 

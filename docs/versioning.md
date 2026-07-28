@@ -59,7 +59,8 @@ into a scratch directory to diff against a current template. Otherwise:
 | image stamped uid/user/contract/incremental | only `user.para.base` — `para image status` reports when it was built and from what |
 | `para start` / `para stop` | `para caddy start\|stop\|status` |
 | `para config-set KEY VALUE` | `para config edit` — the file is hand-edited now |
-| `para run`, `claude`, `web`, `key` | project commands in `.paraspace/commands/` |
+| `para web`, `key` | project commands in `.paraspace/commands/`, shipped by `void-docker-gh` |
+| `para run`, `claude` | gone from the engine and from every template — write your own, or see [Running coding agents](./agents.md#driving-one) |
 | `para reconcile`, `install`, `image-build`, `config-import`, `config-sync` | deleted — `up` now re-pushes `.paraspace/` every time |
 
 New since then: `PARA_READY_HOST` (wait for guest DNS to resolve a host your
@@ -83,9 +84,9 @@ is listed here, and each is a hand edit to a `.paraspace/` scaffolded before it.
   no stdin. A build hook that piped its own input, or that ran a package manager
   without `-y`, has to stop.
 - **A hook name resolves to more than one script.** para runs your
-  `hooks/<name>`, then each `mods/*/hooks/<name>` — see
-  [Hook points](./hook-points.md). Nothing changes for a project with no
-  `mods/`.
+  `hooks/<name>`, then each `mods/*/hooks/<name>` — see [Hook
+  points](./hook-points.md) and [Mods](./mods.md). Nothing changes for a project
+  with no `mods/`.
 - **`.paraspace/run-hook` is a name para owns**, alongside `env` and `host.env`:
   para writes its runner there on every push, so a file of yours at that path is
   overwritten.

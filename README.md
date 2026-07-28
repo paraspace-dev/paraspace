@@ -61,16 +61,20 @@ Full docs at **[paraspace.dev](https://paraspace.dev)**, and in
 - [Project setup](./docs/project-setup.md) — adapting `para` to your project ·
   [Cookbook](./docs/cookbook.md) — recipes for the common needs.
 - [Commands](./docs/commands.md) · [The Parafile](./docs/parafile.md) ·
-  [Hooks](./docs/hooks.md) · [The image contract](./docs/image.md) ·
-  [Contract versioning](./docs/versioning.md)
+  [Hooks](./docs/hooks.md) · [Mods](./docs/mods.md) · [The image
+  contract](./docs/image.md) · [Contract versioning](./docs/versioning.md)
 - [Troubleshooting](./docs/troubleshooting.md) — `para doctor` and what its
   checks mean.
 
-## Templates
+## Templates and mods
 
-[`templates/`](./templates) holds three runnable templates —
-`void-docker-gh` (the `para init` default), `void-minimal` and `void-jchook`.
-Each has its own README; [Project setup](./docs/project-setup.md) compares them.
+[`templates/`](./templates) holds two runnable templates — `void-docker-gh` (the
+`para init` default) and `void-minimal`. Each has its own README;
+[Project setup](./docs/project-setup.md) compares them.
+
+A template is copied once and owned; a **mod** stays a dependency.
+[`mods/`](./mods) holds the ones this package ships, installed with
+`para mod add <name>` — see [Mods](./docs/mods.md).
 
 ## Development
 

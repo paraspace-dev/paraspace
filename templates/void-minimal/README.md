@@ -51,7 +51,9 @@ The scaffold tells you where each piece goes:
   port in `PARA_ROUTES` (it ships as `PARA_ROUTES=""`, the explicit "serves no
   HTTP", because this box boots nothing).
 
-For a fuller starting point, see [`void-docker-gh`](../void-docker-gh) (a runnable
-docker demo) or [`void-jchook`](../void-jchook) (a full personal dev environment).
+For a fuller starting point, see [`void-docker-gh`](../void-docker-gh) — a
+runnable docker demo. For a full personal dev environment on top of either, add
+the [`dotfiles-jchook`](../../mods/dotfiles-jchook) mod instead of forking a
+template: `para mod add dotfiles-jchook`.
 
 Full schema + the hook/image contracts: [`../../docs/`](../../docs/README.md).

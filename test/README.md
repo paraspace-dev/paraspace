@@ -6,8 +6,13 @@ Real tests for `para`. Two tiers, one entrypoint:
 test/run            # both tiers (e2e is skipped with a note if incus is absent)
 test/run --cli      # CLI tier only — no incus, fast, runs in CI
 test/run --e2e      # e2e tier only — needs a reachable incus daemon
-test/run route      # run only tests whose description contains "route"
+test/run route      # only tests whose description matches the regex "route"
+test/run '^image build'      # …so anchors and alternation work too
 ```
+
+A description is the test's function name with `test_` dropped and underscores
+as spaces, so it is only ever letters, digits and spaces — a plain word behaves
+as the substring match it looks like.
 
 `npm test`, `npm run test:cli`, and `npm run test:e2e` map to the same.
 
@@ -71,7 +76,7 @@ the existence check.
 The fixture also ships **one mod**, `.paraspace/mods/e2e-mod/`, committed rather
 than installed at test time — `PARA_PROJECT_DIR` points at the tracked fixture,
 so a test that vendored one would dirty the working tree and fail on a second
-run. It fills `provision`, `image-build`, and a `clone:before` point the
+run. It fills `provision`, `image-build`, a `clone:before` point, and a `commands/` verb the
 fixture's own provision hook opens, which is what gives the tier its only
 coverage of a hook name resolving to more than one script. Its `image-build`
 half is baked into the cached image, so it is one more reason

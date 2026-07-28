@@ -27,7 +27,9 @@ what it does and doesn't isolate, and the review loop.
 [Project setup](./project-setup.md) — `para init`, then the pieces that make a
 project para-enabled: the [Parafile](./parafile.md), the [hooks](./hooks.md),
 the [image](./image.md), and any [commands](./commands.md#project-commands) you
-want to add. The [Cookbook](./cookbook.md) has recipes for the common ones.
+want to add. [Mods](./mods.md) are how you vendor a ready-made piece of that
+instead of writing it. The [Cookbook](./cookbook.md) has recipes for the common
+ones.
 
 **Something is broken.**
 [Troubleshooting](./troubleshooting.md) — `para doctor` and what its checks
@@ -42,6 +44,8 @@ mean.
   environment `para` injects.
 - [Hook points](./hook-points.md) — running a hook point of your own, and how a
   name resolves to more than one script.
+- [Mods](./mods.md) — vendoring a reusable piece of `.paraspace/` with
+  `para mod add`, and writing one that plays well with others.
 - [The image contract](./image.md) — what a base image must provide, and how
   `para image build` builds one.
 - [Workspace URLs](./urls.md) — dropping the `:8443`, using your own domain,

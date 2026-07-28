@@ -880,7 +880,7 @@ cmd_init() {
   local template="" force=0 full=0
   while [ "$#" -gt 0 ]; do
     case "$1" in
-      --list)     template_names; return ;;
+      --list)     bundled_names templates; return ;;
       -f|--force) force=1; shift ;;
       --full)     full=1; shift ;;
       -*) die "usage: para init [<template>] [--list] [-f|--force] [--full]" ;;
@@ -921,11 +921,40 @@ cmd_init() {
     || log "Next: edit .paraspace/Parafile (PARA_ORIGIN, PARA_ROUTES), then 'para image build' and 'para up <name>'."
 }
 
-template_names() {
+# What this para ships under templates/ or mods/, one name per line.
+bundled_names() { # bundled_names <templates|mods>
   local dir
-  for dir in "$(pkg_root)"/templates/*/; do
+  for dir in "$(pkg_root)/$1"/*/; do
     if [ -d "$dir" ]; then printf '%s\n' "$(basename "$dir")"; fi
   done
+}
+
+# A mod is a directory shaped like a .paraspace/ — hooks/, skel/ — that a project
+# vendors instead of forking a template to get it. Copied from what this para
+# ships, never fetched, so it lands in the project's own git history and `para
+# up` stays offline. docs/mods.md.
+cmd_mod() {
+  local usage="usage: para mod add <name>  ('para mod add --list' names what this para ships)"
+  [ "${1:-}" = add ] || die "$usage"
+  local name="${2:-}"
+  case "$name" in
+    --list) bundled_names mods; return ;;
+    "")     die "$usage" ;;
+    # Same reason as a template's: without it, `para mod add ../..` copies an
+    # arbitrary tree in — and the destination is one your project commits.
+    */*|.|..) die "a mod is a plain directory name (see: para mod add --list); got '$name'." ;;
+  esac
+  require_project
+  local src dest
+  src="$(pkg_root)/mods/$name"
+  dest="$PARA_PROJECT_DIR/.paraspace/mods/$name"
+  [ -d "$src" ] || die "no such mod '$name' (see: para mod add --list)."
+  # Replace, so adding it again is how you update. The mkdir is not optional: cp
+  # creates the last component but not the mods/ above it.
+  rm -rf "$dest"
+  mkdir -p "$dest"
+  cp -R "$src/." "$dest"
+  log "Vendored '$name' into .paraspace/mods/$name — read it, commit it, then: para up <name>"
 }
 
 # ---- project commands ------------------------------------------------------
@@ -1113,7 +1142,10 @@ doctor_project() {
 # ---- help ------------------------------------------------------------------
 is_engine_verb() {
   case "$1" in
-    up|down|rm|ls|sh|caddy|config|image|init|doctor|commands|completions|help|exec|--version) return 0 ;;
+    up|down|rm|ls|sh|caddy|config|image|init|mod|doctor|commands|completions|exec) return 0 ;;
+    # Every spelling main dispatches, or doctor stays silent about a command
+    # named for one and the reader never learns why theirs does nothing.
+    help|-h|--help|--version) return 0 ;;
     *) return 1 ;;
   esac
 }
@@ -1137,6 +1169,7 @@ usage() {
 
 	PROJECT
 	  init [<template>]         scaffold .paraspace/ into the current directory
+	  mod add <name>            vendor a bundled mod into .paraspace/mods/
 	  image <build|status|rm>   the base image workspaces launch from
 	  commands                  list this project's own commands
 	  completions <bash|zsh>    source <(para completions bash)
@@ -1173,7 +1206,7 @@ cmd_completions() {
   cat <<-'EOF'
 	_para() {
 	  local cur="${COMP_WORDS[COMP_CWORD]}" cmd="${COMP_WORDS[1]:-}"
-	  local verbs="up down rm ls sh caddy config image init doctor commands completions help"
+	  local verbs="up down rm ls sh caddy config image init mod doctor commands completions help"
 
 	  if [ "$COMP_CWORD" -eq 1 ]; then
 	    COMPREPLY=( $(compgen -W "$verbs $(para commands 2>/dev/null)" -- "$cur") )
@@ -1185,6 +1218,7 @@ cmd_completions() {
 	    image)       COMPREPLY=( $(compgen -W "build status rm" -- "$cur") ) ;;
 	    completions) COMPREPLY=( $(compgen -W "bash zsh" -- "$cur") ) ;;
 	    init)        COMPREPLY=( $(compgen -W "--list --full --force" -- "$cur") ) ;;
+	    mod)         COMPREPLY=( $(compgen -W "add $(para mod add --list 2>/dev/null)" -- "$cur") ) ;;
 	    ls)          COMPREPLY=( $(compgen -W "--all --names" -- "$cur") ) ;;
 	    # Everything else — including every project command — takes a workspace.
 	    *)           [ "$COMP_CWORD" -eq 2 ] \
@@ -1214,6 +1248,7 @@ main() {
     config)      cmd_config "$@" ;;
     image)       cmd_image "$@" ;;
     init)        cmd_init "$@" ;;
+    mod)         cmd_mod "$@" ;;
     doctor)      cmd_doctor "$@" ;;
     commands)    project_commands ;;
     completions) cmd_completions "$@" ;;

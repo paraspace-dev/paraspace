@@ -71,16 +71,16 @@ change, the variable is what it promises.
 
 | In the guest | Reach it as | What it is |
 |---|---|---|
-| `~/.paraspace/hooks/` | `$PARA_HOOKS` | your hooks, plus anything they source — a vendored component's hook sees its own, per the table below |
+| `~/.paraspace/hooks/` | `$PARA_HOOKS` | your hooks, plus anything they source — a [mod](./mods.md)'s hook sees its own, per the table below |
 | `~/.paraspace/skel/` | `$PARA_SKEL` | your seed files (dotfiles etc.), for a hook to copy or link |
+| `~/.paraspace/mods/` | — | the [mods](./mods.md) you vendored, each with its own `hooks/` and `skel/` |
 | `~/.paraspace/host.env` | `$PARA_HOST_ENV` | your `.env` from the host, if that file exists. Workspaces only — never pushed to the image builder |
 | `~/.paraspace/env` | — | para's context as export lines. Every `PARA_*` except the handful that name paths on the *host* (`PARA_BIN`, `PARA_PROJECT_DIR`, `PARA_CONFIG`, `PARA_CONFIG_DIR`, `PARA_STATE_DIR`), which are unset here rather than pointing at files that don't exist |
 | `~/.paraspace/commands/` | — | synced along, but these run on the *host* — see [Commands](./commands.md#project-commands) |
 | `~/.paraspace/run-hook` | `$PARA_RUN_HOOK` | para's hook runner — call it to open a [hook point](./hook-points.md) |
 
-`para` reads the `Parafile` itself, on the host. Like `commands/`, it is synced
-into the guest as well, but nothing in the workspace runs it — so don't put a
-host-only secret in a `Parafile`.
+`para` reads the `Parafile` on the host. Like `commands/`, it is synced into the
+guest as well but nothing there runs it — so don't put a host-only secret in one.
 
 Files come from your **host checkout**, not the clone, and are pushed fresh on
 every `up` — so editing a hook takes effect on the next `para up` without

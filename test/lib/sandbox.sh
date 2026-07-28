@@ -39,7 +39,7 @@ sandbox_base() {
   #     and get their real volume deleted by a `--cli` run;
   #   - the image keys are just as destructive one step over. The fixture's
   #     Parafile declares them with `: "${X:=…}"`, which yields to the
-  #     environment — so an exported PARA_IMAGE (say, a real `void-jchook` alias)
+  #     environment — so an exported PARA_IMAGE (say, a real project's alias)
   #     means a PARA_TEST_REBUILD=1 run PUBLISHES the Alpine fixture payload over
   #     that real alias. Without the rebuild it's merely confusing: workspaces
   #     launch from the wrong image and fail with no /usr/sbin/httpd.

@@ -65,6 +65,10 @@ ln -sfn "$PARA_SHARED/nvim" ~/.config/nvim       # shared across workspaces
 `skel/` is re-pushed on every `up`, so editing a dotfile in your checkout and
 re-running `para up` is the whole update loop — no image rebuild.
 
+If someone has already packaged the set you want, vendor it instead of writing
+this by hand — `para mod add dotfiles-jchook` brings a zsh/tmux/Neovim/Claude
+Code environment and the hooks that install it. See [Mods](./mods.md).
+
 ## Pre-pull images so the first boot is fast
 
 `para` forwards every `PARA_*` to your image build, so a key it has never heard

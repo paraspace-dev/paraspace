@@ -2,7 +2,8 @@
 
 `para --help` is always current for the build you're running; this page is the
 same surface with room to explain. It comes in two halves: the **engine verbs**
-below, which are fixed, and the **project commands** your own repo adds.
+below, which are fixed, and the **project commands** your repo adds — its own,
+and any a [mod](./mods.md) brought with it.
 
 Only `para up`, `para image …` and `para mod add` must run inside a project (a
 `.paraspace/` directory, found from `$PWD` upward). Everything else — including
@@ -79,7 +80,7 @@ it (`--force` overwrites); `path` prints its location — both for scripting.
 | `para image build [-i\|--from-current]` | build and publish the project's base image; `-i` layers onto the current one for fast iteration — see [The image contract](./image.md) |
 | `para image status` | when `$PARA_IMAGE` was built, and from what base |
 | `para image rm` | delete `$PARA_IMAGE`. Running workspaces are clones and keep running |
-| `para commands` | list this project's own commands, one per line |
+| `para commands` | list the verbs this project adds, its mods' included, one per line |
 | `para completions <bash\|zsh>` | print a completion script |
 
 ```sh

@@ -285,10 +285,10 @@ is what happens, not that it's desirable.
 | Today | Becomes |
 |---|---|
 | the `skel/` tree (nvim, tmux, claude, zshrc, bin) | `mods/dotfiles-jchook/skel/` |
-| the provision diff (seed, symlink, `chsh`, Claude policy) | `hooks/provision`, replacing the base's seeded files once behind its own sentinel |
+| the provision diff (seed, symlink, `chsh`, Claude policy) | `hooks/provision`, seeding under its own name where the base already owns one, so it replaces nothing |
 | the `image-build.sh` diff (packages, Claude Code) | `hooks/image-build` |
 | the `[alias]` block in `$shared/gitconfig` | `/etc/gitconfig`, written by `hooks/image-build` |
-| `commands/{claude,run}` | stay project commands — [until mods get their own](#what-a-mod-may-assume) |
+| `commands/{claude,run}` | `mods/dotfiles-jchook/commands/`, verbatim — [mods ship verbs](#what-a-mod-may-assume) |
 | the `Parafile` and `boot` diffs | nothing — prose differences |
 | the template itself | deleted; its README becomes `mods/dotfiles-jchook/README.md` |
 

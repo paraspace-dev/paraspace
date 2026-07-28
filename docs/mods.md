@@ -155,9 +155,9 @@ para sh feat-x -c 'mv /para/shared/nvim /para/shared/nvim.mine'
 para up feat-x
 ```
 
-Whatever a mod does replace, it replaces **once**, behind [its own
-mark](#own-your-files), on the first `up` after you add it — and a well-written
-one moves your file aside rather than deleting it. Its README says which.
+**A link into `$HOME` is not a seed.** `ln -sfn` onto a real directory nests
+inside it, so a mod that links `~/.claude` deletes what a workspace already had
+there. Its README lists every path it claims; read that before the first `up`.
 
 **A mod with an `image-build` hook does nothing until you rebuild.** Add the
 mod, run `para up`, and the dotfiles are there but the editor they configure

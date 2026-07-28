@@ -21,7 +21,7 @@ features:
       height: 32
       wrap: true
     title: Sandboxed
-    details: Set your coding agent to YOLO mode and enjoy peace of mind. Each workspace runs in an unpriveleged system container. Boot up is fast, system memory and compute are shared, and you can run containerized stacks inside it.
+    details: Set your coding agent to YOLO mode and enjoy peace of mind. Each workspace runs in an unprivileged system container. Boot up is fast, system memory and compute are shared, and you can run containerized stacks inside it.
   - icon:
       light: /icons/key-light.svg
       dark: /icons/key-dark.svg

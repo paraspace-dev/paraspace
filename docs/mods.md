@@ -73,8 +73,8 @@ host so a command can't be handed one that doesn't exist.
 
 ## Hooks a mod fills
 
-`provision`, `boot` and `image-build` run for every owner, every time — para
-runs each name through the project's hook first, then each mod's, in
+`provision`, `boot` and `image-build` run every time — para runs each name
+through the project's hook first, then each mod's, in
 [no promised order](./hook-points.md#filling-one).
 
 Any other name is a [hook point](./hook-points.md), and a mod filling one

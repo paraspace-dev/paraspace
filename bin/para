@@ -481,14 +481,15 @@ run_hook() { # run_hook <hook> <name>
   ws_exec "$2" "exec ~/.paraspace/run-hook '$1'" || die "the '$1' hook failed (above)."
 }
 
-# Every owner of a .paraspace tree, most specific first: the project, then each
-# mod it vendored. Hooks, skel and commands all resolve down this list, and
-# libexec/run-hook walks the same one on the guest side.
+# Every directory shaped like a .paraspace — the project's own, then each mod it
+# vendored, most specific first. Each holds its own hooks/, skel/ and commands/,
+# so every name para resolves runs down this list; libexec/run-hook walks
+# the same one on the guest side.
 #
 # The glob is `mods/*`, never `mods/*/hooks/x` — bash sorts a multi-component
 # glob with strcoll, which ignores `/` under en_US and orders mods/m2 before
 # mods/m. One component keeps the order the same in every locale.
-owners() {
+paraspace_dirs() {
   printf '%s\n' "$PARA_PROJECT_DIR/.paraspace"
   local d
   for d in "$PARA_PROJECT_DIR"/.paraspace/mods/*; do
@@ -496,14 +497,14 @@ owners() {
   done
 }
 
-# Does any owner fill <hook>? Resolution is the runner's job, but refusing is
-# the host's: the runner's note prints inside a container, minutes in, and the
-# caller has already committed by then.
+# Does the project or any of its mods fill <hook>? Resolution is the runner's
+# job, but refusing is the host's: the runner's note prints inside a container,
+# minutes in, and the caller has already committed by then.
 have_hook() { # have_hook <hook>
   local d
   while IFS= read -r d; do
     if [ -f "$d/hooks/$1" ]; then return 0; fi
-  done < <(owners)
+  done < <(paraspace_dirs)
   return 1
 }
 
@@ -990,7 +991,7 @@ project_commands() {
     for f in "$d"/commands/*; do
       if [ -f "$f" ]; then printf '%s\n' "${f##*/}"; fi
     done
-  done < <(owners) | sort -u
+  done < <(paraspace_dirs) | sort -u
 }
 
 # Every command file answering to <verb>, in owner order.
@@ -998,7 +999,7 @@ command_files() { # command_files <verb>
   local d
   while IFS= read -r d; do
     if [ -f "$d/commands/$1" ]; then printf '%s\n' "$d/commands/$1"; fi
-  done < <(owners)
+  done < <(paraspace_dirs)
 }
 
 # The file `para <verb>` runs, or nothing: yours first, then each mod's.
@@ -1006,7 +1007,7 @@ command_path() { # command_path <verb>
   local d
   while IFS= read -r d; do
     if [ -f "$d/commands/$1" ]; then printf '%s\n' "$d/commands/$1"; return 0; fi
-  done < <(owners)
+  done < <(paraspace_dirs)
   return 1
 }
 

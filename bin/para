@@ -430,8 +430,8 @@ ws_exec() { # ws_exec <name> [<command>]
 
 # ---- hooks -----------------------------------------------------------------
 # para_env as the guest sees it: the three path keys renamed to where <dest>
-# actually put them, and the host-only ones unset rather than left pointing at
-# files that do not exist in there.
+# actually put them, and the ones that must not cross unset rather than left
+# pointing at host files — or, for PARA_HOOK_STACK, at a lie.
 guest_env() { # guest_env <dest>
   # Local, because the host keeps its own PARA_HOST_ENV — push_project reads it.
   # shellcheck disable=SC2034  # all three are read by para_env's ${!PARA_@}
@@ -439,7 +439,11 @@ guest_env() { # guest_env <dest>
         PARA_SKEL="$1/.paraspace/skel" \
         PARA_HOST_ENV="$1/.paraspace/host.env"
   para_env
-  printf 'unset PARA_BIN PARA_PROJECT_DIR PARA_CONFIG PARA_CONFIG_DIR PARA_STATE_DIR\n'
+  # para_env forwards every PARA_* in scope, including whatever the caller
+  # happened to export. PARA_HOOK_STACK is the runner's to build from empty:
+  # inherited, it reads as "we are already inside that hook" and every run
+  # trips the cycle guard instead of running anything.
+  printf 'unset PARA_BIN PARA_PROJECT_DIR PARA_CONFIG PARA_CONFIG_DIR PARA_STATE_DIR PARA_HOOK_STACK\n'
 }
 
 # Replace <instance>:<dest>/.paraspace with the project's, plus para's context.
@@ -475,6 +479,18 @@ push_project() { # push_project <name>
 # Hooks own all provisioning; para only decides when they run. docs/hooks.md.
 run_hook() { # run_hook <hook> <name>
   ws_exec "$2" "exec ~/.paraspace/run-hook '$1'" || die "the '$1' hook failed (above)."
+}
+
+# Does any owner fill <hook>? Resolution is the runner's job, but refusing is
+# the host's: the runner's note prints inside a container, minutes in, and the
+# caller has already committed by then.
+have_hook() { # have_hook <hook>
+  local f
+  for f in "$PARA_PROJECT_DIR/.paraspace/hooks/$1" \
+           "$PARA_PROJECT_DIR"/.paraspace/mods/*/hooks/"$1"; do
+    if [ -f "$f" ]; then return 0; fi
+  done
+  return 1
 }
 
 # The per-workspace half of the hook environment. Everything else a hook sees
@@ -748,8 +764,8 @@ cmd_image_build() {
   done
   # Everything the project itself has to get right, checked before the daemon —
   # an incomplete Parafile is more useful to hear about than an absent incus.
-  # Whether any owner ships an image-build hook is the runner's business: it
-  # warns, by name, at the moment it finds none.
+  have_hook image-build \
+    || die "no 'image-build' hook — .paraspace/hooks/image-build (renamed from image-build.sh). See docs/image.md."
   local base="$PARA_IMAGE_BASE"
   [ "$from_current" -eq 0 ] || base="$PARA_IMAGE"
   [ -n "$base" ] \

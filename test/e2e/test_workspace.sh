@@ -73,6 +73,22 @@ test_image_carries_no_project_tree() {
   assert_eq "" "$found" "the published image has no /opt/.paraspace"
 }
 
+test_a_stray_hook_stack_does_not_stop_the_hooks() {
+  # para_env forwards every PARA_* the caller exported — including one that only
+  # the runner is supposed to set. Inherited, PARA_HOOK_STACK reads as "we are
+  # already inside that hook", so the cycle guard fires on the first hook of
+  # every `up` and the workspace converges having run nothing.
+  #
+  # Exporting it for the `up` is the whole test: without it this asserts nothing,
+  # because the suite's own environment never has the variable set.
+  local out
+  out="$(PARA_HOOK_STACK=provision "$PARA" up "$PARA_WS" 2>&1)" \
+    || { echo "  'para up' failed with a stray PARA_HOOK_STACK exported" >&2
+         echo "$out" | tail -5 >&2; return 1; }
+  assert_not_contains "$out" "hook cycle" "no bogus cycle from an inherited stack" || return 1
+  assert_contains     "$out" "hook: hooks/provision" "the provision hook still ran"
+}
+
 test_a_mod_fills_the_same_hooks_the_project_does() {
   # The multi-owner rule, end to end: one hook name resolves to the project's
   # hook and then each mods/*/hooks/<name>. The fixture ships one mod, and the

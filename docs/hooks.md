@@ -145,8 +145,10 @@ Name what you write after whoever owns it — `/etc/profile.d/dotfiles.sh`,
 `$PARA_SHARED/dotfiles/` — so two things filling the same hook can't quietly
 land on one path.
 
-**The one that surprises people:** a `/etc/profile.d` file doesn't reach the
-hooks running beside it. The shell that runs your hooks read its environment
-before any of them started, so the file takes effect on the *next* thing para
-runs — `boot`, `para sh`, the next `up`. Two hooks that have to hand off within
-a single `provision` do it through a file each reads at the moment it needs it.
+**The one that surprises people:** within a single `provision`, files cross but
+the environment doesn't. Every hook filling a name runs under one shell that
+read its environment before any of them started — so a `/etc/profile.d` file one
+writes takes effect on the *next* thing para runs (`boot`, `para sh`, the next
+`up`), not on the hook beside it. Every other row above is fine: the next hook
+is a fresh process reading the filesystem as it finds it, so a sentinel, an
+installed tool or a `$PARA_SHARED` file written seconds earlier is right there.

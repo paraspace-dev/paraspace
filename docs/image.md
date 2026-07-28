@@ -40,7 +40,8 @@ The command is base-agnostic plumbing:
    enough to the way `para up` pushes it to `~/.paraspace` that `$PARA_HOOKS`
    and `$PARA_SKEL` name real paths in there — your `.env` is the exception, so
    `$PARA_HOST_ENV` names a file the builder does not have;
-4. runs **`.paraspace/hooks/image-build`** as root, with no tty and no stdin;
+4. runs **`hooks/image-build`** as root, with no tty and no stdin — yours, then
+   any a mod vendored under `.paraspace/mods/`;
 5. removes `/opt/.paraspace` and publishes the result as **`$PARA_IMAGE`**. A
    failed or interrupted build leaves the existing image untouched.
 
@@ -50,6 +51,10 @@ snapshot — a workspace should find its `.paraspace/` at `~`, pushed fresh by
 
 Both keys live in the [Parafile](./parafile.md), which is also where the
 per-distro bootstrap examples are.
+
+Nothing to build is an error, not a no-op: with no `hooks/image-build` anywhere,
+`para image build` stops before it touches incus rather than publishing a base
+image with nothing in it.
 
 Two caveats:
 

@@ -25,5 +25,5 @@ for owner in "$root" "$root"/mods/*; do
   ran=1
 done
 if [ "$ran" -eq 0 ]; then
-  printf "\033[33mwarn:\033[0m no '%s' hook\n" "$name" >&2
+  printf "\033[36m==>\033[0m no '%s' hook\n" "$name" >&2
 fi

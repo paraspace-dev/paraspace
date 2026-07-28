@@ -307,13 +307,26 @@ test_image_build_refuses_without_a_base_image() {
 }
 
 test_image_build_refuses_without_an_image_build_hook() {
-  # The whole migration story for image-build.sh -> hooks/image-build: the old
-  # name is not recognized, so a project still shipping it has to hear which
-  # path para wanted rather than build an image with no provisioning in it.
-  local p; p="$(a_project)"
-  printf 'true\n' > "$p/.paraspace/image-build.sh"
-  assert_refuses "$p" "missing image-build hook" image build || return 1
+  # Refusing is the host's job, not the runner's. The runner's note prints
+  # inside the builder, minutes in, and the build then publishes and exits 0 —
+  # so a project that never renamed image-build.sh would get one line of
+  # scrollback and a base image with no provisioning in it.
+  local p; p="$(a_project 'PARA_IMAGE_BASE=images:alpine/edge')"
+  assert_refuses "$p" "no 'image-build' hook" image build || return 1
   assert_backend_untouched
+}
+
+test_image_build_accepts_a_hook_from_a_mod() {
+  # ...and it has to span mods, or vendoring the hook that builds your image
+  # would be refused by the very check that exists to catch its absence.
+  local p; p="$(a_project 'PARA_IMAGE_BASE=images:alpine/edge')"
+  mkdir -p "$p/.paraspace/mods/tools/hooks"
+  printf 'true\n' > "$p/.paraspace/mods/tools/hooks/image-build"
+  para_in "$p" image build
+  case "$PARA_OUT" in
+    *"no 'image-build' hook"*) echo "  a mod's image-build hook was not counted" >&2; return 1 ;;
+  esac
+  return 0
 }
 
 test_image_rejects_an_unknown_subcommand() {

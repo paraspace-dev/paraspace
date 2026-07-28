@@ -31,7 +31,7 @@ but never contains. The `mods/` and `templates/` this package ships are
 
 The para↔project interface is versioned (`PARA_CONTRACT`, currently **1**) — the
 `.paraspace/` dir a project ships: its `Parafile`, its `hooks/`, its `mods/`
-(vendored `hooks/`+`skel/` para also runs), and its
+(vendored `hooks/`+`skel/`+`commands/` para also resolves), and its
 `commands/` (host-side verbs that become `para <verb>`). A **breaking** change to
 injected env, the hook names/semantics, the `~/.paraspace` layout in the guest,
 or the `Parafile` vars must bump `PARA_CONTRACT`; additive changes don't.
@@ -151,10 +151,10 @@ one was a mess that a full rewrite had to clean up.
   `para sh` needs util-linux `su`; images are per-arch; the first
   `para image build` takes minutes.
 - **Never document template or mod policy as engine behavior.** The
-  generic-mechanism boundary applies to prose: `para claude` is a file *you*
-  drop in `commands/` — no bundled template ships it, and a mod can't — and
-  every page that shows it says so. Blurring it teaches people to file engine
-  bugs about their own hooks.
+  generic-mechanism boundary applies to prose: `para claude` is a file the
+  `dotfiles-jchook` mod ships (no bundled *template* does), not something the
+  engine knows about — and every page that shows it says so. Blurring it
+  teaches people to file engine bugs about their own hooks.
 - **Show the command.** A page earns its keep with the line the reader can
   paste. Prose that surrounds no command is usually rationale in disguise.
 - **Don't restate defaults.** A doc — or a Parafile — that repeats a default is

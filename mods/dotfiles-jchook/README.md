@@ -18,6 +18,17 @@ para up demo
 
 It opens no [hook point](https://paraspace.dev/docs/hook-points) of its own.
 
+## Verbs it adds
+
+| Verb | What it does |
+|---|---|
+| `para claude <ws> [args…]` | Claude Code in that workspace's clone, arguments passed through intact |
+| `para run <ws>` | a tmux session — Claude in one window, a shell in another; re-running attaches instead of stacking |
+
+Both run on your machine with your privileges, like any
+[para verb](https://paraspace.dev/docs/commands#project-commands) — read them
+before you run them. Your own `.paraspace/commands/<verb>` overrides either.
+
 **Targets [`void-docker-gh`](https://github.com/paraspace-dev/paraspace/tree/main/templates/void-docker-gh).** Two couplings:
 the build hook is `xbps`, so another distro means rewriting the package list;
 and it installs Claude Code as `$PARA_USER`, so the base's `image-build` has to
@@ -67,9 +78,5 @@ It's vendored — the copy under your `.paraspace/mods/` is in your git history,
 so edit `skel/` freely and `para up` pushes the change with no image rebuild.
 Adding packages or another runtime means editing `hooks/image-build` and
 rebuilding.
-
-`para claude` and `para run` aren't here: v1 mods ship no `commands/`. Both are
-one-liners you copy into your own `.paraspace/commands/` — see
-[Running coding agents](https://paraspace.dev/docs/agents#driving-one).
 
 More about mods: [paraspace.dev/docs/mods](https://paraspace.dev/docs/mods).

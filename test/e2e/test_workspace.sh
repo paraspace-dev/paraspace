@@ -59,7 +59,14 @@ test_guest_paths_are_injected() {
 
   # The host-only paths stay unset in here, so a hook can't reach a host file.
   local host; host="$("$PARA" sh "$PARA_WS" -c 'echo "${PARA_PROJECT_DIR-unset}"' 2>/dev/null)"
-  assert_eq "unset" "$host" "PARA_PROJECT_DIR is not leaked into the guest"
+  assert_eq "unset" "$host" "PARA_PROJECT_DIR is not leaked into the guest" || return 1
+
+  # PARA_MOD_DIR is the one most likely to actually BE in scope: para exports it
+  # for a mod's own command, and such a command calling back into `para sh` is
+  # the ordinary way to write one. Exported here to reproduce exactly that.
+  local mod
+  mod="$(env PARA_MOD_DIR=/on/the/host "$PARA" sh "$PARA_WS" -c 'echo "${PARA_MOD_DIR-unset}"' 2>/dev/null)"
+  assert_eq "unset" "$mod" "PARA_MOD_DIR is not leaked into the guest"
 }
 
 # shellcheck disable=SC2016  # the guest expands this, not us

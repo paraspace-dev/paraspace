@@ -40,17 +40,41 @@ A mod is a directory shaped like a `.paraspace/`:
   README.md
   hooks/{provision,image-build,helpers}
   skel/{zshrc,nvim,tmux,claude,bin}
+  commands/{claude,run}
 ```
 
 Which is why almost nothing had to be invented for it: `para up` already pushes
 your whole `.paraspace/` into the workspace, so a mod arrives with it and its
 hooks run there like yours do.
 
-Two entries a mod does **not** have. There is no `Parafile` — mods are never
-sourced on the host, so a mod's knobs are ordinary `PARA_*` variables it
-defaults in its own hook and documents in its README. And there is no
-`commands/`: `para <verb>` resolves only against the project's, so a mod that
-wants to ship you a verb has to tell you to copy it in.
+The one entry a mod does **not** have is a `Parafile` — mods are never sourced
+on the host, so a mod's knobs are ordinary `PARA_*` variables it defaults in its
+own hook and documents in its README.
+
+## Verbs a mod brings
+
+A mod's `commands/` become `para <verb>` like the project's own — see
+[Commands](./commands.md#project-commands) for what a command is. Three rules
+settle who answers to a name:
+
+- **Engine verbs always win.** Nothing can redefine `para up`.
+- **Your own `commands/` beats any mod's.** Dropping a file in
+  `.paraspace/commands/<verb>` is how you override one you don't like.
+- **Two mods defining one verb is refused**, naming both files, because para
+  promises no order between mods and picking one would be a coin toss you can't
+  see the result of. Delete one or shadow it with your own.
+
+`para --help` names the mod each verb came from, and `para doctor` reports a
+conflict before you trip over it.
+
+> [!WARNING]
+> A command runs **on your machine, with your privileges** — not in the
+> workspace. `para mod add` says so when a mod ships any. Read them.
+
+A mod's command reaches its own files through **`$PARA_MOD_DIR`** — e.g.
+`cp -R "$PARA_MOD_DIR/skel/nvim" ~/.config/nvim`. `$PARA_HOOKS` and `$PARA_SKEL`
+are no help: they name guest paths, and para unsets them on the host precisely
+so a host path can't cross into a container.
 
 ## Which of a mod's hooks run
 

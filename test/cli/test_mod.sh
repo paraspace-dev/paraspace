@@ -6,6 +6,7 @@
 # test/fixtures/hello. The fixture is tracked, and teardown doesn't cover it — a
 # test that added a mod there would dirty the working tree, hand bin/lint the
 # installed copy to lint, and fail the second time it ran.
+# shellcheck disable=SC2016  # command bodies expand when the command runs, not here
 
 # a_para_pkg <entry>... — a package root of our own: a copy of para under bin/,
 # and the given entries created under mods/ (a trailing / makes a directory).
@@ -18,7 +19,8 @@ a_para_pkg() {
   for entry in "$@"; do
     case "$entry" in
       */) mkdir -p "$d/mods/$entry" ;;
-      *)  printf 'not a mod\n' > "$d/mods/$entry" ;;
+      *)  mkdir -p "$(dirname "$d/mods/$entry")"
+          printf 'not a mod\n' > "$d/mods/$entry" ;;
     esac
   done
   printf '%s\n' "$d/bin/para"
@@ -40,6 +42,29 @@ test_mod_add_vendors_a_bundled_mod() {
   # The README travels with it: the copy in your repo documents the copy in
   # your repo, which is the whole reason a mod is vendored rather than fetched.
   assert test -f "$p/.paraspace/mods/dotfiles-jchook/README.md"
+}
+
+test_mod_add_makes_a_mods_commands_runnable_and_says_so() {
+  # A command honours its shebang, so unlike a hook it needs the exec bit — a
+  # checkout with core.fileMode=false has none to copy, and `exec` would fail
+  # with a bare "permission denied" naming a file the reader never installed.
+  local p; p="$(a_project)"
+  para_in "$p" mod add dotfiles-jchook
+  assert test -x "$p/.paraspace/mods/dotfiles-jchook/commands/claude" || return 1
+  assert test -x "$p/.paraspace/mods/dotfiles-jchook/commands/run"    || return 1
+  # And the reader is told, because these run on the HOST with their privileges
+  # — the one thing about a mod that isn't confined to a throwaway container.
+  assert_contains "$PARA_OUT" "YOUR machine" "the warning names where they run" || return 1
+  assert_contains "$PARA_OUT" "claude, run"  "and which verbs landed"
+}
+
+test_mod_add_is_quiet_about_a_mod_with_no_commands() {
+  # The warning has to mean something when it fires, so it must not fire on
+  # every install. Needs a package of our own: every bundled mod ships commands.
+  local pkg d out; pkg="$(a_para_pkg quiet-mod/hooks/)"; d="$(a_project)"
+  out="$(env PARA_PROJECT_DIR="$d" "$pkg" mod add quiet-mod 2>&1)"
+  assert_contains     "$out" "Vendored"     "it still installed" || return 1
+  assert_not_contains "$out" "YOUR machine" "no verbs, no warning"
 }
 
 test_mod_add_replaces_rather_than_merging() {
@@ -142,6 +167,83 @@ echo SHADOWED-THE-ENGINE'
   assert_not_contains "$PARA_OUT" "SHADOWED-THE-ENGINE" "the engine verb won" || return 1
   para_in "$p" doctor
   assert_contains "$PARA_OUT" "shadowed" "doctor warns about the shadowed command"
+}
+
+# -------------------------------------------------------------- a mod's verbs
+
+test_a_mods_command_becomes_a_verb() {
+  # The whole point: `para <verb>` resolves against the project's commands/ AND
+  # each mod's, so a mod that ships a tool can ship the verb that drives it.
+  local p; p="$(a_project)"
+  a_mod_command "$p" tools deploy '#!/bin/sh
+# summary: ship it
+echo RAN-THE-MODS-COMMAND'
+  para_in "$p" deploy
+  assert_contains "$PARA_OUT" "RAN-THE-MODS-COMMAND" "the mod's command ran" || return 1
+  para_in "$p" commands
+  assert_contains "$PARA_OUT" "deploy" "para commands lists it" || return 1
+  # Named, not anonymous: a verb you didn't write should say where it came from.
+  para_in "$p" --help
+  assert_contains "$PARA_OUT" "ship it"  "help shows its summary" || return 1
+  assert_contains "$PARA_OUT" "[tools]"  "help names the mod it came from"
+}
+
+test_a_project_command_shadows_a_mods() {
+  # Your own commands/ is the override: same precedence as engine-over-project,
+  # one step down. This is the documented way to replace a verb you dislike.
+  local p; p="$(a_project)"
+  a_mod_command     "$p" tools deploy '#!/bin/sh
+echo MOD'
+  a_project_command "$p"       deploy '#!/bin/sh
+echo PROJECT'
+  para_in "$p" deploy
+  assert_contains     "$PARA_OUT" "PROJECT" "the project's command won" || return 1
+  assert_not_contains "$PARA_OUT" "MOD"     "the mod's did not run"     || return 1
+  # Listed once, not twice, and attributed to nobody: it's yours now.
+  para_in "$p" commands
+  assert_eq 1 "$(grep -c '^deploy$' <<<"$PARA_OUT")" "listed once across both owners" || return 1
+  para_in "$p" --help
+  assert_not_contains "$PARA_OUT" "[tools]" "help no longer credits the mod"
+}
+
+test_two_mods_defining_one_verb_are_refused() {
+  # Nothing promises an order between mods, so running one would be a coin toss
+  # the reader can't see the result of. Refuse, and name both files.
+  local p; p="$(a_project)"
+  a_mod_command "$p" alpha deploy '#!/bin/sh
+echo ALPHA'
+  a_mod_command "$p" beta  deploy '#!/bin/sh
+echo BETA'
+  para_in "$p" deploy
+  [ "$PARA_RC" -ne 0 ] || { echo "  a contested verb was dispatched anyway" >&2; return 1; }
+  assert_not_contains "$PARA_OUT" "ALPHA" "neither mod ran" || return 1
+  assert_not_contains "$PARA_OUT" "BETA"  "neither mod ran" || return 1
+  assert_contains "$PARA_OUT" "mods/alpha/commands/deploy" "the refusal names one" || return 1
+  assert_contains "$PARA_OUT" "mods/beta/commands/deploy"  "and the other"        || return 1
+
+  # --help must survive it. A conflict is a project you have to go fix, and
+  # help is what you run when you're lost — killing it there would be hostile.
+  para_in "$p" --help
+  assert_eq 0 "$PARA_RC" "help still works with a contested verb" || return 1
+  para_in "$p" doctor
+  assert_contains "$PARA_OUT" "two mods define 'deploy'" "doctor reports it before you trip"
+}
+
+test_a_mods_command_gets_para_mod_dir() {
+  # A host-side command has no other way to find its own files: $PARA_HOOKS and
+  # $PARA_SKEL name GUEST paths and para keeps them unset on the host.
+  local p; p="$(a_project)"
+  a_mod_command "$p" tools whereami '#!/bin/sh
+echo "at:$PARA_MOD_DIR"'
+  para_in "$p" whereami
+  assert_contains "$PARA_OUT" "at:$p/.paraspace/mods/tools" "it points at the mod's own directory" || return 1
+
+  # And a project's own command must not see one — including a stale value from
+  # the environment, which is exactly what a mod command calling back would leave.
+  a_project_command "$p" whoami '#!/bin/sh
+echo "at:${PARA_MOD_DIR-<unset>}"'
+  PARA_OUT="$(env PARA_PROJECT_DIR="$p" PARA_MOD_DIR=/leaked "$PARA" whoami 2>&1)"
+  assert_contains "$PARA_OUT" "at:<unset>" "a project command owns no mod dir"
 }
 
 # ------------------------------------------------------------------ packaging

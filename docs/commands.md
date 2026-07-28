@@ -104,9 +104,10 @@ xdg-open "$url"
 ```
 
 Save that as `.paraspace/commands/web`, make it executable, and `para web ws1`
-works. Two variables exist for exactly this: **`PARA_BIN`** (the path to this
-`para`, so a command can call back without relying on `$PATH`) and
-**`PARA_PROJECT_DIR`**.
+works. Three variables exist for exactly this: **`PARA_BIN`** (the path to this
+`para`, so a command can call back without relying on `$PATH`),
+**`PARA_PROJECT_DIR`**, and — only when the command came from a
+[mod](./mods.md) — **`PARA_MOD_DIR`**, the directory that mod was vendored into.
 
 Because [`para sh`](#running-one-command) owns all the terminal handling,
 commands that drive something inside a workspace stay one-liners:
@@ -135,6 +136,7 @@ you don't want:
 | `void-docker-gh` (the `para init` default) | `key`, `web` |
 | `void-minimal` | none |
 
-A [mod](./mods.md) can't add a verb — `para <verb>` resolves only against the
-project's `commands/`, so a mod that wants to give you one says so in its README
-and you copy the file in.
+A [mod](./mods.md) you vendored can add verbs too, and they're listed the same
+way with the mod named beside them. Yours wins over any mod's; two mods claiming
+one verb is refused rather than settled silently — [the rules are
+there](./mods.md#verbs-a-mod-brings).

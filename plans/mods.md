@@ -208,12 +208,17 @@ does so **once, behind its own sentinel** — the base seeds, the mod replaces,
 neither touches it again, and your later edits survive both. Two mods claiming
 `~/.zshrc` is a conflict para will not detect.
 
-**Mods have no `commands/` in v1 — the first thing v2 should fix.** A mod
-shipping nvim, tmux and Claude Code wants to ship `para claude` with them, so
-today the one piece a consumer must hand-copy is the piece they most wanted.
-`project_commands`, `is_engine_verb`, `usage_project_commands` and
-`cmd_completions` each resolve one directory and would take a short search path.
-What has to be *decided* is the collision rule — hence [deferred](#deferred).
+**Mods ship `commands/`, landed in PR 5** rather than deferred: the deferral
+would have left the one piece a consumer must hand-copy being the piece they
+most wanted, since a mod shipping nvim, tmux and Claude Code wants to ship `para
+claude` with them. The collision rule that was blocking it: yours beats any
+mod's, and two mods over one verb is **refused at dispatch** naming both files —
+para promises no order between mods, so settling it silently would be a coin
+toss you cannot see. Two things the sketch here missed. A host-side command has
+no `$PARA_HOOKS` to locate itself by, so it gets **`$PARA_MOD_DIR`** (additive,
+and `guest_env` unsets it like every other host path). And a command honours its
+shebang, so unlike a hook it needs the exec bit — `mod add` sets it, and warns
+that a mod's verbs run on the host with your privileges.
 
 ### A mod may open a point
 
@@ -376,11 +381,12 @@ image build` with the fixture mod's `hooks/image-build` actually running.
 - **Third-party mods** — `para mod add <git-url>`, and whatever a mod author
   publishes *to*. The fetch story is where the real questions are (what a ref
   means, what gets stripped, how a consumer reviews a tree before running it),
-  and none can be answered before a second person has written a mod. The install
+  and none can be answered before a second person has written a mod. PR 5
+  sharpened the last one: a mod's `commands/` run on the **host**, so a fetched
+  mod is `curl | sh` with extra steps unless review is part of the verb. The
+  warning `mod add` prints is the floor, not the answer. The install
   target is the same either way, so nothing about v1 gets undone; the eventual
   verb is `git clone` + `rm -rf .git` into a path `mod add` already owns.
-- **Mod `commands/`** — the [first thing after this](#what-a-mod-may-assume), and
-  the reason to keep `project_commands` easy to turn into a search path.
 - **`PARA_MODS` — the designated follow-up PR.** An ordered list a template
   declares and `para init` installs: what makes templates composable, and the
   answer to [ordering between mods](#a-mod-may-open-a-point). Lands after

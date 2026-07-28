@@ -87,13 +87,19 @@ is listed here, and each is a hand edit to a `.paraspace/` scaffolded before it.
   `hooks/<name>`, then each `mods/*/hooks/<name>` — see [Hook
   points](./hook-points.md) and [Mods](./mods.md). Nothing changes for a project
   with no `mods/`.
+- **A verb resolves to more than one `commands/`**, and `$PARA_MOD_DIR` is new:
+  para runs your `commands/<verb>` if you have it, else the one mod that does —
+  see [Mods](./mods.md#verbs-a-mod-brings). Additive: with no `mods/`, or with
+  no mod that ships `commands/`, nothing resolves differently.
 - **`.paraspace/run-hook` is a name para owns**, alongside `env` and `host.env`:
   para writes its runner there on every push, so a file of yours at that path is
   overwritten.
-- **The exec bit is no longer load-bearing**, and para no longer sets it. A hook
-  runs as `bash <the file>` whatever its mode, so a `core.fileMode=false`
-  checkout stops breaking a workspace — but a helper *you* run by path out of
-  `hooks/` now needs `bash` in front of it, or its own exec bit committed.
+- **The exec bit is no longer load-bearing in `hooks/`**, and para no longer
+  sets it there. A hook runs as `bash <the file>` whatever its mode, so a
+  `core.fileMode=false` checkout stops breaking a workspace — but a helper *you*
+  run by path out of `hooks/` now needs `bash` in front of it, or its own exec
+  bit committed. `commands/` is unchanged: a command honours its own shebang, so
+  it still needs the bit, and `para init` and `para mod add` both set it.
 
 At 1.0 this section closes and anything that breaks a `.paraspace/` bumps the
 number instead.

@@ -139,10 +139,13 @@ test_image_build_status_and_rm_lifecycle() {
   env PARA_IMAGE="$img" "$PARA" image build >/dev/null 2>&1 \
     || { echo "  'para image build' of throwaway image '$img' failed" >&2; return 1; }
 
-  # Read path: status names the image, when it was built, and its base.
+  # Read path: status names the image, when it was built, and its base. `built`
+  # and `base` are both read back out of incus, and each prints the literal
+  # 'unknown' if its read broke — which is what the last assert is for.
   out="$(env PARA_IMAGE="$img" "$PARA" image status 2>&1)"
-  assert_contains "$out" "$img"               "status names the image"         || rc=1
-  assert_contains "$out" "images:alpine/edge" "status reports the base image"  || rc=1
+  assert_contains "$out" "$img"               "status names the image"          || rc=1
+  assert_contains "$out" "images:alpine/edge" "status reports the stamped base" || rc=1
+  assert_not_contains "$out" "unknown"        "status resolved built and base"  || rc=1
 
   # rm deletes it — verify the image is actually gone afterwards.
   env PARA_IMAGE="$img" "$PARA" image rm >/dev/null 2>&1 \

@@ -777,7 +777,7 @@ cmd_image_build() {
   # INT trap, which tears the builder down.
   { para_env; cat "$payload"; } | incus exec "$builder" -- bash -s &
   wait "$!"
-  image_publish
+  image_publish "$base"
   # Before the traps are cleared, so an interrupt here is still covered.
   incus delete -f "$builder"
   trap - EXIT INT TERM
@@ -789,7 +789,7 @@ cmd_image_build() {
 # halts; a snapshot because publishing a just-stopped instance races its rootfs
 # settling; a temp alias because publishing over the live alias would leave the
 # box with no image at all if the publish failed.
-image_publish() {
+image_publish() { # image_publish <base>
   incus stop -f "$builder"
   incus snapshot create "$builder" publish
   log "Publishing as '$PARA_IMAGE'…"
@@ -798,6 +798,9 @@ image_publish() {
   incus image delete "$PARA_IMAGE" >/dev/null 2>&1 || true
   incus image alias rename "$tmp_alias" "$PARA_IMAGE" \
     || die "the new image is published as '$tmp_alias' but could not be renamed — recover with: incus image alias rename $tmp_alias $PARA_IMAGE"
+  # What this image was built from, as opposed to what the Parafile names today,
+  # which is what the *next* build would use. `-i` stamps $PARA_IMAGE itself.
+  incus image set-property "$PARA_IMAGE" user.para.base "$1"
 }
 
 # Never delete the temp alias once it holds the only copy of the image.
@@ -812,10 +815,11 @@ cmd_image_status() {
   local info
   info="$(incus image info "$PARA_IMAGE" 2>/dev/null)" \
     || die "no '$PARA_IMAGE' image yet — build it with: para image build"
-  local built
+  local built base
   built="$(awk -F'Uploaded: *' '/Uploaded:/{print $2; exit}' <<<"$info")"
+  base="$(incus image get-property "$PARA_IMAGE" user.para.base 2>/dev/null || true)"
   printf '  image    %s\n  built    %s\n  base     %s\n' \
-    "$PARA_IMAGE" "${built:-unknown}" "${PARA_IMAGE_BASE:-<unset>}"
+    "$PARA_IMAGE" "${built:-unknown}" "${base:-unknown}"
 }
 
 cmd_image_rm() {

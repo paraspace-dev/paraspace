@@ -59,8 +59,6 @@ is the reference: a package list, a user, and Docker set up for nesting.
 
 ## Checking it — `para image status`
 
-An image outlasts the source that built it, so:
-
 ```
 $ para image status
   image    myapp
@@ -68,9 +66,13 @@ $ para image status
   base     images:voidlinux
 ```
 
-para does not track whether your `image-build.sh` has changed since that build —
-rebuild when you've edited it, and if you leave it too long you find out because
-the tool you added isn't in the workspace.
+`base` is what this image was built **from**, stamped at build time — not what
+`PARA_IMAGE_BASE` names today. After a `-i` build it is `$PARA_IMAGE` itself,
+which is how you tell an incremental image from a clean one.
+
+Rebuild when you've edited your `image-build.sh` — nothing checks for you, and
+if you leave it too long you find out because the tool you added isn't in the
+workspace.
 
 `para image rm` deletes `$PARA_IMAGE` — to reclaim space or force a fully clean
 next build. Workspaces already `up` are clones and keep running.

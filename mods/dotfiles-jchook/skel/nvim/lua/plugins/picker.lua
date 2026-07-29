@@ -34,11 +34,14 @@ return {
           -- image; fall back to a plain fd listing when it's absent so <C-p>
           -- still works (just without proximity ordering).
           local has_prox = vim.fn.executable("proximity-sort") == 1
+          -- An explicit `cmd` bypasses `fd_opts` entirely, and fzf-lua still
+          -- appends `--hidden` for its <A-h> toggle — so the excludes have to
+          -- be repeated here or <C-p> lists the whole .git tree.
+          local base = "fd -t f --exclude .git --exclude .jj --strip-cwd-prefix"
           local cmd = (cur == "" or cur == nil or not has_prox)
-            and "fd -t f --strip-cwd-prefix"
+            and base
             or string.format(
-              "fd -t f --strip-cwd-prefix | proximity-sort %s",
-              vim.fn.shellescape(cur))
+              "%s | proximity-sort %s", base, vim.fn.shellescape(cur))
           require("fzf-lua").files({
             cmd = cmd,
             _fzf_nth_devicons = false,

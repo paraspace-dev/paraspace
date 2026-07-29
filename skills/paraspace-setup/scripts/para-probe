@@ -1,16 +1,51 @@
 #!/usr/bin/env bash
-set -uo pipefail
+set -u
 # para-probe — one read-only report on this machine and this project, so a
 # ParaSpace setup starts from what is installed rather than from a guess.
 #
-# No -e on purpose: every section here is allowed to fail (a missing tool IS the
-# finding), and a probe that stops at the first one reports nothing.
+# Neither -e nor pipefail: every section is allowed to fail (a missing tool IS
+# the finding), and a probe that reports failure is as useless as one that stops
+# at the first one — the agent running it would read a non-zero exit as "the
+# survey broke" and start debugging the probe.
 
-have() { command -v "$1" >/dev/null 2>&1; }
-head2() { printf '\n== %s\n' "$*"; }
-kv()    { printf '  %-14s %s\n' "$1" "$2"; }
+have()    { command -v "$1" >/dev/null 2>&1; }
+section() { printf '\n== %s\n' "$*"; }
+kv()      { printf '  %-14s %s\n' "$1" "$2"; }
 
-head2 machine
+# para's package root, through any symlink chain, the way bin/para's pkg_root
+# does it — plain readlink, because macOS has no readlink -f. The docs and
+# templates the setup skill must read live in there.
+para_pkg() {
+  local self dir link
+  self="$(command -v para)" || return 1
+  while [ -L "$self" ]; do
+    dir="$(cd -P "$(dirname "$self")" && pwd)"
+    link="$(readlink "$self")"
+    case "$link" in /*) self="$link" ;; *) self="$dir/$link" ;; esac
+  done
+  cd -P "$(dirname "$self")/.." && pwd
+}
+
+# para finds a project by walking up from $PWD for a .paraspace/, so git's
+# toplevel is only a fallback — in a monorepo the two are different directories.
+project_root() {
+  local dir="$PWD"
+  while [ "$dir" != / ]; do
+    if [ -d "$dir/.paraspace" ]; then printf '%s\n' "$dir"; return; fi
+    dir="$(dirname "$dir")"
+  done
+  git rev-parse --show-toplevel 2>/dev/null || pwd
+}
+
+vcs_kind() {
+  if   [ -d "$1/.git" ]; then echo git
+  elif [ -d "$1/.hg"  ]; then echo mercurial
+  elif [ -d "$1/.svn" ]; then echo svn
+  else echo "none found — the code has to be pushed in, not cloned"
+  fi
+}
+
+section machine
 kv os "$(uname -s) $(uname -r) $(uname -m)"
 case "$(uname -s)" in
   Darwin)
@@ -23,43 +58,50 @@ case "$(uname -s)" in
     ;;
 esac
 
-head2 tools
+section tools
 for t in para incus caddy git docker; do
   if have "$t"; then kv "$t" "$(command -v "$t")"; else kv "$t" "MISSING"; fi
 done
-have para  && kv para-version "$(para --version 2>&1 | head -1)"
+have incus || kv incus-install "https://linuxcontainers.org/incus/docs/main/installing/ (distro repos ship too-old versions)"
+have caddy || kv caddy-install "https://caddyserver.com/docs/install"
+have para  || kv para-install  "npm i -g paraspace"
+have para  && kv para-version  "$(para --version 2>&1 | head -1)"
 have incus && kv incus-version "$(incus version 2>&1 | tr '\n' ' ')"
 have caddy && kv caddy-version "$(caddy version 2>&1 | head -1)"
+if pkg="$(para_pkg 2>/dev/null)"; then
+  kv docs      "$pkg/docs"        # the authoritative spec for THIS para — read it
+  kv templates "$pkg/templates"
+fi
 
 # Storage driver is the one thing doctor can only warn about and the one that
 # silently costs the most: nested Docker on btrfs/zfs falls back to vfs.
-head2 incus
+section incus
 if have incus && incus info >/dev/null 2>&1; then
   printf '  storage pools (name,driver):\n'
-  incus storage list -f csv -c nD 2>&1 | sed 's/^/    /'
+  incus storage list -f csv -c nD | sed 's/^/    /'
   printf '  managed bridges (name,ipv4):\n'
-  incus network list -f csv -c nm4 2>&1 | grep ',YES,' | cut -d, -f1,3 | sed 's/^/    /'
+  incus network list -f csv -c nm4 | grep ',YES,' | cut -d, -f1,3 | sed 's/^/    /'
 else
   kv daemon "unreachable — on macOS: colima start --runtime incus"
 fi
 
-head2 "para doctor"
+section "para doctor"
 if have para; then
   report="$(para doctor 2>&1)"; rc=$?
   printf '%s\n' "$report" | sed 's/^/  /'
-  kv exit "$rc (non-zero means at least one ✗ — fix those first)"
+  kv exit "$rc — host ✗ are the human's to fix; 'no image' is expected before adoption"
 else
-  kv skipped "para is not installed (npm i -g paraspace)"
+  kv skipped "para is not installed"
 fi
 
 # What this repo already says about how it comes up. Every hit is a source for
 # the .paraspace/ you are about to write — see references/evidence.md.
-head2 "project evidence"
-root="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+section "project evidence"
+root="$(project_root)"
 kv root "$root"
-kv vcs "$(if [ -d "$root/.git" ]; then echo git; elif [ -d "$root/.hg" ]; then echo mercurial; elif [ -d "$root/.svn" ]; then echo svn; else echo "none found"; fi)"
+kv vcs "$(vcs_kind "$root")"
 if [ -d "$root/.paraspace" ]; then
-  kv paraspace "present — this project is already adopted; you are amending it"
+  kv paraspace "present — this project is already adopted; you are AMENDING it"
   find "$root/.paraspace" -mindepth 1 -maxdepth 1 -exec basename {} \; | sed 's/^/    /'
 else
   kv paraspace "absent — nothing adopted yet"
@@ -75,6 +117,7 @@ find "$root" -maxdepth 3 \
      -o -iname '.env.example' -o -iname 'Makefile' -o -iname 'Taskfile.y*ml' \
      -o -iname 'provision*.sh' -o -iname 'bootstrap*.sh' -o -iname 'setup*.sh' \) \
   -print 2>/dev/null | sed "s|^$root/|    |" | head -40
-printf '  ci:\n'
-find "$root/.github/workflows" -mindepth 1 -maxdepth 1 2>/dev/null \
-  | sed "s|^$root/|    |" | head -20
+if [ -d "$root/.github/workflows" ]; then
+  printf '  ci:\n'
+  find "$root/.github/workflows" -mindepth 1 -maxdepth 1 | sed "s|^$root/|    |" | head -20
+fi

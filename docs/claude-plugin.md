@@ -16,13 +16,6 @@ same contract, and you review the diff like any other change.
 /plugin install paraspace@paraspace
 ```
 
-Installed `para` from npm rather than cloning it? The package is its own
-marketplace, so point at it instead and you get the version you're running:
-
-```
-/plugin marketplace add "$(npm root -g)/paraspace"
-```
-
 `/plugin uninstall paraspace` removes it. Nothing about the plugin is required
 to use `para`, and nothing it writes depends on it afterwards — the
 `.paraspace/` it produces is ordinary files you own.
@@ -50,13 +43,14 @@ What it then does, in order:
 5. **Builds and boots**, reads the failures, fixes the hooks, and goes around
    again until a workspace serves. Then it tears the throwaway workspace down.
 
-It works on a repo that already has a `.paraspace/` too — it amends rather than
-overwrites, and `para init` skips files that exist.
+It works on a repo that already has a `.paraspace/` too — it reads what's there
+and amends in place rather than overwriting.
 
 ## What it's good for
 
-The bundled templates cover a git repo with a Docker Compose stack. The plugin
-is for everything else:
+The `para init` default covers a git repo with a Docker Compose stack (the
+[templates](./project-setup.md#templates) are the two shapes it ships). The
+plugin is for everything else:
 
 - stacks that just run locally — PHP + MySQL, Rails + Postgres, a Python service
   and a queue — where the workspace runs them as system services rather than in
@@ -66,13 +60,14 @@ is for everything else:
 - code that arrives without a git remote, or without git at all;
 - k3s, or a hybrid where the databases are containers and the app is a plain
   process;
-- the readiness gate that keeps `para up` from reporting a ready workspace whose
-  URL 502s — the part people most often get wrong by hand.
+- the [readiness contract](./hooks.md#boot) for stacks that aren't
+  `docker compose --wait` — the part people most often get wrong by hand, and
+  the reason a workspace comes up and its URL 502s.
 
 ## What it costs
 
-- **Minutes, once you approve the build.** `para image build` is several minutes
-  the first time, and the boot loop usually runs two or three times.
+- **Minutes, once you approve the build.** The boot loop usually runs two or
+  three times on top of the image build.
 - **Your machine's state.** It runs `para` for real: builds an image, creates a
   workspace, and removes that workspace when it's done. It asks first.
 - **Review is still yours.** Hooks run inside your workspaces and a project
@@ -82,9 +77,10 @@ is for everything else:
 ## What it won't do
 
 It won't change `para` itself. If your project seems to need the engine to know
-something about it, the answer is a hook, a `PARA_*` variable of your own, or a
-[project command](./commands.md#project-commands) — the plugin stays on that
-side of the line, and so should any change it suggests.
+something about it, the answer is a hook, [a `PARA_*` variable of your
+own](./parafile.md#your-own-vars), or a [project
+command](./commands.md#project-commands) — the plugin stays on that side of the
+line, and so should any change it suggests.
 
 It also can't finish on a machine that isn't ready for containers. It will still
 write and explain the `.paraspace/`, then hand you the `para doctor` failures to

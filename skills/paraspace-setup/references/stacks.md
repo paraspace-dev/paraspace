@@ -21,33 +21,48 @@ first compile).
 ```sh
 # Wait until something is listening on a TCP port. $1 port, $2 seconds (60).
 wait_port() {
+  command -v ss >/dev/null || die "ss is missing — add iproute2 in image-build"
   local i=0
   while [ "$i" -lt "${2:-60}" ]; do
     ss -ltn "sport = :$1" 2>/dev/null | grep -q LISTEN && return 0
     sleep 1; i=$((i + 1))
   done
-  die "nothing is listening on :$1 after ${2:-60}s — check the service log"
+  return 1
 }
 
-# Wait until a URL answers with any HTTP status. $1 url, $2 seconds (120).
+# Wait until a URL answers at all — any status, including 404 and 500. $1 url,
+# $2 seconds (120). No `curl -f`: it exits non-zero on >=400, so an app whose /
+# is a 404 would look dead for the whole timeout.
 wait_http() {
   local i=0
   while [ "$i" -lt "${2:-120}" ]; do
-    curl -fsS -o /dev/null --max-time 3 "$1" && return 0
+    curl -sS -o /dev/null --max-time 3 "$1" && return 0
     sleep 1; i=$((i + 1))
   done
-  die "$1 never answered after ${2:-120}s — check the service log"
+  return 1
 }
 ```
 
-`ss` comes from `iproute2` (Debian/Ubuntu), `iproute2` (Alpine), `iproute2`
-(Void) — add it in `image-build` or the helper silently never succeeds.
+**They return rather than `die`, and that matters.** `die` exits the hook, so a
+caller written as `wait_port 3000 || { tail log; }` would never reach the `tail`
+— the process is already gone, and the log you most wanted is the one nobody
+sees. Returning leaves the decision with the call site:
+
+```sh
+wait_port 3000 120 || die "nothing on :3000 after 120s"
+wait_port 3000 120 || { tail -50 ~/log/dev.log >&2; die "the dev server never came up"; }
+```
+
+`ss` is in `iproute2` on every base in `references/bases.md` — install it there,
+and the guard above blames the missing package instead of blaming your app.
 
 A boot hook that starts several things should wait for each of them, and the
 routed ones are non-negotiable:
 
 ```sh
-for r in $PARA_ROUTES; do wait_port "${r##*:}" 120; done
+for r in $PARA_ROUTES; do
+  wait_port "${r##*:}" 120 || die "nothing listening on the routed port ${r##*:}"
+done
 ```
 
 That loop is worth writing verbatim in most projects: it reads the routes para
@@ -67,12 +82,12 @@ running, which satisfies the contract for free — provided your compose file
 actually defines healthchecks for the services that matter. If it doesn't, add
 `wait_port` calls after it rather than trusting "running".
 
-What this costs in the image (`references/bases.md` has the per-distro spelling):
-docker, the workspace user in the `docker` group, `security.nesting` (para sets
-this), and a storage driver that resolves to **overlayfs**. On a btrfs- or
-ZFS-backed Incus pool, nested Docker silently falls back to the `vfs` driver and
-everything becomes punishingly slow — the templates' `image-build` refuses to
-publish an image in that state, and yours should too.
+What this costs in the image is in `image.md` under the docker requirements;
+`references/bases.md` has the per-distro spelling, including the Debian/Ubuntu
+equivalent of the Void template's docker block. The one thing worth repeating
+because it is silent: on a btrfs- or ZFS-backed pool nested Docker falls back to
+the `vfs` driver instead of overlayfs, so refuse to publish the image in that
+state the way the templates' `image-build` does.
 
 Bind mounts and `network_mode: host` inside a workspace behave normally; ports
 bind on the container's own IP, so nothing collides with the host or with other
@@ -100,10 +115,10 @@ Enabling at build time means every workspace has them running before `boot`. In
 ```sh
 cd "$HOME/$PARA_CLONE_DIR"
 sudo systemctl is-active --quiet postgresql || sudo systemctl start postgresql
-wait_port 5432 30
+wait_port 5432 30 || die "postgres never came up"
 npm ci && npm run build
 sudo systemctl restart myapp        # a unit your image-build installed
-wait_port 3000 120
+wait_port 3000 120 || die "myapp is not listening — journalctl -u myapp"
 ```
 
 `boot` runs as `$PARA_USER`, so anything touching systemd needs `sudo` — the
@@ -124,14 +139,14 @@ hook's stdout dies with it:
 cd "$HOME/$PARA_CLONE_DIR"
 mkdir -p ~/log
 setsid nohup npm run dev >~/log/dev.log 2>&1 < /dev/null &
-wait_port 3000 120 || { tail -50 ~/log/dev.log >&2; exit 1; }
+wait_port 3000 120 || { tail -50 ~/log/dev.log >&2; die "the dev server never came up"; }
 ```
 
 Three things make this survivable:
 
 - **`setsid` + redirecting all three streams** detaches the process from the
-  hook. Without it the process is killed when the hook exits, and the symptom is
-  a URL that works for one second.
+  hook. Leave it attached and you get one of two bad outcomes: it dies with the
+  hook, or it holds the hook's stdout open and `para up` never returns.
 - **A log file you can point at.** `tail` it in the failure path — a boot hook
   that dies without showing why is the worst thing to hand a teammate.
 - **Idempotence.** `boot` re-runs on every `up`, so either kill the old process
@@ -173,7 +188,7 @@ docker compose up -d --wait db redis          # only the infra services
 mise install                                   # or nvm/pyenv, per the repo's pin
 npm ci
 setsid nohup npm run dev >~/log/dev.log 2>&1 </dev/null &
-wait_http "http://127.0.0.1:3000" 180
+wait_http "http://127.0.0.1:3000" 180 || die "the app never answered — see ~/log/dev.log"
 ```
 
 The rule of thumb: put in a container whatever you'd otherwise have to install
@@ -197,8 +212,7 @@ re-deriving one.
 
 ## Routes
 
-`PARA_ROUTES` is a list of `[sub:]port`; a bare port is the workspace apex.
-Route only what a human would open — an internal port with no route is still
-reachable from inside the workspace, and every route is a Caddy site para has to
-keep valid. A workspace that serves nothing (a worker, a consumer) declares
-`PARA_ROUTES=""` deliberately, and `para ls` then shows no URL.
+Route only what a human would open. An unrouted port is still reachable from
+inside the workspace, and every route is one more Caddy site to keep valid. The
+syntax and what an empty list means are in `parafile.md`, in the docs the probe
+located — read it there rather than from a copy that can drift.

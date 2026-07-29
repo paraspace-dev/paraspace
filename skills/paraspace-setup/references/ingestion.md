@@ -12,16 +12,16 @@ The bundled `void-docker-gh` template already does this: `PARA_ORIGIN` in the
 `Parafile`, a clone in `provision`, and one ssh key on the shared volume so you
 authenticate once per project rather than once per workspace.
 
-Worth knowing:
+Worth knowing (`parafile.md` has the definitions; these are the consequences):
 
-- **`PARA_ORIGIN` and `PARA_CLONE_BRANCH` are project variables, not engine
-  ones.** para forwards them and never acts on them; your `provision` hook is
-  what reads them. That also means `PARA_CLONE_BRANCH=release-2 para up hotfix`
-  works as a one-off if your hook honors it.
-- **The clone can race guest DNS.** Set `PARA_READY_HOST` to your git host
-  (`github.com`) and para blocks until the guest resolves it.
+- **`PARA_ORIGIN` and `PARA_CLONE_BRANCH` are the project's variables**, read by
+  your `provision` hook rather than by para. So `PARA_CLONE_BRANCH=release-2
+  para up hotfix` works as a one-off exactly when your hook honors it.
+- **The clone can race guest DNS**, which is what `PARA_READY_HOST` is for —
+  set it to your git host.
 - **A repo the Parafile lives in can derive its own origin**, which is one less
-  thing to keep in sync:
+  thing to keep in sync — and stops the scaffolded template's demo URL from
+  silently surviving:
   ```sh
   : "${PARA_ORIGIN:=$(git -C "$PARA_PROJECT_DIR" remote get-url origin)}"
   ```
@@ -33,8 +33,23 @@ Worth knowing:
 
 ### Private repos
 
-The template prints the workspace's public key and waits for you to authorize
-it, and with `PARA_GH_AUTH=1` it has `gh` upload it for you. For other hosts:
+Interactively, the template prints the workspace's public key and waits for a
+human to authorize it, and with `PARA_GH_AUTH=1` it has `gh` upload it instead.
+
+**Neither of those happens when you are the one running `para up`.** A hook only
+prompts when para has a terminal on both ends, and a tool call has neither — so
+`pause` returns immediately and `gh auth login` is skipped. The first `up`
+against a private repo will print the key and then fail at the clone. Don't
+fight it; the loop that works is:
+
+```sh
+para up <ws>              # fails at the clone, leaves the workspace running
+para key <ws>             # a verb void-docker-gh ships: prints the public key
+                          # → give it to the human with the URL to paste it at
+para up <ws>              # idempotent, so this costs nothing once they confirm
+```
+
+For other hosts:
 
 - **GitLab / Bitbucket / Gitea** — same flow, no CLI: print the key, pause,
   human pastes it into the host's SSH-keys page. The key lives on the shared
@@ -65,16 +80,20 @@ goes through the same door as everything else:
 set -euo pipefail
 git -C "$PARA_PROJECT_DIR" bundle create - --all \
   | "$PARA_BIN" sh "$1" -c 'cat > /tmp/repo.bundle'
-"$PARA_BIN" sh "$1" -c "
-  git clone /tmp/repo.bundle \$HOME/$PARA_CLONE_DIR &&
-  git -C \$HOME/$PARA_CLONE_DIR remote remove origin
-"
+"$PARA_BIN" sh "$1" -c 'git clone /tmp/repo.bundle "$HOME/$PARA_CLONE_DIR" &&
+  git -C "$HOME/$PARA_CLONE_DIR" remote remove origin'
 ```
 
-Save as `.paraspace/commands/seed`, `chmod +x`, and `para seed ws1` works. Two
-notes: the clone's `origin` points at the bundle file, so remove or repoint it;
-and `para sh -c` is byte-clean when its stdin isn't a terminal, which is exactly
-what makes piping a bundle through it safe.
+Save as `.paraspace/commands/seed`, `chmod +x`, and `para seed ws1` works.
+Three notes:
+
+- **The guest script stays fully single-quoted.** `$PARA_CLONE_DIR` is already
+  in the workspace's environment, so nothing has to cross from the host — and
+  the moment you start escaping `\$HOME` inside double quotes you are one typo
+  from a command that runs on the wrong side.
+- `para sh -c` is byte-clean when its stdin isn't a terminal, which is what
+  makes piping a bundle through it safe.
+- The clone's `origin` points at the bundle file — remove it or repoint it.
 
 Then have `provision` skip cloning when `~/$PARA_CLONE_DIR/.git` already exists,
 so `para up` stays idempotent and the seed isn't fought over.
@@ -90,8 +109,32 @@ for, and for "I need my uncommitted changes in there":
 # summary: copy the host working tree into a workspace (a seed, not a sync)
 set -euo pipefail
 tar -C "$PARA_PROJECT_DIR" --exclude-vcs --exclude node_modules -cz . \
-  | "$PARA_BIN" sh "$1" -c "mkdir -p \$HOME/$PARA_CLONE_DIR && tar -xz -C \$HOME/$PARA_CLONE_DIR"
+  | "$PARA_BIN" sh "$1" -c 'mkdir -p "$HOME/$PARA_CLONE_DIR" && tar -xz -C "$HOME/$PARA_CLONE_DIR"'
 ```
+
+**A seed verb runs *after* `para up`, so the first bring-up is three commands.**
+`para up` runs provision and boot in one pass and `para sh` needs the workspace
+running, so there is no ordering in which the code is already there:
+
+```sh
+para up ws1 && para seed ws1 && para up ws1
+```
+
+Both hooks therefore have to tolerate an empty box on that first pass — and the
+guard is on the *tree*, not on `.git`, because in this case there isn't one:
+
+```sh
+# provision
+[ -d "$HOME/$PARA_CLONE_DIR" ] || warn "no code yet — run: para seed $PARA_NAME"
+# boot
+[ -d "$HOME/$PARA_CLONE_DIR" ] || { warn "nothing to boot yet"; exit 0; }
+```
+
+Or have the seed verb do all three itself (`"$PARA_BIN" up "$1"`, push, `up`
+again), which is friendlier and is what you should write if the project will
+live on this path. Either way `PARA_ORIGIN` stays unset and the template's clone
+block gets deleted — `void-docker-gh`'s `provision` dies on an empty
+`PARA_ORIGIN`, so leaving it half-adapted fails on the first `up`.
 
 **Say plainly that this is a seed, not a sync.** Nothing propagates afterwards
 in either direction; re-running it overwrites files that changed inside the

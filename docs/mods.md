@@ -40,7 +40,7 @@ A mod is a directory shaped like a `.paraspace/`:
 .paraspace/mods/dotfiles-jchook/
   README.md
   hooks/{provision,image-build,helpers}
-  skel/{zshrc,nvim,tmux,claude,bin}
+  skel/{zshrc,nvim,tmux,claude,claude.json,bin}
   commands/{claude,run}
 ```
 

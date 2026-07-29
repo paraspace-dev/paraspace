@@ -2,19 +2,18 @@
 # summary: attach a tmux session — claude in one window, a shell in another
 set -euo pipefail
 [ "$#" -eq 1 ] || { echo "usage: para run <workspace>" >&2; exit 1; }
-ws="$1"                    # for para sh, which takes it as one argument
-# For the guest shell, which re-parses the -c string as one line — the same
-# reason commands/claude quotes what it passes through. tmux takes a window's
-# command as plain argv, so the name is never quoted a second time inside it.
-q="$(printf '%q' "$ws")"
 
-# Re-running attaches the existing session rather than stacking duplicates. The
-# workspace name is the session name, so it shows in tmux's status line and the
-# outer terminal title even when claude is full-screen.
-exec "$PARA_BIN" sh "$ws" -c "
-  tmux has-session -t $q 2>/dev/null && exec tmux attach -t $q
-  tmux new-session -d -s $q -n claude claude --name $q
-  tmux new-window  -t $q: -n sh
-  tmux select-window -t $q:1
-  exec tmux attach -t $q
-"
+# The workspace name crosses out of band, as the $PARA_NAME para exports into
+# every workspace. It names the tmux session too, so it shows in tmux's status
+# line and the outer terminal title even when claude is full-screen.
+# shellcheck disable=SC2016  # the guest expands these, not us
+guest='
+  # Re-running attaches the existing session rather than stacking duplicates.
+  if tmux has-session -t "$PARA_NAME" 2>/dev/null; then exec tmux attach -t "$PARA_NAME"; fi
+  tmux new-session -d -s "$PARA_NAME" -n claude claude --name "$PARA_NAME"
+  tmux new-window -t "$PARA_NAME": -n sh
+  tmux select-window -t "$PARA_NAME":1
+  exec tmux attach -t "$PARA_NAME"
+'
+
+exec "$PARA_BIN" sh "$1" -c "$guest"

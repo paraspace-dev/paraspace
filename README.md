@@ -61,7 +61,8 @@ Full docs at **[paraspace.dev](https://paraspace.dev)**, and in
 - [How it works](./docs/how-it-works.md) · [Running coding
   agents](./docs/agents.md)
 - [Project setup](./docs/project-setup.md) (adapting `para` to your project) ·
-  [Cookbook](./docs/cookbook.md) (recipes for the common needs)
+  [The Claude Code plugin](./docs/claude-plugin.md) (having it do that for
+  you) · [Cookbook](./docs/cookbook.md) (recipes for the common needs)
 - [Commands](./docs/commands.md) · [The Parafile](./docs/parafile.md) ·
   [Hooks](./docs/hooks.md) · [Mods](./docs/mods.md) · [The image
   contract](./docs/image.md) · [Contract versioning](./docs/versioning.md)

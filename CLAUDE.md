@@ -69,6 +69,17 @@ the constant and [`docs/versioning.md`](./docs/versioning.md).
   functions run in name order, so write them **order-independent**. See
   [`test/README.md`](./test/README.md) for the full conventions (tier choice,
   `|| return 1`, `eventually`, per-workspace asserts).
+- **`skills/` defers to the spec; it does not restate it.**
+  `skills/paraspace-setup/` is the Claude Code plugin this repo publishes
+  (`.claude-plugin/`, also shipped in the npm `files`). It scaffolds with
+  `para init` and sends the agent to the *installed* `docs/`, so it names no
+  `Parafile` key, no hook-environment table and no `troubleshooting.md` entry
+  of its own. What it owns is the judgment the spec deliberately omits:
+  base-image choice, readiness patterns for stacks that aren't compose, getting
+  code in without git, and the safety rules an agent needs that a human
+  doesn't. When a page there summarizes `docs/`, it links and defers. A second
+  copy of a fact is the one thing that will go stale, and the one nobody will
+  notice has.
 - The `zsh` `skel/` is intentionally not linted (ShellCheck parses only sh/bash).
 - `plans/` holds design notes for in-flight work; not shipped in the npm `files`.
 

@@ -1,0 +1,17 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "paraspace",
+  "description": "ParaSpace — parallel dev workspaces on Incus",
+  "owner": {
+    "name": "Wes Roberts"
+  },
+  "plugins": [
+    {
+      "name": "paraspace",
+      "source": "./",
+      "description": "Set up ParaSpace for a project: write the .paraspace/ directory that turns a repo into parallel Incus dev workspaces, then build the image and prove `para up` boots and serves.",
+      "category": "development",
+      "homepage": "https://paraspace.dev"
+    }
+  ]
+}

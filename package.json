@@ -50,8 +50,10 @@
     "libexec",
     "README.md",
     "LICENSE",
+    ".claude-plugin",
     "docs",
     "mods",
+    "skills",
     "templates"
   ],
   "publishConfig": {

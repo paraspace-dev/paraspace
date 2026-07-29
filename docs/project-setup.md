@@ -24,6 +24,11 @@ para init <template>
 that already has application code or an earlier ParaSpace setup. The generated
 `Parafile` pins the [contract version](./versioning.md) it was written for.
 
+> [!TIP]
+> The configuration below is also a [Claude Code plugin](./claude-plugin.md)
+> this package ships. It reads how your repo already comes up, writes the
+> `.paraspace/`, and iterates until a workspace boots and serves.
+
 ## Configure the project
 
 The scaffold runs as-is, but it still describes the template's project rather

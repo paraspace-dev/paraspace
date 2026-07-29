@@ -29,8 +29,8 @@ seed() { # seed <src> <dest>
 seed "$skel/tmux"         "$shared/tmux"
 seed "$skel/nvim"         "$shared/nvim"
 seed "$skel/claude"       "$shared/claude"
+seed "$skel/claude.json"  "$shared/claude.json"
 seed "$skel/bin/open-url" "$shared/bin/open-url"
-if [ ! -f "$shared/claude.json" ]; then echo '{}' > "$shared/claude.json"; fi
 
 # zshrc goes in this mod's own corner rather than at $shared/zshrc, because the
 # base template writes that name too. Nothing then has to arbitrate: ~/.zshrc is

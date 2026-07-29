@@ -7,13 +7,16 @@ set -euo pipefail
 [ "$#" -ge 1 ] || { echo "usage: para claude <workspace> [claude args…]" >&2; exit 1; }
 ws="$1"; shift
 
-# Everything after the workspace passes through to claude, and `printf %q` is
-# what makes that true: the command crosses into the container as ONE string
-# and a shell there re-parses it, so a bare "$*" would turn
-# `-p 'write a test'` into four arguments and evaluate any $ or backtick.
+# The command crosses into the container as ONE string a shell there re-parses,
+# so the arguments are the only thing that has to survive a second parse — a
+# bare "$*" would turn `-p 'write a test'` into four of them.
 args=""
-[ "$#" -eq 0 ] || args="$(printf '%q ' "$@")"
+if [ "$#" -gt 0 ]; then args="$(printf '%q ' "$@")"; fi
 
-# --name labels the session, which Claude Code puts in the terminal title, so a
-# full-screen claude stays identifiable as this workspace.
-exec "$PARA_BIN" sh "$ws" -c "exec claude --name $(printf '%q' "$ws") $args"
+# The name crosses out of band, as the $PARA_NAME para exports into every
+# workspace. --name labels the session, which Claude Code puts in the terminal
+# title, so a full-screen claude stays identifiable as this workspace.
+# shellcheck disable=SC2016  # the guest expands this, not us
+guest='exec claude --name "$PARA_NAME" '
+
+exec "$PARA_BIN" sh "$ws" -c "$guest$args"

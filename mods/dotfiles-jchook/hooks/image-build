@@ -19,10 +19,9 @@ home="$(getent passwd "${PARA_USER:?}" | cut -d: -f6)" || home=""
   || die "no home for '$PARA_USER' — this mod runs after a base image-build that creates the user. See docs/image.md."
 
 stage "Toolchain the dotfiles assume"
-# Everything skel/ reaches for, plus what builds it: tree-sitter-cli is what
-# nvim-treesitter shells out to, base-devel compiles its parsers, and zsh/tmux
-# are here rather than left to the base because docs/image.md makes them
-# ergonomics rather than contract.
+# Everything skel/ reaches for, plus what builds it: nvim-treesitter shells out
+# to tree-sitter-cli and base-devel compiles its parsers. zsh and tmux are here
+# rather than left to the base — docs/image.md makes them ergonomics, not contract.
 pkgs="zsh tmux just neovim nodejs tree-sitter-cli base-devel ripgrep fd bat fzf lsd tree xz"
 missing=()
 for p in $pkgs; do xbps-query "$p" >/dev/null 2>&1 || missing+=("$p"); done

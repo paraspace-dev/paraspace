@@ -248,7 +248,7 @@
  * A call to action is not prose. The one at the foot of the page is authored in
  * index.md, so it lands inside `.vp-doc` and picks up the theme's prose-anchor
  * treatment — underline and weight 500 — which `.para-btn` alone can't outrank.
- * Colour needs no help: `.para-btn.brand` and `.para-btn.alt` already win.
+ * Colour is handled where each state is declared, below.
  */
 .vp-doc a.para-btn {
   font-weight: 600;
@@ -260,8 +260,12 @@
   color: var(--vp-button-brand-text);
 }
 
+/* Every state names its own colour, including the ones that don't change it.
+   `.vp-doc a:hover` is two classes and an element, so a hover rule that sets
+   only a background hands the text back to the prose link. */
 .para-btn.brand:hover {
   background-color: var(--vp-button-brand-hover-bg);
+  color: var(--vp-button-brand-hover-text);
 }
 
 /* The quiet one: an outline in the lens tint, so the second action belongs to

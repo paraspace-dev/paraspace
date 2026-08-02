@@ -226,7 +226,7 @@
 
 /*
  * One button, used by the poster and by the call to action that closes the
- * page. Brand orange is the page's one warm interactive thing — against the
+ * page. The brand gold is the page's one warm interactive thing — against the
  * blue-green lenses it's the complement, which is why it's the only fill.
  */
 .para-btn {
@@ -242,6 +242,17 @@
     background-color 0.25s,
     border-color 0.25s,
     color 0.25s;
+}
+
+/*
+ * A call to action is not prose. The one at the foot of the page is authored in
+ * index.md, so it lands inside `.vp-doc` and picks up the theme's prose-anchor
+ * treatment — underline and weight 500 — which `.para-btn` alone can't outrank.
+ * Colour needs no help: `.para-btn.brand` and `.para-btn.alt` already win.
+ */
+.vp-doc a.para-btn {
+  font-weight: 600;
+  text-decoration: none;
 }
 
 .para-btn.brand {

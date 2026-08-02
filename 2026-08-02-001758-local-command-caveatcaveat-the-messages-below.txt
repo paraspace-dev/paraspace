@@ -1,0 +1,2870 @@
+ ▐▛███▜▌   Claude Code v2.1.220
+▝▜█████▛▘  Opus 5 · Claude Max
+  ▘▘ ▝▝    ~/projects/paraspace
+
+   Tackle your toughest work with Opus 5. Switch anytime with /model.
+
+❯ /clear                                                                        
+
+❯ /frontend-design:frontend-design Let's try an alternative homepage for the    
+VitePress site -- I'm thinking for the vibe that we want kind of like           
+overlapping soft focus venn diagram circles that are emanating outward with     
+soft gradients -- keeping the kind of 70s gruvbox vibe but softer and maybe     
+incorporating some of the classic Kodak/Panasonic VHS vibe. I can see it in my  
+mind, but it's hard to describe. The lander almost feels like a classic sci fi  
+movie teaser poster -- two large soft focus emanating circles overlapping like  
+a Venn Diagram, soft blue/green hues combining and emananting (maybe light      
+yellow underglow, not sure), kind of like blurred liquid glass definition on    
+the circles, like they're related to lenses. Then a rounded sci-fi font         
+PARASPACE, you know the A that feels like a wide arch and the P matches it --   
+like Supernova font. Any questions? We can start with the hero then fix the     
+feature cards to match it.                                                      
+
+⏺ I'll dig into the existing site first, then come back with a design plan
+  before writing anything.
+
+  Read 6 files, listed 2 directories, ran 1 shell command (ctrl+o to expand)
+
+⏺ Read the site: the current lander is a layout: home hero with Sky.vue
+  (nebula/daytime) behind everything and TerminalDemo.vue in the hero image
+  slot, all on gruvbox + Anton SC. Four things would change what I build, so let
+  me pin them before designing.
+
+⏺ User answered Claude's questions:
+  ⎿  · How should the PARASPACE wordmark be made? → Drawn as SVG geometry 
+     (Recommended)
+     · What happens to the terminal demo in the new hero? → Poster replaces it 
+     (Recommended)
+     · What should light mode be? → Faded print (Recommended)
+     · Where should I build it so you can compare? → Branch, edit index.md 
+     (Recommended)
+
+⏺ Locking the direction. Checking how VitePress's home layout is composed so the
+  poster can own the full bleed:
+
+  Listed 1 directory, ran 4 shell commands (ctrl+o to expand)
+
+⏺ Design locked. Building it:
+
+  - Signature — the Venn is the product: two lenses overlap, and the overlap is
+  what's shared (host, kernel, auth) while the crescents are what's isolated.
+  The page's only light source is that intersection.
+  - One primitive — the arch radius that draws the wordmark's P and A is the
+  same circle the lenses are. P is the arch closed at the bar; A is the same
+  arch with both legs run to the baseline.
+  - Two physics — dark mode is a CRT: lenses screen-blend additively, wordmark
+  carries RGB fringing. Light mode is a faded print: the same plates multiply
+  like ink, and the fringe becomes CMYK misregistration.
+
+⏺ Write(.vitepress/theme/Wordmark.vue)
+  ⎿  Wrote 99 lines to .vitepress/theme/Wordmark.vue
+       1 <script setup>
+       3  * PARASPACE, drawn rather than typeset.
+       4  *
+         h is a
+       6  * semicircle of radius 30.5 on a 78x100 body, stroked at 17: P 
+       7  * closed at the bar, A is the same arch with both legs run to t
+         he baseline, and
+         ery curve on the
+       9  * page — including the two lenses behind this — comes off one c
+      10  *
+     … +105 lines (ctrl+o to expand)
+
+⏺ Update(.vitepress/theme/Wordmark.vue)
+  ⎿  Added 1 line, removed 4 lines
+      22  
+      23  /* Every body is 78 wide on a 100 advance, so the wordmark sets
+           solid — the
+      24     tracking is the 22 units between them, not a per-pair judgem
+          ent. */
+      25 -const LETTERS = [...'parasp ace'.replace(' ', '')].map((ch, i) 
+         -=> ({                                                          
+      26 -  d: GLYPHS[ch],                                               
+      27 -  x: i * 100,                                                  
+      28 -}))                                                            
+      25 +const LETTERS = [...'paraspace'].map((ch, i) => ({ d: GLYPHS[ch
+         +], x: i * 100 }))                                              
+      26  </script>
+      27  
+      28  <template>
+
+⏺ Now the poster itself:
+
+⏺ Write(.vitepress/theme/Poster.vue)
+  ⎿  Wrote 325 lines to .vitepress/theme/Poster.vue
+       1 <script setup>
+       3  * The landing page's first screen: two lenses overlapping like 
+         a Venn, the
+          underneath.
+       5  *
+         re the host,
+       7  * the kernel and the project's credentials — that's the overlap
+       8  * nothing else, which is the two crescents. The lenses separate
+          out of a single
+      10  *
+     … +351 lines (ctrl+o to expand)
+
+⏺ Write(.vitepress/theme/custom.css)
+  ⎿  Added 145 lines, removed 238 lines
+       1  /**
+       2 - * ParaSpace theme: Gruvbox-flavored brand colors with a 70s sp
+         -ace-race feel.                                                 
+       2 + * ParaSpace theme: gruvbox brand colors, softened, in two phys
+         +ics.                                                           
+       3 + *                                                             
+       4 + * The landing page is a teaser one-sheet — two lenses overlapp
+         +ing like a Venn                                                
+       5 + * (see Poster.vue) — and it prints twice. Dark is a CRT: the l
+         +enses combine                                                  
+       6 + * additively and the wordmark carries RGB fringing. Light is a
+         + faded photo                                                   
+       7 + * print: the same two plates overprint like ink and the fringe
+         + becomes                                                       
+       8 + * misregistration. The palettes below are those two passes, no
+         +t one recolored.                                               
+       9 + *                                                             
+      10   * Palette reference: https://github.com/morhetz/gruvbox
+      11   */
+      12  
+      13  /*
+       7 - * The hero's display face, self-hosted from public/fonts/ (SIL
+         - OFL, license                                                  
+       8 - * alongside the file), so the page makes no third-party reques
+         -t and works                                                    
+       9 - * offline. Anton SC draws its small caps rather than faking th
+         -em: the                                                        
+      10 - * lowercase codepoints map to real small-cap glyphs, which is 
+         -why nothing here                                               
+      11 - * asks for font-variant-caps — that would shrink letters that 
+         -are already                                                    
+      12 - * small caps. It earns the display job in the hero and nowhere
+         - else, since                                                   
+      13 - * heavy type makes a reference page harder to scan, so the doc
+         -s stay on the                                                  
+      14 - * body face. Latin subset only; the unicode-range hands anythi
+         -ng outside it                                                  
+      15 - * back to the stack.                                          
+      14 + * Body and code: IBM Plex Sans and Plex Mono, self-hosted from
+         + public/fonts/                                                 
+      15 + * (SIL OFL, license alongside the files), so the page makes no
+         + third-party                                                   
+      16 + * request and works offline. They're siblings by design, which
+         + is the point —                                                
+      17 + * the prose and the commands inside it are the same voice at t
+         +wo widths. The                                                 
+      18 + * theme entry pulls vitepress/theme-without-fonts so the defau
+         +lt Inter isn't                                                 
+      19 + * shipped underneath them. Sans is the variable file: one down
+         +load covers 400                                                
+      20 + * through 700, which is every weight the theme asks for. There
+         + is no display                                                 
+      21 + * face to load — the wordmark is drawn (see Wordmark.vue). Lat
+         +in subset only;                                                
+      22 + * the unicode-range hands anything outside it back to the stac
+         +k.                                                             
+      23   */
+      24  @font-face {
+      18 -  font-family: 'Anton SC';                                     
+      19 -  font-style: normal;                                          
+      20 -  font-weight: 400;                                            
+      21 -  font-display: swap;                                          
+      22 -  src: url('/fonts/anton-sc-latin-400.woff2') format('woff2'); 
+      23 -  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC,
+         - U+02C6, U+02DA,                                               
+      24 -    U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122
+         -, U+2191, U+2193,                                              
+      25 -    U+2212, U+2215, U+FEFF, U+FFFD;                            
+      26 -}                                                              
+      27 -                                                               
+      28 -/*                                                             
+      29 - * Body and code: IBM Plex Sans and Plex Mono, self-hosted alon
+         -gside the display                                              
+      30 - * face. They're siblings by design, which is the point — the p
+         -rose and the                                                   
+      31 - * commands inside it are the same voice at two widths, and Ple
+         -x Mono has enough                                              
+      32 - * character to carry a terminal without being a novelty. The t
+         -heme entry pulls                                               
+      33 - * vitepress/theme-without-fonts so the default Inter isn't shi
+         -pped underneath                                                
+      34 - * these. Sans is the variable file: one download covers 400 th
+         -rough 700, which                                               
+      35 - * is every weight the theme asks for.                         
+      36 - */                                                            
+      37 -@font-face {                                                   
+      25    font-family: 'IBM Plex Sans';
+      26    font-style: normal;
+      27    font-weight: 100 700;
+     ...
+      57  }
+      58  
+      59  :root {
+      73 -  --para-display: 'Anton SC', var(--vp-font-family-base);      
+      74 -                                                               
+      60    --vp-font-family-base: 'IBM Plex Sans', ui-sans-serif, system
+          -ui, sans-serif,
+      61      'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', '
+          Noto Color Emoji';
+      62    --vp-font-family-mono: 'IBM Plex Mono', ui-monospace, 'Menlo'
+          , 'Monaco',
+     ...
+       78    --vp-button-brand-active-text: #1d2021;
+       79    --vp-button-brand-active-border: transparent;
+       80  
+       96 -  --vp-home-hero-name-color: transparent;                     
+       97 -  /* The gold end of the ramp is bright enough to disappear in
+          -to the cumulus                                                
+       98 -     deck, which left "Space" fading out of the wordmark in li
+          -ght mode. Light                                               
+       99 -     takes the deep end of the same gruvbox ramp; dark keeps t
+          -he bright one. */                                             
+      100 -  --vp-home-hero-name-background: linear-gradient(120deg, #d65
+          -d0e 30%, #b57614);                                            
+      101 -                                                              
+       81    /* Inline code defaults to the brand color, which makes it r
+           ead as a link;
+       82       gruvbox gold stays in the site's warm family while readin
+           g as its own
+       83       thing (faded variant for light-bg contrast). */
+     ...
+       94    --vp-code-link-color: var(--para-link);
+       95    --vp-code-link-hover-color: var(--para-link-hover);
+       96  
+      118 -  /* Nebula palette, for the dark theme's night sky. Deep-spac
+          -e values on hues                                              
+      119 -     gruvbox already owns (purple #b16286, light purple #d3869
+          -b, blue #458588)                                              
+      120 -     so it reads as the same brand, not a purple bolt-on. Gas 
+          -4 is the existing                                             
+      121 -     brand orange doing double duty as the nebula's warm core.
+          - */                                                           
+      122 -  --neb-plum: #4b2a63;                                        
+      123 -  --neb-rose: #d3869b;                                        
+      124 -  --neb-gas-1: #4b2a63;                                       
+      125 -  --neb-gas-2: #b16286;                                       
+      126 -  --neb-gas-3: #427b86;                                       
+      127 -  --neb-gas-4: #fe8019;                                       
+      128 -  --neb-fil-1: #5a2a6b;                                       
+      129 -  --neb-fil-2: #b16286;                                       
+      130 -  --neb-fil-3: #427b86;                                       
+       97 +  /* ---- Poster: the print pass -----------------------------
+          +------------- */                                              
+       98  
+      132 -  /* Daytime palette, for the light theme. Light mode doesn't 
+          -try to be a                                                   
+      133 -     nebula — white has no darkness for gas to glow against, s
+          -o it read as                                                  
+      134 -     either candy or a smudge every way it was tried. It's a l
+          -ate-afternoon sky                                             
+      135 -     instead: aqua overhead off gruvbox blue #458588, paling d
+          -ownward, with a                                               
+      136 -     cumulus deck (see Sky.vue) filling everything below its o
+          -wn contour, so the                                            
+      137 -     blue only ever shows above the cloud. */                 
+      138 -  --sky-high: #5794a8;                                        
+      139 -  --sky-mid: #a2cad7;                                         
+      140 -  --sky-low: #e6f1f4;                                         
+       99 +  /* Aged stock, not white — the paper the plates were printed
+          + on. */                                                       
+      100 +  --pv-paper: #f3e8cd;                                        
+      101 +  --pv-lens-a: #4f8fa6;                                       
+      102 +  --pv-lens-b: #7f9a52;                                       
+      103 +  --pv-under: #dfae4a;                                        
+      104 +  /* Ink on paper is subtractive, so the plates darken where t
+          +hey cross —                                                   
+      105 +     which is also what makes the intersection the densest thi
+          +ng on the page. */                                            
+      106 +  --pv-blend: multiply;                                       
+      107 +  --pv-mix: #6a927c;                                          
+      108 +  --pv-halo: #9dbcae;                                         
+      109 +  --pv-muted: #7c6f64;                                        
+      110 +  --pv-edge: rgba(191, 168, 120, 0.44);                       
+      111 +  --pv-grain: 0.1;                                            
+      112 +  --pv-grain-blend: multiply;                                 
+      113  
+      142 -  /* Washed out, not luminous: the daytime moon is barely brig
+          -hter than the sky                                             
+      143 -     around it. Venus reads as a clean point because planets d
+          -on't scintillate. */                                          
+      144 -  --moon-lit: #fbf8ee;                                        
+      145 -  --moon-dim: #dfe3e0;                                        
+      146 -  --moon-mare: #b9bfc2;                                       
+      147 -  --venus-core: #fffdf2;                                      
+      114 +  --pv-ink-1: #3c3836;                                        
+      115 +  --pv-ink-2: #4f5b52;                                        
+      116 +  --pv-fringe-1: #4aa6bb;                                     
+      117 +  --pv-fringe-2: #c0708f;                                     
+      118 +                                                              
+      119 +  /* Composition. --pv-eye is the lenses' shared center line, 
+          +measured from the                                             
+      120 +     top of the page; the wordmark lands just under it. */    
+      121 +  --pv-lens-d: clamp(300px, 52vw, 640px);                     
+      122 +  --pv-eye: clamp(230px, 26vh + 150px, 360px);                
+      123 +  --pv-field-h: clamp(780px, 100vh + 240px, 1180px);          
+      124  }
+      125  
+      126  .dark {
+     ...
+      131  
+      132    --vp-code-color: #fabd2f;
+      133  
+      158 -  --vp-home-hero-name-background: linear-gradient(120deg, #fe8
+          -019 30%, #fabd2f);                                            
+      159 -                                                              
+      134    --para-link: #83a598;
+      135    --para-link-hover: #a2bfb4;
+      136 +                                                              
+      137 +  /* ---- Poster: the CRT pass -------------------------------
+          +------------- */                                              
+      138 +                                                              
+      139 +  /* Video black lifts; a true #000 reads as a hole rather tha
+          +n a screen. */                                                
+      140 +  --pv-paper: #14151a;                                        
+      141 +  --pv-lens-a: #5ea3bd;                                       
+      142 +  --pv-lens-b: #8ec07c;                                       
+      143 +  --pv-under: #fabd2f;                                        
+      144 +  --pv-blend: screen;                                         
+      145 +  --pv-mix: #a8dcc8;                                          
+      146 +  --pv-halo: #8ec07c;                                         
+      147 +  --pv-muted: #a89984;                                        
+      148 +  --pv-edge: rgba(8, 9, 12, 0.8);                             
+      149 +  --pv-grain: 0.07;                                           
+      150 +  --pv-grain-blend: overlay;                                  
+      151 +                                                              
+      152 +  --pv-ink-1: #f6ecd2;                                        
+      153 +  --pv-ink-2: #c9ddd2;                                        
+      154 +  --pv-fringe-1: #4fc3dc;                                     
+      155 +  --pv-fringe-2: #fb4934;                                     
+      156  }
+      157  
+      158  /*
+     ...
+      181  }
+      182  
+      183  /*
+      190 - * The terminal demo's decorations (orbit, stars, glow) intent
+          -ionally spill                                                 
+      191 - * outside their box. Clip them at the hero section's edge so 
+          -they can't widen                                              
+      192 - * the page and open a phantom right gutter on small screens. 
+          -`clip` (not                                                   
+      193 - * `hidden`) keeps the vertical glow and creates no scroll con
+          -tainer.                                                       
+      184 + * The lenses are wider than the page at small widths and the 
+          +terminal's stack                                              
+      185 + * spills past its box; clip both at the page edge so neither 
+          +opens a phantom                                               
+      186 + * right gutter. `clip` on one axis only — `hidden` would crea
+          +te a scroll                                                   
+      187 + * container and cut the poster's own vertical bleed.         
+      188   */
+      195 -.VPHome .VPHero {                                             
+      189 +.VPHome {                                                     
+      190    overflow-x: clip;
+      191 +  overflow-y: visible;                                        
+      192 +  margin-bottom: 64px;                                        
+      193  }
+      194  
+      195  /*
+      200 - * The hero image slot holds the terminal demo, which sizes it
+          -self; undo the                                                
+      201 - * default theme's fixed-size circular image treatment.       
+      196 + * Above 960px the default theme already drops the navbar's ba
+          +ckground on                                                   
+      197 + * `home.top`; below it the bar stays opaque and cuts a band a
+          +cross the poster.                                             
+      198 + * Let it go transparent there too — the paper is pale and the
+          + CRT is dark, so                                              
+      199 + * the nav controls keep their contrast either way. `screen-op
+          +en` keeps its                                                 
+      200 + * background: the mobile menu needs it.                      
+      201   */
+      203 -.VPHome .VPHero .image-container {                            
+      204 -  width: min(480px, 100%);                                    
+      205 -  height: auto;                                               
+      206 -  transform: none;                                            
+      207 -  margin: 0 auto;                                             
+      202 +.VPNavBar.home.top:not(.screen-open),                         
+      203 +.VPNavBar.home.top:not(.screen-open) .content-body {          
+      204 +  background-color: transparent;                              
+      205  }
+      206  
+      210 -.VPHome .VPHero .image-bg {                                   
+      211 -  display: none;                                              
+      207 +.VPNavBar.home.top:not(.screen-open) .divider-line {          
+      208 +  background-color: transparent;                              
+      209  }
+      210  
+      211  /*
+      215 - * Below 960px the default theme floats the image above the te
+          -xt with negative                                              
+      216 - * margins (sized for a small logo) — the terminal collides wi
+          -th the navbar and                                             
+      217 - * H1 there. Let it fall below the text block and clear it ins
+          -tead.                                                         
+      212 + * One button, used by the poster and by the call to action th
+          +at closes the                                                 
+      213 + * page. Brand orange is the page's one warm interactive thing
+          + — against the                                                
+      214 + * blue-green lenses it's the complement, which is why it's th
+          +e only fill.                                                  
+      215   */
+      219 -@media (max-width: 959px) {                                   
+      220 -  .VPHome .VPHero .image {                                    
+      221 -    order: 3;                                                 
+      222 -    margin: 32px 0 0;                                         
+      223 -  }                                                           
+      216 +.para-btn {                                                   
+      217 +  display: inline-block;                                      
+      218 +  padding: 0 22px;                                            
+      219 +  border-radius: 20px;                                        
+      220 +  line-height: 38px;                                          
+      221 +  font-size: 14px;                                            
+      222 +  font-weight: 600;                                           
+      223 +  white-space: nowrap;                                        
+      224 +  text-decoration: none;                                      
+      225 +  transition:                                                 
+      226 +    background-color 0.25s,                                   
+      227 +    border-color 0.25s,                                       
+      228 +    color 0.25s;                                              
+      229  }
+      230  
+      226 -/*                                                            
+      227 - * The wordmark and the headline are the poster; everything un
+          -der them is the                                               
+      228 - * caption. The face ships one weight, so both lines ask for e
+          -xactly that — any                                             
+      229 - * other and the browser synthesizes a bold over the top. Trac
+          -king is neutral on                                            
+      230 - * purpose — a starting point to tune by eye, not a correction
+          - applied blind.                                               
+      231 - */                                                           
+      232 -.VPHome .VPHero .name,                                        
+      233 -.VPHome .VPHero .text {                                       
+      234 -  font-family: var(--para-display);                           
+      235 -  font-weight: 400;                                           
+      236 -  letter-spacing: 0.01em;                                     
+      237 -  line-height: 1.05;                                          
+      231 +.para-btn.brand {                                             
+      232 +  background-color: var(--vp-button-brand-bg);                
+      233 +  color: var(--vp-button-brand-text);                         
+      234  }
+      235  
+      240 -/*                                                            
+      241 - * The sky layer lives in the `layout-top` slot, so it needs .
+          -Layout as its                                                 
+      242 - * containing block.                                          
+      243 - */                                                           
+      244 -.Layout {                                                     
+      245 -  position: relative;                                         
+      236 +.para-btn.brand:hover {                                       
+      237 +  background-color: var(--vp-button-brand-hover-bg);          
+      238  }
+      239  
+      248 -/*                                                            
+      249 - * Extra headroom under the navbar on the landing page. The de
+          -fault leaves an                                               
+      250 - * 80px band between the nav and the headline, which is too li
+          -ttle sky to place                                             
+      251 - * the moon and Venus in without them crowding the terminal's 
+          -top corner — and                                              
+      252 - * the hero reads better with the room regardless.            
+      253 - */                                                           
+      254 -@media (min-width: 960px) {                                   
+      255 -  .VPHome .VPHero {                                           
+      256 -    padding-top: calc(var(--vp-nav-height) + var(--vp-layout-t
+          -op-height, 0px) + 132px);                                     
+      257 -  }                                                           
+      240 +/* The quiet one: an outline in the lens tint, so the second a
+          +ction belongs to                                              
+      241 +   the poster rather than borrowing the theme's gray chip. */ 
+      242 +.para-btn.alt {                                               
+      243 +  border: 1px solid color-mix(in srgb, var(--pv-mix) 55%, tran
+          +sparent);                                                     
+      244 +  line-height: 36px;                                          
+      245 +  color: var(--vp-c-text-1);                                  
+      246  }
+      247  
+      248 +.para-btn.alt:hover {                                         
+      249 +  border-color: color-mix(in srgb, var(--pv-mix) 90%, transpar
+          +ent);                                                         
+      250 +  color: var(--vp-c-text-1);                                  
+      251 +}                                                             
+      252 +                                                              
+      253  /*
+      261 - * Above 960px the default theme already drops the navbar's ba
+          -ckground on                                                   
+      262 - * `home.top`; below it the bar stays opaque and cuts a gray b
+          -and across the                                                
+      263 - * nebula. Let it go transparent there too — the nebula is dar
+          -kest overhead in                                              
+      264 - * dark mode and palest in light, so the nav controls keep the
+          -ir contrast                                                   
+      265 - * either way. `screen-open` keeps its background: the mobile 
+          -menu needs it.                                                
+      254 + * The terminal, one screen down from the poster: what the two
+          + circles actually                                             
+      255 + * are, in commands. It sizes itself, so this only places it. 
+      256   */
+      267 -.VPNavBar.home.top:not(.screen-open),                         
+      268 -.VPNavBar.home.top:not(.screen-open) .content-body {          
+      269 -  background-color: transparent;                              
+      257 +.VPHome .para-hero {                                          
+      258 +  margin-top: 96px;                                           
+      259 +  margin-bottom: 104px;                                       
+      260  }
+      261  
+      272 -.VPNavBar.home.top:not(.screen-open) .divider-line {          
+      273 -  background-color: transparent;                              
+      274 -}                                                             
+      275 -                                                              
+      262  /*
+      277 - * Feature cards as glass panes lit by whichever sky is behind
+          - them: the fill                                               
+      278 - * fades to fully transparent toward the bottom-right so the s
+          -ky shows through,                                             
+      279 - * and the 1px border is a gradient that dissolves along the s
+          -ame diagonal — the                                            
+      280 - * card looks lit from the top-left rather than outlined. back
+          -drop-filter does                                              
+      281 - * the actual glass work on whatever passes behind. Light mode
+          - picks up the                                                 
+      282 - * afternoon sky's cool blue; dark mode picks up the nebula's 
+          -rose and plum.                                                
+      263 + * Feature cards, lit by the lenses above them: the fill fades
+          + out toward the                                               
+      264 + * bottom-right so the page shows through, and the 1px rim is 
+          +a gradient that                                               
+      265 + * dissolves along the same diagonal — the card looks lit from
+          + the top-left                                                 
+      266 + * rather than outlined.                                      
+      267   */
+      268  .VPHome .VPFeature {
+      269    position: relative;
+      270 +  border-radius: 16px;                                        
+      271    border-color: transparent;
+      272    background: linear-gradient(
+      273      168deg,
+      274      color-mix(in srgb, var(--vp-c-bg-soft) 96%, transparent) 0
+           %,
+      290 -    color-mix(in srgb, var(--vp-c-bg-soft) 68%, transparent) 5
+          -4%,                                                           
+      275 +    color-mix(in srgb, var(--vp-c-bg-soft) 62%, transparent) 5
+          +6%,                                                           
+      276      transparent 100%
+      277    );
+      293 -  backdrop-filter: blur(10px) saturate(1.1);                  
+      294 -  box-shadow:                                                 
+      295 -    inset 0 1px 0 rgba(255, 255, 255, 0.75),                  
+      296 -    0 20px 44px -30px color-mix(in srgb, var(--sky-high) 62%, 
+          -transparent);                                                 
+      278    transition:
+      279      box-shadow 0.25s,
+      280      transform 0.25s;
+      281 +  box-shadow: 0 18px 40px -32px color-mix(in srgb, var(--pv-mi
+          +x) 70%, transparent);                                         
+      282  }
+      283  
+      284  .VPHome .VPFeature::before {
+     ...
+      289    padding: 1px;
+      290    background: linear-gradient(
+      291      168deg,
+      310 -    color-mix(in srgb, var(--sky-high) 62%, transparent),     
+      311 -    color-mix(in srgb, var(--sky-high) 24%, transparent) 46%, 
+      292 +    color-mix(in srgb, var(--pv-mix) 62%, transparent),       
+      293 +    color-mix(in srgb, var(--pv-mix) 22%, transparent) 46%,   
+      294      transparent 76%
+      295    );
+      296    /* Two-layer mask minus the content box = a 1px gradient rin
+           g. */
+     ...
+      308  
+      309  .VPHome .VPFeature:hover {
+      310    transform: translateY(-2px);
+      329 -  box-shadow:                                                 
+      330 -    inset 0 1px 0 rgba(255, 255, 255, 0.9),                   
+      331 -    0 26px 52px -28px color-mix(in srgb, var(--sky-high) 78%, 
+          -transparent);                                                 
+      311 +  box-shadow: 0 24px 48px -30px color-mix(in srgb, var(--pv-mi
+          +x) 85%, transparent);                                         
+      312  }
+      313  
+      314  .VPHome .VPFeature:hover::before {
+      315    background: linear-gradient(
+      316      168deg,
+      337 -    color-mix(in srgb, var(--sky-high) 82%, transparent),     
+      338 -    color-mix(in srgb, var(--sky-high) 34%, transparent) 46%, 
+      317 +    color-mix(in srgb, var(--pv-mix) 88%, transparent),       
+      318 +    color-mix(in srgb, var(--pv-mix) 34%, transparent) 46%,   
+      319      transparent 78%
+      320    );
+      321  }
+      322  
+      343 -.dark .VPHome .VPFeature::before {                            
+      344 -  background: linear-gradient(                                
+      345 -    168deg,                                                   
+      346 -    color-mix(in srgb, var(--neb-rose) 38%, transparent),     
+      347 -    color-mix(in srgb, var(--neb-plum) 16%, transparent) 46%, 
+      348 -    transparent 76%                                           
+      323 +/* The icon sits in a lens of its own — same circle, same glow
+          +, small enough                                                
+      324 +   that six of them read as a row of apertures rather than six
+          + more diagrams. */                                            
+      325 +.VPHome .VPFeature .icon {                                    
+      326 +  border-radius: 50%;                                         
+      327 +  background: radial-gradient(                                
+      328 +    circle at 38% 32%,                                        
+      329 +    color-mix(in srgb, var(--pv-mix) 26%, var(--vp-c-bg)),    
+      330 +    color-mix(in srgb, var(--pv-mix) 8%, var(--vp-c-bg))      
+      331    );
+      332 +  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--pv-mix)
+          + 32%, transparent);                                           
+      333 +  transition: box-shadow 0.25s;                               
+      334  }
+      335  
+      352 -.dark .VPHome .VPFeature:hover::before {                      
+      353 -  background: linear-gradient(                                
+      354 -    168deg,                                                   
+      355 -    color-mix(in srgb, var(--neb-rose) 60%, transparent),     
+      356 -    color-mix(in srgb, var(--neb-plum) 26%, transparent) 46%, 
+      357 -    transparent 78%                                           
+      358 -  );                                                          
+      359 -}                                                             
+      360 -                                                              
+      361 -.dark .VPHome .VPFeature {                                    
+      362 -  background: linear-gradient(                                
+      363 -    168deg,                                                   
+      364 -    color-mix(in srgb, var(--vp-c-bg-soft) 88%, transparent) 0
+          -%,                                                            
+      365 -    color-mix(in srgb, var(--vp-c-bg-soft) 48%, transparent) 5
+          -4%,                                                           
+      366 -    transparent 100%                                          
+      367 -  );                                                          
+      336 +.VPHome .VPFeature:hover .icon {                              
+      337    box-shadow:
+      369 -    inset 0 1px 0 color-mix(in srgb, var(--neb-rose) 16%, tran
+          -sparent),                                                     
+      370 -    0 20px 44px -30px color-mix(in srgb, var(--neb-plum) 70%, 
+          -transparent);                                                 
+      338 +    inset 0 0 0 1px color-mix(in srgb, var(--pv-mix) 58%, tran
+          +sparent),                                                     
+      339 +    0 0 22px -4px color-mix(in srgb, var(--pv-mix) 60%, transp
+          +arent);                                                       
+      340  }
+      341  
+      373 -.dark .VPHome .VPFeature:hover {                              
+      374 -  box-shadow:                                                 
+      375 -    inset 0 1px 0 color-mix(in srgb, var(--neb-rose) 28%, tran
+          -sparent),                                                     
+      376 -    0 26px 52px -28px color-mix(in srgb, var(--neb-plum) 85%, 
+          -transparent);                                                 
+      377 -}                                                             
+      378 -                                                              
+      379 -/* The icon chip is a lit tile on the pane: near-white with a 
+          -sky tint in light                                             
+      380 -   mode, which also puts the orange glyphs against their compl
+          -ement, and                                                    
+      381 -   plum-cast in dark mode. */                                 
+      382 -.VPHome .VPFeature .icon {                                    
+      383 -  background: color-mix(in srgb, var(--sky-mid) 20%, var(--vp-
+          -c-bg));                                                       
+      384 -  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--sky-hig
+          -h) 26%, transparent);                                         
+      385 -}                                                             
+      386 -                                                              
+      387 -.dark .VPHome .VPFeature .icon {                              
+      388 -  background: color-mix(in srgb, var(--neb-plum) 14%, var(--vp
+          --c-default-soft));                                            
+      389 -  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--neb-ros
+          -e) 14%, transparent);                                         
+      390 -}                                                             
+      391 -                                                              
+      342  @media (prefers-reduced-motion: reduce) {
+      343    .VPHome .VPFeature:hover {
+      344      transform: none;
+     ...
+      360  }
+      361  
+      362  /*
+      413 - * The page used to end on a paragraph and then a few hundred 
+          -pixels of empty                                               
+      414 - * page. It closes on a call to action instead, cut from the s
+          -ame glass as the                                              
+      415 - * feature panes, and the layout's trailing margin comes in be
+          -hind it.                                                      
+      363 + * The page closes on a call to action cut from the same glass
+          + as the feature                                               
+      364 + * panes; the layout's trailing margin comes in behind it.    
+      365   */
+      417 -.Layout .VPHome {                                             
+      418 -  margin-bottom: 64px;                                        
+      419 -}                                                             
+      420 -                                                              
+      366  .VPHome .home-cta {
+      367    margin-top: 72px;
+      368    padding: 44px 32px;
+      424 -  border-radius: 12px;                                        
+      369 +  border-radius: 16px;                                        
+      370    text-align: center;
+      371    background: linear-gradient(
+      372      168deg,
+     ...
+      374      color-mix(in srgb, var(--vp-c-bg-soft) 62%, transparent) 6
+           0%,
+      375      transparent 100%
+      376    );
+      432 -  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--sky-hig
+          -h) 26%, transparent);                                         
+      433 -  backdrop-filter: blur(10px) saturate(1.1);                  
+      377 +  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--pv-mix)
+          + 30%, transparent);                                           
+      378  }
+      379  
+      436 -.dark .VPHome .home-cta {                                     
+      437 -  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--neb-ros
+          -e) 18%, transparent);                                         
+      438 -}                                                             
+      439 -                                                              
+      380  /* No rule above it and no top gap: the band is its own thing,
+            not a section. */
+      381  .VPHome .home-cta h2 {
+      382    margin: 0;
+     ...
+      399    gap: 12px;
+      400    margin-top: 24px;
+      401  }
+      462 -                                                              
+      463 -.VPHome .home-cta-btn {                                       
+      464 -  display: inline-block;                                      
+      465 -  padding: 0 20px;                                            
+      466 -  border-radius: 20px;                                        
+      467 -  line-height: 38px;                                          
+      468 -  font-size: 14px;                                            
+      469 -  font-weight: 600;                                           
+      470 -  text-decoration: none;                                      
+      471 -  transition:                                                 
+      472 -    background-color 0.25s,                                   
+      473 -    color 0.25s;                                              
+      474 -}                                                             
+      475 -                                                              
+      476 -.VPHome .home-cta-btn.brand {                                 
+      477 -  background-color: var(--vp-button-brand-bg);                
+      478 -  color: var(--vp-button-brand-text);                         
+      479 -}                                                             
+      480 -                                                              
+      481 -.VPHome .home-cta-btn.brand:hover {                           
+      482 -  background-color: var(--vp-button-brand-hover-bg);          
+      483 -  color: var(--vp-button-brand-hover-text);                   
+      484 -}                                                             
+      485 -                                                              
+      486 -.VPHome .home-cta-btn.alt {                                   
+      487 -  background-color: var(--vp-button-alt-bg);                  
+      488 -  color: var(--vp-button-alt-text);                           
+      489 -}                                                             
+      490 -                                                              
+      491 -.VPHome .home-cta-btn.alt:hover {                             
+      492 -  background-color: var(--vp-button-alt-hover-bg);            
+      493 -  color: var(--vp-button-alt-hover-text);                     
+      494 -}                                                             
+
+⏺ Write(.vitepress/theme/index.ts)
+  ⎿  Added 7 lines, removed 6 lines
+      3  // and code faces are declared in custom.css instead, so shippin
+         g Inter as well
+      4  // would be ~50KB of font nobody renders.
+      5  import DefaultTheme from 'vitepress/theme-without-fonts'
+      6 -import Sky from './Sky.vue'                                     
+      6 +import Poster from './Poster.vue'                               
+      7  import TerminalDemo from './TerminalDemo.vue'
+      8  import './custom.css'
+      9  
+     ...
+      11    extends: DefaultTheme,
+      12    Layout() {
+      13      return h(DefaultTheme.Layout, null, {
+      14 -      // `layout-top` renders above the navbar in the DOM, whic
+         -h is what lets the                                             
+      15 -      // sky bleed behind it. The layer is absolutely positione
+         -d, so it claims no                                             
+      16 -      // space and needs no --vp-layout-top-height.            
+      17 -      'layout-top': () => h(Sky),                              
+      18 -      'home-hero-image': () => h(TerminalDemo),                
+      14 +      // The landing page has no `hero` in its frontmatter, so 
+         +the default one                                                
+      15 +      // doesn't render and the poster stands in its place — it
+         + owns the whole                                                
+      16 +      // first screen, background included. The terminal follow
+         +s it: the poster                                               
+      17 +      // says what para is, the terminal shows the commands.   
+      18 +      'home-hero-before': () => h(Poster),                     
+      19 +      'home-hero-after': () => h(TerminalDemo),                
+      20      })
+      21    },
+      22  }
+
+⏺ Write(index.md)
+  ⎿  Added 2 lines, removed 14 lines
+       1  ---
+       2  layout: home
+       3  
+       4 -hero:                                                          
+       5 -  name: ParaSpace                                              
+       6 -  text: Parallel dev workspaces on your machine                
+       7 -  tagline: A full, isolated copy of your project per task — its
+         - own clone, its own stack, its own https URL. Run coding agents
+         - in parallel without collisions.                               
+       8 -  actions:                                                     
+       9 -    - theme: brand                                             
+      10 -      text: Get started                                        
+      11 -      link: /docs/getting-started                              
+      12 -    - theme: alt                                               
+      13 -      text: Why ParaSpace                                      
+      14 -      link: /docs/why                                          
+      15 -                                                               
+       4  features:
+       5    - icon:
+       6        light: /icons/planet-light.svg
+     ...
+      78    <h2>Give every task its own machine</h2>
+      79    <p>Point <code>para</code> at a repo and run as many workspac
+          es as you have work.</p>
+      80    <div class="home-cta-actions">
+      93 -    <a class="home-cta-btn brand" href="/docs/getting-started">
+         -Get started</a>                                                
+      94 -    <a class="home-cta-btn alt" href="https://github.com/parasp
+         -ace-dev/paraspace">View on GitHub</a>                          
+      81 +    <a class="para-btn brand" href="/docs/getting-started">Get 
+         +started</a>                                                    
+      82 +    <a class="para-btn alt" href="https://github.com/paraspace-
+         +dev/paraspace">View on GitHub</a>                              
+      83    </div>
+      84  </div>
+
+⏺ Now the config preload, the terminal, and retiring Sky.vue:
+
+⏺ Update(.vitepress/config.mts)
+  ⎿  Added 5 lines, removed 6 lines
+      11    cleanUrls: true,
+      12    lastUpdated: true,
+      13  
+      14 -  // The three faces the first screen actually paints: the hero
+         - display, the                                                  
+      15 -  // body sans, and the mono the hero terminal is set in. Prelo
+         -aded so none of                                                
+      16 -  // them swaps under the reader — the rest of Plex Mono's weig
+         -hts can wait for                                               
+      17 -  // the stylesheet. Fonts are fetched in CORS mode even same-o
+         -rigin, hence the                                               
+      18 -  // crossorigin attribute.                                    
+      14 +  // The two faces the first screen actually paints: the body s
+         +ans and the mono                                               
+      15 +  // the poster's host list is set in. Preloaded so neither swa
+         +ps under the                                                   
+      16 +  // reader — the rest of Plex Mono's weights can wait for the 
+         +stylesheet. The                                                
+      17 +  // wordmark needs no font at all; it's drawn (see theme/Wordm
+         +ark.vue). Fonts                                                
+      18 +  // are fetched in CORS mode even same-origin, hence the cross
+         +origin attribute.                                              
+      19    head: (
+      20      [
+      21 -      '/fonts/anton-sc-latin-400.woff2',                       
+      21        '/fonts/ibm-plex-sans-latin-var.woff2',
+      22        '/fonts/ibm-plex-mono-latin-400.woff2',
+      23      ] as const
+  Ran 1 shell command (ctrl+o to expand)
+
+⏺ Update(.vitepress/theme/TerminalDemo.vue)
+  ⎿  Removed 4 lines
+      1  <template>
+      2    <div class="para-hero">
+      3 -    <div class="space" aria-hidden="true">                      
+      4 -      <span class="orbit"><span class="sat" /></span>           
+      5 -    </div>                                                      
+      6 -                                                                
+      3      <!-- ws2 and ws3, one color plate each -->
+      4      <div class="ghost g2" aria-hidden="true" />
+      5      <div class="ghost g1" aria-hidden="true" />
+
+⏺ Update(.vitepress/theme/TerminalDemo.vue)
+  ⎿  Added 2 lines, removed 2 lines
+      28  </template>
+      29  
+      30  <style scoped>
+      31 -/* Gruvbox dark-hard terminal on the nebula; gruvbox light on t
+         -he daytime sky —                                               
+      32 -   see the light override below the palette. */                
+      31 +/* Gruvbox dark-hard terminal under the CRT poster; gruvbox lig
+         +ht under the                                                   
+      32 +   print one — see the light override below the palette. */    
+      33  .para-hero {
+      34    --gb-bg: #1d2021;
+      35    --gb-bg-soft: #282828;
+
+⏺ Update(.vitepress/theme/TerminalDemo.vue)
+  ⎿  Added 2 lines, removed 2 lines
+      57  }
+      58  
+      59  /*
+      60 - * Daylight runs the whole terminal on gruvbox light. These are
+         - the same nine                                                 
+      61 - * inks the code blocks further down the page are highlighted w
+         -ith (see                                                       
+      60 + * The print pass runs the whole terminal on gruvbox light. The
+         +se are the same                                                
+      61 + * nine inks the code blocks further down the page are highligh
+         +ted with (see                                                  
+      62   * .vitepress/shiki-gruvbox.ts) — a command in the hero and the
+           same command in
+      63   * Quick start are then literally the same color, which is the 
+          argument for
+      64   * doing this at all. It also settles the stack: the ghost plat
+          es derive their
+
+⏺ Update(.vitepress/theme/TerminalDemo.vue)
+  ⎿  Added 1 line, removed 2 lines
+      77    --gb-red: #9d0006;
+      78  }
+      79  
+      80 -/* The page nebula supplies the ambient color now; this is just
+         - the warm bloom                                                
+      81 -   that lifts the terminal off it. */                          
+      80 +/* The warm bloom that lifts the terminal off the page. */     
+      81  .para-hero::before {
+      82    content: '';
+      83    position: absolute;
+
+  Read 2 files, ran 5 shell commands (ctrl+o to expand)
+
+⏺ Dark renders well — the wordmark works. But the lenses read as flat disks
+  rather than emanating light, and the copy is trapped inside them. Fixing
+  composition and lens falloff:
+
+  Ran 2 shell commands (ctrl+o to expand)
+
+⏺ Now the lens rework:
+
+⏺ Update(.vitepress/theme/Poster.vue)
+  ⎿  Added 7 lines, removed 6 lines
+      73  /*
+      74   * Each lens is a halo that falls off to nothing plus a rim tha
+          t doesn't: the
+      75   * halo is what emanates, the rim is what makes it read as a pi
+          ece of glass
+      76 - * rather than a smudge. Neither uses a blur filter — a radial 
+         -gradient is                                                    
+      77 - * already soft, which keeps the drift transform-only.         
+      76 + * rather than a smudge. The halo is a radial gradient rather t
+         +han a blurred                                                  
+      77 + * disc, which keeps the drift transform-only and leaves the co
+         +py legible where                                               
+      78 + * it crosses the falloff.                                     
+      79   */
+      80  .lens {
+      81    position: absolute;
+     ...
+      88    mix-blend-mode: var(--pv-blend);
+      89    background: radial-gradient(
+      90      circle at 50% 50%,
+      90 -    color-mix(in srgb, var(--c) 58%, transparent) 0%,          
+      91 -    color-mix(in srgb, var(--c) 40%, transparent) 40%,         
+      92 -    color-mix(in srgb, var(--c) 15%, transparent) 68%,         
+      93 -    transparent 84%                                            
+      91 +    color-mix(in srgb, var(--c) 30%, transparent) 0%,          
+      92 +    color-mix(in srgb, var(--c) 25%, transparent) 44%,         
+      93 +    color-mix(in srgb, var(--c) 11%, transparent) 72%,         
+      94 +    transparent 93%                                            
+      95    );
+      96  }
+      97  
+
+⏺ Update(.vitepress/theme/Poster.vue)
+  ⎿  Added 9 lines, removed 8 lines
+      113      breathe-b 61s ease-in-out 1.5s infinite alternate;
+      114  }
+      115  
+      116 -/* The glass itself, inside the glow it throws. backdrop-filte
+          -r is doing real                                               
+      117 -   work here: in the intersection each rim refracts the other 
+          -lens. */                                                      
+      116 +/* The glass itself, inside the glow it throws: a hoop bright 
+          +enough to hold the                                            
+      117 +   circle's edge, blurred so it reads as a lens seen out of fo
+          +cus rather than a                                             
+      118 +   drawn outline. It is the only hard shape on the poster, whi
+          +ch is why the                                                 
+      119 +   Venn stays a Venn once the halos have faded into the page. 
+          +*/                                                            
+      120  .lens::after {
+      121    content: '';
+      122    position: absolute;
+      121 -  inset: 13%;                                                 
+      123 +  inset: 9%;                                                  
+      124    border-radius: 50%;
+      123 -  backdrop-filter: blur(7px) saturate(1.15);                  
+      125    box-shadow:
+      125 -    inset 0 0 0 1.5px color-mix(in srgb, var(--c) 60%, transpa
+          -rent),                                                        
+      126 -    inset 0 0 46px 6px color-mix(in srgb, var(--c) 16%, transp
+          -arent),                                                       
+      127 -    0 0 40px color-mix(in srgb, var(--c) 14%, transparent);   
+      128 -  filter: blur(2.5px);                                        
+      126 +    inset 0 0 0 2px color-mix(in srgb, var(--c) 80%, transpare
+          +nt),                                                          
+      127 +    inset 0 0 70px 12px color-mix(in srgb, var(--c) 18%, trans
+          +parent),                                                      
+      128 +    0 0 46px 4px color-mix(in srgb, var(--c) 16%, transparent)
+          +;                                                             
+      129 +  filter: blur(3.5px);                                        
+      130  }
+      131  
+      132  /* One circle becomes two: para in one gesture. */
+
+  Read 2 files, ran 1 shell command (ctrl+o to expand)
+
+⏺ Light mode is landing — it reads as a sun-faded one-sheet. Two fixes: the
+  green plate is too olive, and the halos stop at the rim instead of emanating
+  past it.
+
+⏺ Update(.vitepress/theme/Poster.vue)
+  ⎿  Added 18 lines, removed 9 lines
+      71  /* ---- The lenses --------------------------------------------
+          ------------ */
+      72  
+      73  /*
+      74 - * Each lens is a halo that falls off to nothing plus a rim tha
+         -t doesn't: the                                                 
+      75 - * halo is what emanates, the rim is what makes it read as a pi
+         -ece of glass                                                   
+      76 - * rather than a smudge. The halo is a radial gradient rather t
+         -han a blurred                                                  
+      77 - * disc, which keeps the drift transform-only and leaves the co
+         -py legible where                                               
+      78 - * it crosses the falloff.                                     
+      74 + * The lens box is the circle you actually see the edge of; bot
+         +h the light it                                                 
+      75 + * throws and the glass itself are drawn off it. The halo is a 
+         +radial gradient                                                
+      76 + * rather than a blurred disc, which keeps the drift transform-
+         +only and leaves                                                
+      77 + * the copy legible where it crosses the falloff.              
+      78   */
+      79  .lens {
+      80    position: absolute;
+     ...
+       85    margin: calc(var(--pv-lens-d) / -2);
+       86    border-radius: 50%;
+       87    mix-blend-mode: var(--pv-blend);
+       88 +}                                                             
+       89 +                                                              
+       90 +/* The emanation, which runs well past the glass — the reason 
+          +the light reads                                               
+       91 +   as coming out of the lens instead of being trapped in a dis
+          +c. */                                                         
+       92 +.lens::before {                                               
+       93 +  content: '';                                                
+       94 +  position: absolute;                                         
+       95 +  inset: -34%;                                                
+       96 +  border-radius: 50%;                                         
+       97    background: radial-gradient(
+       98      circle at 50% 50%,
+       91 -    color-mix(in srgb, var(--c) 30%, transparent) 0%,         
+       92 -    color-mix(in srgb, var(--c) 25%, transparent) 44%,        
+       93 -    color-mix(in srgb, var(--c) 11%, transparent) 72%,        
+       94 -    transparent 93%                                           
+       99 +    color-mix(in srgb, var(--c) 38%, transparent) 0%,         
+      100 +    color-mix(in srgb, var(--c) 26%, transparent) 26%,        
+      101 +    color-mix(in srgb, var(--c) 12%, transparent) 52%,        
+      102 +    color-mix(in srgb, var(--c) 4%, transparent) 74%,         
+      103 +    transparent 92%                                           
+      104    );
+      105  }
+      106  
+
+⏺ Update(.vitepress/theme/Poster.vue)
+  ⎿  Added 6 lines, removed 3 lines
+      129  .lens::after {
+      130    content: '';
+      131    position: absolute;
+      132 -  inset: 9%;                                                  
+      132 +  inset: 0;                                                   
+      133    border-radius: 50%;
+      134    box-shadow:
+      135 -    inset 0 0 0 2px color-mix(in srgb, var(--c) 80%, transpare
+          -nt),                                                          
+      136 -    inset 0 0 70px 12px color-mix(in srgb, var(--c) 18%, trans
+          -parent),                                                      
+      135 +    inset 0 0 0 2px color-mix(in srgb, var(--c) 78%, transpare
+          +nt),                                                          
+      136 +    /* The crown catches more light than the base, which is wh
+          +at stops the                                                  
+      137 +       hoop reading as a soap bubble. */                      
+      138 +    inset 0 14px 26px -14px var(--pv-crown),                  
+      139 +    inset 0 0 70px 14px color-mix(in srgb, var(--c) 16%, trans
+          +parent),                                                      
+      140      0 0 46px 4px color-mix(in srgb, var(--c) 16%, transparent)
+           ;
+      141    filter: blur(3.5px);
+      142  }
+
+  Read 1 file, ran 1 shell command (ctrl+o to expand)
+
+⏺ The lenses dropped out. Checking the built CSS:
+
+  Searched for 1 pattern, read 1 file (ctrl+o to expand)
+
+⏺ Halos were far too diffuse — pulling the emanation back to just past the
+  glass:
+
+⏺ Update(.vitepress/theme/Poster.vue)
+  ⎿  Added 6 lines, removed 6 lines
+       92  .lens::before {
+       93    content: '';
+       94    position: absolute;
+       95 -  inset: -34%;                                                
+       95 +  inset: -16%;                                                
+       96    border-radius: 50%;
+       97    background: radial-gradient(
+       98      circle at 50% 50%,
+       99 -    color-mix(in srgb, var(--c) 38%, transparent) 0%,         
+      100 -    color-mix(in srgb, var(--c) 26%, transparent) 26%,        
+      101 -    color-mix(in srgb, var(--c) 12%, transparent) 52%,        
+      102 -    color-mix(in srgb, var(--c) 4%, transparent) 74%,         
+      103 -    transparent 92%                                           
+       99 +    color-mix(in srgb, var(--c) 40%, transparent) 0%,         
+      100 +    color-mix(in srgb, var(--c) 30%, transparent) 30%,        
+      101 +    color-mix(in srgb, var(--c) 16%, transparent) 55%,        
+      102 +    color-mix(in srgb, var(--c) 5%, transparent) 74%,         
+      103 +    transparent 90%                                           
+      104    );
+      105  }
+      106  
+
+  Read 2 files, ran 3 shell commands (ctrl+o to expand)
+⏺ Light plates are washing out — adding a single density knob so the print pass
+  bites harder than the CRT pass:
+
+⏺ Update(.vitepress/theme/Poster.vue)
+  ⎿  Added 6 lines, removed 4 lines
+       94    position: absolute;
+       95    inset: -16%;
+       96    border-radius: 50%;
+       97 +  /* --pv-d is the one density knob: ink on paper has to be la
+          +id down harder                                                
+       98 +     than light on a screen to read as the same strength. */  
+       99    background: radial-gradient(
+      100      circle at 50% 50%,
+       99 -    color-mix(in srgb, var(--c) 40%, transparent) 0%,         
+      100 -    color-mix(in srgb, var(--c) 30%, transparent) 30%,        
+      101 -    color-mix(in srgb, var(--c) 16%, transparent) 55%,        
+      102 -    color-mix(in srgb, var(--c) 5%, transparent) 74%,         
+      101 +    color-mix(in srgb, var(--c) calc(var(--pv-d) * 40%), trans
+          +parent) 0%,                                                   
+      102 +    color-mix(in srgb, var(--c) calc(var(--pv-d) * 30%), trans
+          +parent) 30%,                                                  
+      103 +    color-mix(in srgb, var(--c) calc(var(--pv-d) * 16%), trans
+          +parent) 55%,                                                  
+      104 +    color-mix(in srgb, var(--c) calc(var(--pv-d) * 5%), transp
+          +arent) 74%,                                                   
+      105      transparent 90%
+      106    );
+      107  }
+
+  Read 1 file, ran 1 shell command (ctrl+o to expand)
+
+⏺ Hero works in both passes. Now checking the rest of the page:
+
+  Read 2 files, ran 1 shell command (ctrl+o to expand)
+
+⏺ Hard seam where the poster band ends. Extending the sheet so it dissolves into
+  the page instead of stopping:
+
+⏺ Update(.vitepress/theme/Poster.vue)
+  ⎿  Added 8 lines, removed 8 lines
+      50    position: relative;
+      51  }
+      52  
+      53 -/* Full-bleed without 100vw: .VPHome is the page's full width a
+         -lready, and its                                                
+      54 -   own overflow-x rule keeps the lenses from opening a right gu
+         -tter. */                                                       
+      53 +/* The sheet everything above the fold is printed on. Full-blee
+         +d without 100vw:                                               
+      54 +   .VPHome is the page's full width already, and its own overfl
+         +ow-x rule keeps                                                
+      55 +   the lenses from opening a right gutter. It runs past the ter
+         +minal and into                                                 
+      56 +   the feature grid, then dissolves — a sheet that ended on a l
+         +ine would read as                                              
+      57 +   a band pasted onto the page. */                             
+      58  .field {
+      59    position: absolute;
+      60    top: 0;
+     ...
+      63    height: var(--pv-field-h);
+      64    overflow: hidden;
+      65    pointer-events: none;
+      63 -  background: linear-gradient(                                 
+      64 -    180deg,                                                    
+      65 -    var(--pv-paper) 0%,                                        
+      66 -    var(--pv-paper) 58%,                                       
+      67 -    var(--vp-c-bg) 100%                                        
+      68 -  );                                                           
+      66 +  background: var(--pv-paper);                                 
+      67 +  -webkit-mask-image: linear-gradient(180deg, #000 46%, transpa
+         +rent 92%);                                                     
+      68 +  mask-image: linear-gradient(180deg, #000 46%, transparent 92%
+         +);                                                             
+      69  }
+      70  
+      71  /* ---- The lenses --------------------------------------------
+          ------------ */
+
+⏺ Update(.vitepress/theme/Poster.vue)
+  ⎿  Added 6 lines, removed 1 line
+      212    background-image: url("data:image/svg+xml,%3Csvg xmlns='http
+           ://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter i
+           d='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8
+           2' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect
+            width='180' height='180' filter='url(%23n)'/%3E%3C/svg%3E");
+      213  }
+      214  
+      215 +/* Edge burn around the poster only — it reaches as far as the
+          + composition                                                  
+      216 +   does, not as far as the sheet does. */                     
+      217  .vignette {
+      218    position: absolute;
+      217 -  inset: 0;                                                   
+      219 +  top: 0;                                                     
+      220 +  left: 0;                                                    
+      221 +  right: 0;                                                   
+      222 +  height: var(--pv-burn-h);                                   
+      223    background: radial-gradient(130% 88% at 50% 26%, transparent
+            56%, var(--pv-edge) 100%);
+      224  }
+      225  
+
+  Read 1 file, ran 1 shell command (ctrl+o to expand)
+
+⏺ The vignette's own bottom edge is the seam. Giving it the same dissolve:
+
+⏺ Update(.vitepress/theme/Poster.vue)
+  ⎿  Added 4 lines
+      221    right: 0;
+      222    height: var(--pv-burn-h);
+      223    background: radial-gradient(130% 88% at 50% 26%, transparent
+            56%, var(--pv-edge) 100%);
+      224 +  /* A radial can't come back to transparent at the bottom of 
+          +its own box, so                                               
+      225 +     the burn is faded out the same way the sheet is. */      
+      226 +  -webkit-mask-image: linear-gradient(180deg, #000 58%, transp
+          +arent 100%);                                                  
+      227 +  mask-image: linear-gradient(180deg, #000 58%, transparent 10
+          +0%);                                                          
+      228  }
+      229  
+      230  /* ---- The copy ---------------------------------------------
+           -------------- */
+
+  Read 3 files, ran 2 shell commands (ctrl+o to expand)
+
+⏺ Mobile shot hit Chrome's minimum window width. Framing it properly:
+
+  Read 1 file, ran 1 shell command (ctrl+o to expand)
+
+⏺ Mobile is fine. One typographic flaw though: C is open on its right, so C→E
+  carries visible extra air. Adding the one kern it needs:
+
+⏺ Update(.vitepress/theme/Wordmark.vue)
+  ⎿  Added 12 lines, removed 3 lines
+      20    e: 'M78 8.5H8.5V91.5H78M8.5 50H56',
+      21  }
+      22  
+      23 -/* Every body is 78 wide on a 100 advance, so the wordmark sets
+         - solid — the                                                   
+      24 -   tracking is the 22 units between them, not a per-pair judgem
+         -ent. */                                                        
+      25 -const LETTERS = [...'paraspace'].map((ch, i) => ({ d: GLYPHS[ch
+         -], x: i * 100 }))                                              
+      23 +/* Every body is 78 wide on a 100 advance, so the wordmark sets
+         + solid and the                                                 
+      24 +   tracking is one number rather than a per-pair judgement. C i
+         +s the exception:                                               
+      25 +   it's open on its right, so it carries air no other letter do
+         +es and gives                                                   
+      26 +   back 13 units. */                                           
+      27 +const LETTERS = []                                             
+      28 +let pen = 0                                                    
+      29 +for (const ch of 'paraspace') {                                
+      30 +  LETTERS.push({ d: GLYPHS[ch], x: pen })                      
+      31 +  pen += ch === 'c' ? 87 : 100                                 
+      32 +}                                                              
+      33 +                                                               
+      34 +const WIDTH = LETTERS[LETTERS.length - 1].x + 78               
+      35  </script>
+      36  
+      37  <template>
+
+⏺ Update(.vitepress/theme/Wordmark.vue)
+  ⎿  Added 1 line, removed 1 line
+      37  <template>
+      38    <svg
+      39      class="wordmark"
+      40 -    viewBox="-3 -3 884 106"                                    
+      40 +    :viewBox="`-3 -3 ${WIDTH + 6} 106`"                        
+      41      role="img"
+      42      aria-label="ParaSpace"
+      43      preserveAspectRatio="xMidYMid meet"
+
+  Read 4 files, ran 7 shell commands (ctrl+o to expand)
+⏺ Update(.vitepress/theme/custom.css)
+  ⎿  Added 1 line, removed 1 line
+      107    --pv-blend: multiply;
+      108    --pv-mix: #6a927c;
+      109    --pv-halo: #9dbcae;
+      110 -  --pv-muted: #7c6f64;                                        
+      110 +  --pv-muted: #6a5f54;                                        
+      111    --pv-lede: #574f47;
+      112    --pv-edge: rgba(191, 168, 120, 0.4);
+      113    --pv-grain: 0.11;
+
+⏺ Update(.vitepress/theme/custom.css)
+  ⎿  Added 1 line, removed 1 line
+      149    --pv-d: 1;
+      150    --pv-mix: #a8dcc8;
+      151    --pv-halo: #8ec07c;
+      152 -  --pv-muted: #a89984;                                        
+      152 +  --pv-muted: #b3a493;                                        
+      153    --pv-lede: #cbc2ad;
+      154    --pv-edge: rgba(8, 9, 12, 0.62);
+      155    --pv-grain: 0.05;
+
+  Read 1 file, ran 6 shell commands (ctrl+o to expand)
+
+⏺ While lint finishes, let me review the final Poster source for anything that
+  drifted during iteration:
+
+  Read 1 file (ctrl+o to expand)
+
+⏺ Four near-duplicate keyframe blocks for two mirrored circles is a second
+  spelling of one idea. Collapsing:
+
+⏺ Update(.vitepress/theme/Poster.vue)
+  ⎿  Added 4 lines
+      85    margin: calc(var(--pv-lens-d) / -2);
+      86    border-radius: 50%;
+      87    mix-blend-mode: var(--pv-blend);
+      88 +  transform: translateX(var(--dx));                            
+      89 +  animation:                                                   
+      90 +    split 1.5s cubic-bezier(0.16, 0.84, 0.28, 1) both,         
+      91 +    breathe var(--dur) ease-in-out 1.5s infinite alternate;    
+      92  }
+      93  
+      94  /* The emanation, which runs well past the glass — the reason t
+          he light reads
+
+⏺ Update(.vitepress/theme/Poster.vue)
+  ⎿  Added 13 lines, removed 10 lines
+      110    );
+      111  }
+      112  
+      113 -/* Centers 0.72 diameters apart: enough overlap to read as one
+          - shared region,                                               
+      114 -   not so much that either lens loses its own crescent. */    
+      113 +/*                                                            
+      114 + * The two lenses are one rule mirrored, so everything that di
+          +ffers between them                                            
+      115 + * is a value rather than a second copy: --dx puts their cente
+          +rs 0.72 diameters                                             
+      116 + * apart (enough overlap to read as one shared region, not so 
+          +much that either                                              
+      117 + * loses its own crescent), --dx-drift is where each wanders, 
+          +and the two --dur                                             
+      118 + * are coprime enough never to fall into step.                
+      119 + */                                                           
+      120  .a {
+      121    --c: var(--pv-lens-a);
+      117 -  transform: translateX(-36%);                                
+      118 -  animation:                                                  
+      119 -    split-a 1.5s cubic-bezier(0.16, 0.84, 0.28, 1) both,      
+      120 -    breathe-a 48s ease-in-out 1.5s infinite alternate;        
+      122 +  --dx: -36%;                                                 
+      123 +  --dx-drift: -37.5%;                                         
+      124 +  --dur: 48s;                                                 
+      125  }
+      126  
+      127  .b {
+      128    --c: var(--pv-lens-b);
+      125 -  transform: translateX(36%);                                 
+      126 -  animation:                                                  
+      127 -    split-b 1.5s cubic-bezier(0.16, 0.84, 0.28, 1) both,      
+      128 -    breathe-b 61s ease-in-out 1.5s infinite alternate;        
+      129 +  --dx: 36%;                                                  
+      130 +  --dx-drift: 37.5%;                                          
+      131 +  --dur: 61s;                                                 
+      132  }
+      133  
+      134  /* The glass itself, inside the glow it throws: a hoop bright 
+           enough to hold the
+
+⏺ Update(.vitepress/theme/Poster.vue)
+  ⎿  Added 5 lines, removed 21 lines
+      151  }
+      152  
+      153  /* One circle becomes two: para in one gesture. */
+      154 -@keyframes split-a {                                          
+      154 +@keyframes split {                                            
+      155    from {
+      156      transform: translateX(0) scale(0.84);
+      157      opacity: 0;
+      158    }
+      159    to {
+      160 -    transform: translateX(-36%) scale(1);                     
+      160 +    transform: translateX(var(--dx)) scale(1);                
+      161      opacity: 1;
+      162    }
+      163  }
+      164  
+      165 -@keyframes split-b {                                          
+      166 -  from {                                                      
+      167 -    transform: translateX(0) scale(0.84);                     
+      168 -    opacity: 0;                                               
+      169 -  }                                                           
+      170 -  to {                                                        
+      171 -    transform: translateX(36%) scale(1);                      
+      172 -    opacity: 1;                                               
+      173 -  }                                                           
+      165 +@keyframes breathe {                                          
+      166 +  from { transform: translateX(var(--dx)) scale(1); }         
+      167 +  to { transform: translateX(var(--dx-drift)) scale(1.05); }  
+      168  }
+      169  
+      176 -@keyframes breathe-a {                                        
+      177 -  from { transform: translateX(-36%) scale(1); }              
+      178 -  to { transform: translateX(-37.5%) scale(1.05); }           
+      179 -}                                                             
+      180 -                                                              
+      181 -@keyframes breathe-b {                                        
+      182 -  from { transform: translateX(36%) scale(1); }               
+      183 -  to { transform: translateX(37.5%) scale(1.05); }            
+      184 -}                                                             
+      185 -                                                              
+      170  /* ---- Underglow, grain, vignette ---------------------------
+           ------------- */
+      171  
+      172  /* The warm bed the Venn sits in — low, wide, and centered und
+           er the
+
+  Read 2 files, ran 2 shell commands (ctrl+o to expand)
+
+⏺ Stop Task
+  ⎿  docker images koalaman/shellcheck 2>/dev/null; echo "---"; ps aux |
+     grep -c "[s]hellcheck"; cat
+     /private/tmp/claude-501/-Users-jchook-projects-paraspace/b127226… ·
+     stopped
+
+  Ran 1 shell command (ctrl+o to expand)
+
+⏺ Built on branch poster-lander (uncommitted — git checkout main shows the old
+  lander). Dev server: npm run site.
+
+  The wordmark is drawn, not typeset. One arch of radius 30.5 on a 78×100 body,
+  stroked at 17, builds every glyph — P is that arch closed at the bar, A is the
+  same arch with both legs run to the baseline, R is P with a leg. S and C are
+  arcs of the same family, so every curve on the page, including the two lenses,
+  comes off one circle. No display font ships at all now.
+
+  The Venn is the product, not decoration. Two workspaces on one machine share
+  the host, the kernel and the project's credentials — that's the overlap — and
+  share nothing else, which is the two crescents. The lenses separate out of a
+  single circle over 1.5s on load, then drift on coprime periods. The page's
+  only light source is the intersection, with the amber bed under it.
+
+  Two physics rather than one palette recolored. Dark is a CRT: lenses
+  screen-blend additively, video-black lifts to #14151a, the wordmark carries
+  RGB fringing. Light is a faded print: the same two plates multiply like ink on
+  aged stock, and the fringe becomes CMYK misregistration. One knob, --pv-d,
+  accounts for ink needing to be laid down harder than light.
+
+  Changes: Poster.vue and Wordmark.vue are new; the poster mounts in
+  home-hero-before (no hero: frontmatter, so VitePress's default hero doesn't
+  render) and the terminal moves to home-hero-after, its orbit dressing removed
+  since the poster owns the space motif now. Feature cards are re-lit off the
+  lens tint with circular icon apertures. Sky.vue and Anton SC are deleted — the
+  sky is replaced and nothing rendered the font, which the repo's own "no font
+  nobody renders" rule settles.
+
+  Checked at 1440 and 390 wide, both themes, and with reduced motion forced
+  (lands on the final state, no animation).
+
+  One thing I could not verify: bin/lint did not complete. shellcheck isn't
+  installed locally so it shells out to Docker, and Docker on this machine is
+  unresponsive — docker images itself hung past two minutes. I changed no shell
+  files (only .vue, .css, .mts, .md, and two font binaries), so there's nothing
+  for it to catch here, and CI runs the same gate on push — but I'm flagging it
+  rather than claiming it passed.
+
+✻ Baked for 2h 19m 36s
+
+※ recap: Built an alternative poster-style homepage on branch poster-lander: two overlapping soft-focus lens circles with a hand-drawn PARASPACE wordmark, verified in both themes and on mobile. Next: review it via npm run site, then decide whether to commit.
+
+❯ Great work -- this is so much better. I think the orange doesn't "go" anymore 
+  -- we should pick something else for that.                                    
+
+⏺ Right — the diagnosis is that the page has two warms that aren't the same
+  warm: the underglow is gruvbox gold, and the orange sits beside it as a
+  near-miss. Let me check where orange still lives before choosing.
+
+  Ran 1 shell command (ctrl+o to expand)
+
+⏺ The fix is to collapse the two warms into one: the CTA becomes the color of
+  the light under the Venn. Gruvbox gold is already the underglow, already the
+  inline-code color, and already in the code blocks — orange was the only hue on
+  the page that belonged to nothing else.
+
+  Read 1 file (ctrl+o to expand)
+
+⏺ Update(.vitepress/theme/custom.css)
+  ⎿  Added 23 lines, removed 17 lines
+       62    --vp-font-family-mono: 'IBM Plex Mono', ui-monospace, 'Menlo
+           ', 'Monaco',
+       63      'Consolas', 'Liberation Mono', 'Courier New', monospace;
+       64  
+       65 -  --vp-c-brand-1: #d65d0e;                                    
+       66 -  --vp-c-brand-2: #e56b12;                                    
+       67 -  --vp-c-brand-3: #fe8019;                                    
+       68 -  --vp-c-brand-soft: rgba(214, 93, 14, 0.14);                 
+       65 +  /*                                                          
+       66 +   * The brand is gruvbox gold, which is the light under the V
+          +enn (--pv-under),                                             
+       67 +   * the inline-code color, and the yellow the code blocks alr
+          +eady highlight                                                
+       68 +   * with. That is the whole argument for it: the page carries
+          + two lens hues and                                            
+       69 +   * one warm, and every warm thing on it is the same warm. Br
+          +and-1 is deepened                                             
+       70 +   * off the gold for contrast against a white docs page.     
+       71 +   */                                                         
+       72 +  --vp-c-brand-1: #a4620f;                                    
+       73 +  --vp-c-brand-2: #b57614;                                    
+       74 +  --vp-c-brand-3: #d79921;                                    
+       75 +  --vp-c-brand-soft: rgba(164, 98, 15, 0.14);                 
+       76  
+       70 -  /* Gruvbox orange is mid-luminance; dark text keeps the butt
+          -ons readable. */                                              
+       71 -  --vp-button-brand-bg: #fe8019;                              
+       77 +  /* Gold is high-luminance; dark text keeps the buttons reada
+          +ble. */                                                       
+       78 +  --vp-button-brand-bg: #d79921;                              
+       79    --vp-button-brand-text: #1d2021;
+       80    --vp-button-brand-border: transparent;
+       74 -  --vp-button-brand-hover-bg: #ff9633;                        
+       81 +  --vp-button-brand-hover-bg: #e5a92f;                        
+       82    --vp-button-brand-hover-text: #1d2021;
+       83    --vp-button-brand-hover-border: transparent;
+       77 -  --vp-button-brand-active-bg: #d65d0e;                       
+       84 +  --vp-button-brand-active-bg: #b57614;                       
+       85    --vp-button-brand-active-text: #1d2021;
+       86    --vp-button-brand-active-border: transparent;
+       87  
+       81 -  /* Inline code defaults to the brand color, which makes it r
+          -ead as a link;                                                
+       82 -     gruvbox gold stays in the site's warm family while readin
+          -g as its own                                                  
+       83 -     thing (faded variant for light-bg contrast). */          
+       88 +  /* Faded gold: the same warm as the brand, one step down for
+          + contrast on a                                                
+       89 +     light background. */                                     
+       90    --vp-code-color: #94600e;
+       91  
+       86 -  /* Prose links are blue, not the brand orange: against a pag
+          -e this warm,                                                  
+       87 -     orange links blur into the inline code and the headings, 
+          -while the blue                                                
+       88 -     reads as the one interactive thing on the line. The exact
+          - value is the                                                 
+       89 -     identifier blue the code blocks use for shell arguments (
+          -see                                                           
+       90 -     ../shiki-gruvbox.ts) — a workspace name in a snippet and 
+          -a link in a                                                   
+       91 -     sentence are the same blue, so the page has one blue, not
+          - two. */                                                      
+       92 +  /* Prose links are blue, not the brand gold: against a page 
+          +this warm, a warm                                             
+       93 +     link blurs into the inline code and the headings, while t
+          +he blue reads as                                              
+       94 +     the one interactive thing on the line. The exact value is
+          + the identifier                                               
+       95 +     blue the code blocks use for shell arguments (see ../shik
+          +i-gruvbox.ts) — a                                             
+       96 +     workspace name in a snippet and a link in a sentence are 
+          +the same blue, so                                             
+       97 +     the page has one blue, not two. */                       
+       98    --para-link: #076678;
+       99    --para-link-hover: #0e7285;
+      100    --vp-code-link-color: var(--para-link);
+
+⏺ Update(.vitepress/theme/custom.css)
+  ⎿  Added 10 lines, removed 4 lines
+      134  }
+      135  
+      136  .dark {
+      137 -  --vp-c-brand-1: #fe8019;                                    
+      138 -  --vp-c-brand-2: #f57812;                                    
+      139 -  --vp-c-brand-3: #d65d0e;                                    
+      140 -  --vp-c-brand-soft: rgba(254, 128, 25, 0.16);                
+      137 +  /* On the CRT the gold can run at full strength — nothing ha
+          +s to survive a                                                
+      138 +     white background, so brand and inline code land on the sa
+          +me value. */                                                  
+      139 +  --vp-c-brand-1: #fabd2f;                                    
+      140 +  --vp-c-brand-2: #f0b429;                                    
+      141 +  --vp-c-brand-3: #d79921;                                    
+      142 +  --vp-c-brand-soft: rgba(250, 189, 47, 0.16);                
+      143  
+      144 +  --vp-button-brand-bg: #fabd2f;                              
+      145 +  --vp-button-brand-hover-bg: #ffcd52;                        
+      146 +  --vp-button-brand-active-bg: #d79921;                       
+      147 +                                                              
+      148    --vp-code-color: #fabd2f;
+      149  
+      150    --para-link: #83a598;
+
+  Ran 1 shell command (ctrl+o to expand)
+⏺ Update(.vitepress/theme/TerminalDemo.vue)
+  ⎿  Added 1 line, removed 1 line
+      82    content: '';
+      83    position: absolute;
+      84    inset: -6%;
+      85 -  background: radial-gradient(closest-side at 45% 55%, rgba(254
+         -, 128, 25, 0.2), transparent 72%);                             
+      85 +  background: radial-gradient(closest-side at 45% 55%, rgba(250
+         +, 189, 47, 0.18), transparent 72%);                            
+      86    filter: blur(38px);
+      87    pointer-events: none;
+      88  }
+
+  Searched for 1 pattern, read 4 files, ran 2 shell commands (ctrl+o to expand)
+
+⏺ One prominent orange remains: the terminal's $ prompt. Since the prompt is the
+  terminal's own chrome — not a token the code blocks below also render — it
+  can join the gold without breaking the "same command, same color"
+  correspondence:
+
+  Searched for 1 pattern, read 1 file (ctrl+o to expand)
+
+⏺ Update(.vitepress/theme/TerminalDemo.vue)
+  ⎿  Added 4 lines, removed 1 line
+      176    animation: appear 0.01s linear var(--d, 0s) forwards;
+      177  }
+      178  
+      179 +/* The prompt is the terminal's own chrome rather than a token
+          + the code blocks                                              
+      180 +   below also render, so it takes the site's gold and leaves t
+          +he nine inks it                                               
+      181 +   shares with them untouched. */                             
+      182  .cmd::before {
+      183    content: '$ ';
+      181 -  color: var(--gb-orange);                                    
+      184 +  color: var(--gb-yellow);                                    
+      185    /* 600, not 700: that's the bold cut of Plex Mono the page l
+           oads, and asking
+      186       for a weight no loaded face has leaves the choice to each
+            engine's font
+      187       matching — some pick the 600, some smear a synthetic bold
+            over it. */
+
+  Ran 1 shell command (ctrl+o to expand)
+
+⏺ Update(.vitepress/theme/TerminalDemo.vue)
+  ⎿  Added 1 line, removed 1 line
+      57  
+      58  /*
+      59   * The print pass runs the whole terminal on gruvbox light. The
+          se are the same
+      60 - * nine inks the code blocks further down the page are highligh
+         -ted with (see                                                  
+      60 + * inks the code blocks further down the page are highlighted w
+         +ith (see                                                       
+      61   * .vitepress/shiki-gruvbox.ts) — a command in the hero and the
+           same command in
+      62   * Quick start are then literally the same color, which is the 
+          argument for
+      63   * doing this at all. It also settles the stack: the ghost plat
+          es derive their
+
+  Read 2 files, ran 1 shell command (ctrl+o to expand)
+
+⏺ One refinement: in dark, brand-1 and the inline-code gold are literally the
+  same value. Light should mirror that rather than land one step off it:
+
+⏺ Update(.vitepress/theme/custom.css)
+  ⎿  Added 7 lines, removed 6 lines
+      66     * The brand is gruvbox gold, which is the light under the Ve
+          nn (--pv-under),
+      67     * the inline-code color, and the yellow the code blocks alre
+          ady highlight
+      68     * with. That is the whole argument for it: the page carries 
+          two lens hues and
+      69 -   * one warm, and every warm thing on it is the same warm. Bra
+         -nd-1 is deepened                                               
+      70 -   * off the gold for contrast against a white docs page.      
+      69 +   * one warm, and every warm thing on it is the same warm. Bra
+         +nd-1 is the                                                    
+      70 +   * faded cut of the gold, deep enough to carry small text on 
+         +a white docs                                                   
+      71 +   * page — and it is the same value as --vp-code-color below, 
+         +deliberately.                                                  
+      72     */
+      72 -  --vp-c-brand-1: #a4620f;                                     
+      73 -  --vp-c-brand-2: #b57614;                                     
+      74 -  --vp-c-brand-3: #d79921;                                     
+      75 -  --vp-c-brand-soft: rgba(164, 98, 15, 0.14);                  
+      73 +  --vp-c-brand-1: #94600e;                                     
+      74 +  --vp-c-brand-2: #a4620f;                                     
+      75 +  --vp-c-brand-3: #b57614;                                     
+      76 +  --vp-c-brand-soft: rgba(148, 96, 14, 0.14);                  
+      77  
+      78    /* Gold is high-luminance; dark text keeps the buttons readab
+          le. */
+      79    --vp-button-brand-bg: #d79921;
+
+⏺ Update(.vitepress/theme/custom.css)
+  ⎿  Added 1 line, removed 3 lines
+      86    --vp-button-brand-active-text: #1d2021;
+      87    --vp-button-brand-active-border: transparent;
+      88  
+      89 -  /* Faded gold: the same warm as the brand, one step down for 
+         -contrast on a                                                  
+      90 -     light background. */                                      
+      91 -  --vp-code-color: #94600e;                                    
+      89 +  --vp-code-color: var(--vp-c-brand-1);                        
+      90  
+      91    /* Prose links are blue, not the brand gold: against a page t
+          his warm, a warm
+      92       link blurs into the inline code and the headings, while th
+          e blue reads as
+
+⏺ Update(.vitepress/theme/custom.css)
+  ⎿  Removed 2 lines
+      144    --vp-button-brand-hover-bg: #ffcd52;
+      145    --vp-button-brand-active-bg: #d79921;
+      146  
+      147 -  --vp-code-color: #fabd2f;                                   
+      148 -                                                              
+      147    --para-link: #83a598;
+      148    --para-link-hover: #a2bfb4;
+      149  
+
+  Read 1 file, ran 2 shell commands (ctrl+o to expand)
+
+⏺ Orange is gone, replaced by gruvbox gold — still on poster-lander, still
+  uncommitted.
+
+  The reason gold and not something cooler: orange was the only hue on the page
+  that belonged to nothing else. The underglow under the Venn is already gruvbox
+  gold, inline code is already gold, and the code blocks already highlight with
+  it. So this isn't a swap for a new accent — it's collapsing two near-miss
+  warms into one. The page now carries exactly three hues: blue lens, green
+  lens, and the light between them. The CTA is literally the color of the thing
+  lighting the poster.
+
+  What moved:
+
+  - Brand tokens — dark runs the gold at full strength (#fabd2f); light uses its
+  faded cut (#94600e), deep enough for small text on a white docs page. In both
+  themes brand-1 and --vp-code-color are now the same value, wired as
+  var(--vp-c-brand-1) rather than two hex literals that could drift.
+  - Buttons — #d79921 on paper, #fabd2f on the CRT, dark text on both.
+  - The twelve feature icons — recolored in place; gold line art against the
+  teal aperture chips is still complementary, which was the point of the orange,
+  just in the page's own warm.
+  - The terminal's $ prompt — the last prominent orange. It's the terminal's own
+  chrome, not a token the code blocks below also render, so moving it to gold
+  costs nothing and leaves the "same command, same color" correspondence with
+  Quick start intact. --gb-orange is retired from that component.
+  - The terminal's warm bloom follows to gold.
+
+  Prose links stay blue throughout — that separation is what keeps the gold from
+  reading as clickable.
+
+  One orange remains, deliberately: shiki colors shell flags and operators 
+  orange (-g, |) in the code blocks. I left it because a syntax theme is its own
+  self-contained world — those blocks also carry red keywords, purple
+  constants, and blue variables, none of which follow the page's three-hue rule
+  either. If you'd rather the flags go gold too, that's a one-line change in
+  shiki-gruvbox.ts, though it collapses the orange and yellow token classes
+  (harmless in practice, since shell has no types for yellow to color).
+
+  bin/lint still can't run — Docker on this machine is unresponsive, and no
+  shell files changed in this round either.
+
+✻ Sautéed for 12m 38s
+
+※ recap: Goal: an alternative VitePress lander with a Venn-lens poster hero. Both hero and feature cards are done, and the brand orange is now gruvbox gold. Next: your review of the gold, then commit on the poster-lander branch.
+
+❯ Awesome, this looks fantastic. Let's PR it.                                   
+
+  Read 1 file, ran 2 shell commands (ctrl+o to expand)
+
+⏺ Site deploys to Pages on merge to main, so this PR is what publishes it.
+  Committing and opening it:
+
+  Created PR #35, ran 2 shell commands (ctrl+o to expand)
+
+❯ Also let's fix the callout at the bottom of the homepage -- the "Get Started" 
+  button has the prose link color and it looks weird. Should look the same as   
+  the hero buttons.                                                             
+⏺ PR is open: https://github.com/paraspace-dev/paraspace/pull/35
+
+  Now the bottom CTA. Let me see what's actually happening to it:
+
+  Read 1 file, ran 1 shell command (ctrl+o to expand)
+
+⏺ Found it — the bottom CTA lives in the markdown block, so VitePress's .vp-doc 
+  a rule (underline + weight 500) reaches it at a specificity the button's own
+  rule can't beat. The hero buttons aren't in .vp-doc, which is why only this
+  one is affected.
+
+  Read 1 file (ctrl+o to expand)
+
+⏺ Update(.vitepress/theme/custom.css)
+  ⎿  Added 1 line, removed 1 line
+      226  
+      227  /*
+      228   * One button, used by the poster and by the call to action th
+           at closes the
+      229 - * page. Brand orange is the page's one warm interactive thing
+          - — against the                                                
+      229 + * page. The brand gold is the page's one warm interactive thi
+          +ng — against the                                              
+      230   * blue-green lenses it's the complement, which is why it's th
+           e only fill.
+      231   */
+      232  .para-btn {
+
+⏺ Update(.vitepress/theme/custom.css)
+  ⎿  Added 11 lines
+      244      color 0.25s;
+      245  }
+      246  
+      247 +/*                                                            
+      248 + * A call to action is not prose. The one at the foot of the p
+          +age is authored in                                            
+      249 + * index.md, so it lands inside `.vp-doc` and picks up the the
+          +me's prose-anchor                                             
+      250 + * treatment — underline and weight 500 — which `.para-btn` al
+          +one can't outrank.                                            
+      251 + * Colour needs no help: `.para-btn.brand` and `.para-btn.alt`
+          + already win.                                                 
+      252 + */                                                           
+      253 +.vp-doc a.para-btn {                                          
+      254 +  font-weight: 600;                                           
+      255 +  text-decoration: none;                                      
+      256 +}                                                             
+      257 +                                                              
+      258  .para-btn.brand {
+      259    background-color: var(--vp-button-brand-bg);
+      260    color: var(--vp-button-brand-text);
+
+  Read 2 files, ran 3 shell commands (ctrl+o to expand)
+
+⏺ The commit landed locally (56df546) but the push can't complete — your SSH
+  agent stopped responding to signing requests partway through this turn (the
+  first push worked; this one gets communication with agent failed, then hangs
+  waiting on a passphrase prompt it can't display).
+
+  Run this yourself to finish it:
+
+  ! git push origin poster-lander
+
+  If it prompts for your key passphrase, that's the agent needing a re-unlock
+  (ssh-add ~/.ssh/...).
+
+  The CTA fix itself is done and verified. The cause: those two buttons are
+  authored as raw HTML in index.md, so they render inside .vp-doc and inherit
+  the theme's prose-anchor treatment — underline and weight 500. .para-btn is
+  one class and can't outrank .vp-doc a (one class + one element), so the
+  underline won. The hero's buttons live in Poster.vue, outside .vp-doc, which
+  is why only the bottom pair was affected.
+
+  The fix is one rule at matching specificity:
+
+  .vp-doc a.para-btn {
+    font-weight: 600;
+    text-decoration: none;
+  }
+
+  Color needed no help and I left it alone — .para-btn.brand and .para-btn.alt
+  are two classes each, so they already outrank the prose rule. Worth saying
+  plainly since you'd described it as the prose color: the color was correct all
+  along; the underline and lighter weight were what made it read as a link.
+  Both themes now match the poster's buttons exactly.
+
+  I also dropped a stale "brand orange" from a comment the gold change had left
+  behind.
+
+  Once you push, PR #35 picks up both commits.
+
+✻ Cogitated for 33m 12s
+
+❯ Hover state still has the blue color on the Get started button                
+
+⏺ The :hover case: .vp-doc a:hover is two classes plus an element, which
+  outranks .para-btn.brand's two classes — and .para-btn.brand:hover never
+  declared a color, so the prose rule won. My earlier "colour needs no help" was
+  right for the resting state and wrong for hover.
+
+  Read 1 file (ctrl+o to expand)
+
+⏺ Update(.vitepress/theme/custom.css)
+  ⎿  Added 4 lines
+      260    color: var(--vp-button-brand-text);
+      261  }
+      262  
+      263 +/* Every state names its own colour, including the ones that d
+          +on't change it.                                               
+      264 +   `.vp-doc a:hover` is two classes and an element, so a hover
+          + rule that sets                                               
+      265 +   only a background hands the text back to the prose link. */
+      266  .para-btn.brand:hover {
+      267    background-color: var(--vp-button-brand-hover-bg);
+      268 +  color: var(--vp-button-brand-hover-text);                   
+      269  }
+      270  
+      271  /* The quiet one: an outline in the lens tint, so the second a
+           ction belongs to
+
+⏺ Update(.vitepress/theme/custom.css)
+  ⎿  Added 1 line, removed 1 line
+      248   * A call to action is not prose. The one at the foot of the p
+           age is authored in
+      249   * index.md, so it lands inside `.vp-doc` and picks up the the
+           me's prose-anchor
+      250   * treatment — underline and weight 500 — which `.para-btn` al
+           one can't outrank.
+      251 - * Colour needs no help: `.para-btn.brand` and `.para-btn.alt`
+          - already win.                                                 
+      251 + * Colour is handled where each state is declared, below.     
+      252   */
+      253  .vp-doc a.para-btn {
+      254    font-weight: 600;
+
+⏺ Now verifying against the full set of competing rules in the built CSS, rather
+  than just the two I had in mind:
+
+  Ran 1 shell command (ctrl+o to expand)
+
+⏺ Specificity now favors the button, but I got this wrong once by reasoning
+  alone — let me verify the hover cascade empirically. Headless Chrome has no
+  mouse, so I'll rename :hover to :focus in a copy of the built CSS (identical
+  specificity weight, same source order) and focus the button for real:
+
+  Read 2 files, ran 3 shell commands (ctrl+o to expand)
+
+⏺ The SPA router 404s on that path — the copy has to be served at root. Redoing
+  it as its own server:
+
+  Read 1 file, ran 2 shell commands (ctrl+o to expand)
+
+⏺ Confirmed empirically: the hover-equivalent state keeps dark text on the
+  lightened gold — no blue. (The ring is the theme's :focus-visible outline, an
+  artifact of focusing rather than hovering; it won't appear on mouse hover.)
+
+  Pushed to poster-lander, ran 1 shell command (ctrl+o to expand)
+
+⏺ The agent recovered — both fixes are pushed.
+  Ran 1 shell command (ctrl+o to expand)
+
+⏺ Fixed and pushed — PR #35 now has all three commits, and you don't need to
+  push manually after all.
+
+  The cause was narrower than the first fix: .para-btn.brand:hover set only a
+  background-color. With no color in that rule, the resting .para-btn.brand (two
+  classes) was the button's only claim on text color, and .vp-doc a:hover — two
+  classes plus an element — outranks it. So the moment you hovered, the prose
+  blue took the text back. .para-btn.alt:hover was unaffected because it already
+  declared its own color, which is why only the gold button misbehaved.
+
+  The rule now reads:
+
+  .para-btn.brand:hover {
+    background-color: var(--vp-button-brand-hover-bg);
+    color: var(--vp-button-brand-hover-text);
+  }
+
+  Three classes, which clears .vp-doc a:hover unambiguously.
+
+  On verification — I reasoned my way to the wrong answer last round when I said
+  color needed no help, so this time I checked it rather than argued it.
+  Headless Chrome has no pointer, so I copied the built CSS, renamed :hover to
+  :focus throughout (identical pseudo-class specificity, unchanged source
+  order), served the copy at root so the SPA router wouldn't 404 it, and focused
+  the button for real. The screenshot shows dark text on the lightened gold. I
+  also enumerated every rule in the built CSS that can claim color on an anchor
+  inside .vp-doc, so the competing set is known rather than assumed — .vp-doc a,
+  .vp-doc a:hover (twice, mine and the theme's), and two > code rules that
+  don't apply since the button contains no <code>.
+
+  The general lesson is now a comment on the rule: every state names its own
+  color, including the ones that don't change it. That's what would have
+  prevented both rounds of this.
+
+✻ Crunched for 7m 0s
+
+❯ Here's kinda what I was thinking -- I don't think we want to show the         
+  install/getting started on the homepage because it's duplicating actual docs  
+  in a less thorough way. And I think the 6 feature cards are kind of lame.     
+  Instead I'd like to maybe have some gentle repeat of the kind of glow that we 
+  have in the hero, and do alternating feature descriptions, where we have:     
+                                                                                
+  [Icon with glow] [Description]                                                
+  [Description] [Icon with glow]                                                
+  [Icon with glow] [Description]                                                
+  ...                                                                           
+                                                                                
+  and have the glows kind of tying them together maybe with a bit of            
+  gentle/smooth scroll fade-in/slide-in effect as you scroll down through the   
+  features. We may need to revise some of the icons to work at the bigger       
+  format and embrace more of the blue/green style with yellow glow instead of   
+  the yellow flat color. It's possible we can use gradient or make them more    
+  realistic even. What do you think?                                            
+
+⏺ This is a good direction — the zigzag gives each feature room the cards never
+  did, and repeating the lens down the page is exactly the right way to tie
+  them. Three opinions before I build:
+
+  Where I'd push back: on "more realistic" icons. Everything on this page is
+  constructed — the wordmark is arcs off one circle, the lenses are circles, the
+  Venn is circles. Photoreal icons would be the one thing that isn't drawn by
+  the same hand. I'd rather make them more detailed and give them the gradient +
+  glow you're after, while keeping them geometric. If they still read thin, we
+  escalate.
+
+  Where I'd go further: the icon lenses should alternate hue by side — left-side
+  icons blue, right-side green, matching which hero circle they came from. The
+  two lenses separate on load, then walk down the page. And the icon strokes
+  carry a blue→green gradient, so each one holds both.
+
+  What I'd leave out: a connecting spine down the center. It'd read as a
+  timeline, and these six aren't a sequence — that's a device that should encode
+  real order or not appear. Overlapping glows can do the tying instead.
+
+  Let me check what removing Install/Quick start costs first:
+
+  Ran 1 shell command (ctrl+o to expand)
+
+⏺ README already owns Install and Quick start — which is what CLAUDE.md's
+  three-surfaces rule says — and nothing links to the lander's anchors. Removing
+  them fixes drift rather than losing anything.
+
+  Starting with the lens, which now needs to be a shared primitive rather than
+  something the poster owns:
+
+⏺ Update(.vitepress/theme/custom.css)
+  ⎿  Added 56 lines
+      225  }
+      226  
+      227  /*
+      228 + * The lens: the page's one round primitive. It runs at poster
+          + scale behind the                                             
+      229 + * wordmark (two of them, overlapping) and again at icon scale
+          + down the feature                                             
+      230 + * rows, so the light in the hero and the light beside each fe
+          +ature are the same                                            
+      231 + * construction rather than two things that resemble each othe
+          +r.                                                            
+      232 + *                                                            
+      233 + * The element's own box is the glass and --c is its hue. The 
+          +halo runs past the                                            
+      234 + * glass, which is what makes the light read as coming out of 
+          +a lens instead of                                             
+      235 + * filling a disc. The five dials below are defaulted for the 
+          +poster; the small                                             
+      236 + * one turns them down.                                       
+      237 + */                                                           
+      238 +.pv-lens {                                                    
+      239 +  --pv-rim: 2px;                                              
+      240 +  --pv-blur: 3.5px;                                           
+      241 +  --pv-glow: 70px;                                            
+      242 +  --pv-cast: 46px;                                            
+      243 +  --pv-crown-y: 14px;                                         
+      244 +                                                              
+      245 +  position: relative;                                         
+      246 +  border-radius: 50%;                                         
+      247 +}                                                             
+      248 +                                                              
+      249 +.pv-lens::before {                                            
+      250 +  content: '';                                                
+      251 +  position: absolute;                                         
+      252 +  inset: -16%;                                                
+      253 +  border-radius: 50%;                                         
+      254 +  /* --pv-d is the density knob: ink on paper has to be laid d
+          +own harder than                                               
+      255 +     light on a screen to read as the same strength. */       
+      256 +  background: radial-gradient(                                
+      257 +    circle at 50% 50%,                                        
+      258 +    color-mix(in srgb, var(--c) calc(var(--pv-d) * 40%), trans
+          +parent) 0%,                                                   
+      259 +    color-mix(in srgb, var(--c) calc(var(--pv-d) * 30%), trans
+          +parent) 30%,                                                  
+      260 +    color-mix(in srgb, var(--c) calc(var(--pv-d) * 16%), trans
+          +parent) 55%,                                                  
+      261 +    color-mix(in srgb, var(--c) calc(var(--pv-d) * 5%), transp
+          +arent) 74%,                                                   
+      262 +    transparent 90%                                           
+      263 +  );                                                          
+      264 +}                                                             
+      265 +                                                              
+      266 +/* The glass itself: a hoop bright enough to hold the circle's
+          + edge, blurred so                                             
+      267 +   it reads as a lens seen out of focus rather than a drawn ou
+          +tline. The crown                                              
+      268 +   catches more light than the base, which is what stops it re
+          +ading as a bubble. */                                         
+      269 +.pv-lens::after {                                             
+      270 +  content: '';                                                
+      271 +  position: absolute;                                         
+      272 +  inset: 0;                                                   
+      273 +  border-radius: 50%;                                         
+      274 +  box-shadow:                                                 
+      275 +    inset 0 0 0 var(--pv-rim) color-mix(in srgb, var(--c) 78%,
+          + transparent),                                                
+      276 +    inset 0 var(--pv-crown-y) calc(var(--pv-crown-y) * 1.9) ca
+          +lc(var(--pv-crown-y) * -1)                                    
+      277 +      var(--pv-crown),                                        
+      278 +    inset 0 0 var(--pv-glow) calc(var(--pv-glow) / 5) color-mi
+          +x(in srgb, var(--c) 16%, transparent),                        
+      279 +    0 0 var(--pv-cast) calc(var(--pv-cast) / 11) color-mix(in 
+          +srgb, var(--c) 16%, transparent);                             
+      280 +  filter: blur(var(--pv-blur));                               
+      281 +}                                                             
+      282 +                                                              
+      283 +/*                                                            
+      284   * One button, used by the poster and by the call to action th
+           at closes the
+      285   * page. The brand gold is the page's one warm interactive thi
+           ng — against the
+      286   * blue-green lenses it's the complement, which is why it's th
+           e only fill.
+
+⏺ Now the poster drops its private copy and uses the primitive:
+
+  Read 1 file, ran 2 shell commands (ctrl+o to expand)
+
+⏺ Hero is pixel-identical. Now the feature rows:
+
+⏺ Write(.vitepress/theme/Features.vue)
+  ⎿  Wrote 354 lines to .vitepress/theme/Features.vue
+       1 <script setup>
+       3  * The six things para gives you, alternating down the page.
+       4  *
+       5  * Each one sits in a lens — the same primitive the hero is buil
+       6  * .pv-lens in custom.css) — and takes the hue of the hero circl
+         e on its side:
+         e on load and
+       8  * then walk down the page, which is the whole reason the sectio
+         n reads as part
+      10  *
+     … +391 lines (ctrl+o to expand)
+
+  Ran 1 shell command (ctrl+o to expand)
+
+⏺ Now removing the dead .VPFeature card styles from custom.css, since nothing
+  renders them anymore:
+
+  Read 1 file, ran 2 shell commands (ctrl+o to expand)
+
+⏺ Structure works and the alternating hues read. Fixing what doesn't: icons are
+  too small and get washed out by the amber core, the helmet reads as concentric
+  rings, and the halos don't overlap enough to tie the rows together.
+
+  Ran 1 shell command (ctrl+o to expand)
+
+⏺ Now the connective tissue — a wide, faint wash behind each lens, large enough
+  that consecutive ones actually meet:
+
+  Read 1 file, ran 1 shell command (ctrl+o to expand)
+
+⏺ Rows 5 and 6 look absent — checking whether that's the reveal not firing or
+  just the crop:
+
+  Read 1 file, ran 1 shell command (ctrl+o to expand)
+
+⏺ All six rows are present and the reveal fires correctly — the earlier crop
+  simply cut them, and the trailing space is VitePress's flex layout pushing the
+  footer to the bottom of an oversized window, not a real gap. Checking the
+  print pass:
+
+  Read 1 file, ran 1 shell command (ctrl+o to expand)
+
+⏺ Light mode's hero lenses look absent at this window size — checking at a
+  normal viewport:
+
+  Read 1 file, ran 1 shell command (ctrl+o to expand)
+⏺ Light is fine at a real viewport — the lenses were just washed out by the
+  downscaling in that tall shot. Let me check the terminal's new scroll-gating
+  is complete:
+
+  Ran 1 shell command (ctrl+o to expand)
+
+⏺ The terminal's new scroll-gating is complete and clean — one
+  animation-play-state rule holding every clock. Leaving it as is.
+
+  One robustness fix on my side: the wash used z-index: -1, which can push it
+  behind the poster's sheet on the first row. DOM order alone does the job:
+
+  Read 1 file, ran 2 shell commands (ctrl+o to expand)
+
+⏺ The static server is serving a stale/dev shell — vitepress build recreates
+  dist, orphaning the server's directory. Restarting it clean:
+
+  Read 2 files, ran 3 shell commands (ctrl+o to expand)
+
+⏺ Mobile works — single column, alternating hue carrying the rhythm. Committing.
+  The terminal's scroll-gating wasn't my work, so it goes in its own commit
+  without my trailer:
+
+  Ran 2 shell commands (ctrl+o to expand)
+
+⏺ Pushed — PR #35 now has five commits.
+
+  On your question — what I think. Three places I'd push back or go further, all
+  of them in the build:
+
+  I didn't make the icons realistic. Everything on this page is constructed —
+  the wordmark is arcs off one circle, the lenses are circles, the Venn is
+  circles. Photoreal icons would be the one thing not drawn by the same hand. So
+  they're redrawn from the same primitives, at 64 units instead of 48, with the
+  gradient and glow you asked for. If they still read thin to you, that's the
+  moment to escalate — but I wanted you to see the constructed version first,
+  because it's the one that belongs to the page.
+
+  No spine down the middle. A connector between the rows would read as a
+  timeline, and these six aren't a sequence. The tying is done with light
+  instead: behind each lens sits a wash three lens-widths across at very low
+  alpha, wide enough that one row's glow reaches the next. The section reads as
+  one lit column rather than six lamps.
+
+  The lens became a real primitive. Rather than copying the hero's glow,
+  .pv-lens moved into custom.css with five dials, defaulted for the poster and
+  turned down for the rows. The hero now keeps only what's its own — placement,
+  blend, the split. That's what makes the repeat genuine instead of a
+  resemblance. Verified the hero renders pixel-identical after the extraction.
+
+  Each row takes the hue of the hero circle on its side — blue left, green right
+  — so the two circles separate on load and then walk down the page. Icon
+  strokes are a blue→green gradient over a warm core, so each icon holds both
+  lenses whichever one it's in. Being inline, they need no light/dark pair and
+  no request: the twelve files under public/icons/ are gone, and the helmet was
+  redrawn outright since a circle inside a circle read as a target.
+
+  Install and Quick start are off the lander — the README already owns both,
+  which is what CLAUDE.md's three-surfaces rule says, so removing them fixed
+  drift rather than losing anything. Nothing linked to the anchors.
+
+  Reveal is fade + slide from each row's own side, the lens travelling further
+  than the copy so the light leads. Added by script and only by script: no JS or
+  reduced-motion gets the finished state, not six empty gaps.
+
+  I also committed your terminal change separately, without my co-author trailer
+  since it's yours. Two notes on it: the animation-play-state approach is a
+  nicer solution than what I'd have written, and I checked that the
+  reduced-motion path still works — .js never gets added there, so the media
+  query's animation: none is what handles it.
+
+  Two things worth flagging:
+
+  - Six rows is a long scroll — about 1,400px of feature section. The page holds
+  together, but I'd cut to four if you want it tighter; "Sandboxed" and "Made
+  for agents" overlap in what they promise. Your content, your call, so I built
+  all six.
+  - bin/lint still hasn't run — Docker remains unresponsive here. No shell files
+  in this diff either.
+
+✻ Churned for 22m 10s
+
+❯ Ok the features have a few visual quirks...                                   
+                                                                                
+  1. They're too close together vertically, so it's hard to tell which icon is  
+  associated with which paragraph.                                              
+  2. The icon and the text are far apart on a normal laptop view. so it feels   
+  awkward                                                                       
+  3. The icon glow rings probably don't need to be as prominent as the hero --  
+  they could be much more faded for this section.                               
+  4. I agree 6 is a bit much. Good news is that it doesn't have to be an even   
+  number anymore. Could do 5.                                                   
+                                                                                
+  Overall we are getting closer.                                                
+
+⏺ Good notes — all four are real. Fixing them together, since spacing and
+  pairing interact.
+
+  Read 1 file, ran 3 shell commands (ctrl+o to expand)
+
+⏺ Both the terminal and all five rows vanished — checking whether that's the
+  page or my stale-server problem again:
+
+  Ran 2 shell commands (ctrl+o to expand)
+
+⏺ Only one <article> in the output — the rows aren't rendering at all. Reading
+  what my edit actually left behind:
+
+  Ran 3 shell commands (ctrl+o to expand)
+
+⏺ The rows do render — my greps were wrong (single-line HTML, and <h2 carries
+  scope attributes). So it's the reveal not firing. Getting the browser console:
+
+  Ran 1 shell command (ctrl+o to expand)
+
+⏺ No page errors — just Chrome noise. Testing whether the screenshot is simply
+  racing the reveal:
+
+  Read 1 file, ran 1 shell command (ctrl+o to expand)
+
+⏺ That was the screenshot racing the reveal, not the page — with a longer
+  virtual-time budget everything renders (the terminal's full session completes
+  too). Raising the budget in my capture script so I stop chasing it:
+
+  Read 1 file, ran 2 shell commands (ctrl+o to expand)
+⏺ The 12s budget still races in light — it's flaky, not deterministic. Forcing
+  reduced motion gives a stable capture of the finished state (and verifies that
+  path at the same time):
+
+  Read 1 file, ran 2 shell commands (ctrl+o to expand)
+
+⏺ The helper pages get wiped whenever the build empties dist. Folding
+  regeneration into one step so this stops recurring:
+
+  Read 1 file, ran 1 shell command (ctrl+o to expand)
+
+⏺ All four fixes land. Committing:
+
+  Ran 1 shell command (ctrl+o to expand)
+
+⏺ Pushed. All four addressed:
+
+  1. Vertical spacing — 40px → 104px. At the old spacing a row's copy sat about
+  as close to the next row's lens as to its own, which is exactly the ambiguity
+  you saw. The wash still spans the gap, so they read as separated pairs rather
+  than six disconnected lamps.
+
+  2. Icon/text distance — the lens was centered in a half-width column,
+  stranding ~180px of nothing between the two halves of one pair on a laptop. It
+  now sits at the inner edge of its column (flex-end / flex-start on the flip),
+  so the distance between a lens and its paragraph is the row gap and nothing
+  more. Section narrowed 980 → 900 too.
+
+  3. Glow prominence — rather than hand-tuning four alphas, --pv-fade joined the
+  lens primitive as one dial that every alpha in it answers to: halo stops,
+  rim, inner glow, cast. Rows run at 0.4, the hero stays at 1. One number, so
+  they can't drift apart.
+
+  4. Five rows — I dropped "Made for agents", because it was largely restating
+  the hero's own lede ("Run coding agents in parallel without collisions"). The
+  one promise it carried that Sandboxed didn't — a dozen at once, none of them 
+  seeing the others — moved into Sandboxed, which owns the mechanism that makes
+  it true. So Sandboxed is now a sentence longer than its neighbors. What's
+  actually lost is para ls showing the fleet; the commands reference covers it.
+  Flag it if you'd rather I'd dropped a different one or kept the copy untouched
+  and just deleted a row — I edited your words, so that's yours to veto.
+
+  The helmet icon went with it, leaving planet / key / sputnik / rocket /
+  console, alternating L-R-L-R-L.
+
+  One process note worth having: the "rows vanished" scare earlier was my
+  screenshot racing the scroll reveal, not the page — headless Chrome captured
+  before the IntersectionObserver transitions finished. I now capture with
+  reduced motion forced, which lands the finished layout deterministically and
+  exercises the no-JS path. Two of my earlier "it's broken" readings this
+  session were bad greps or capture artifacts rather than real defects; I've
+  tightened the tooling so that stops costing us turns.
+
+  bin/lint still hasn't run — Docker remains unresponsive, and no shell files
+  are in any of these commits.
+
+✻ Cogitated for 14m 37s
+
+※ recap: We're redesigning the ParaSpace homepage as a soft-focus Venn poster with drawn wordmark and alternating feature rows, all pushed to PR #35. Your next call: approve the merged "Sandboxed" copy or tell me to restore it and drop a different row.
+
+❯ Ok few issues with the spacing:                                               
+                                                                                
+  1. I think we could afford even a bit more spacing between the features for   
+  visual comfort.                                                               
+  2. The spacing between the icon bubble + header for each feature seems        
+  inconsistent on smaller mobile views.                                         
+  3. Same on mobile view, the spacing between features is not consistent.       
+  4. The spacing beneath the last feature should be the same as the spacing     
+  between features, to separate them from the final Get Started block           
+
+⏺ Let me diagnose the mobile spacing properly rather than guess — capturing with
+  reduced motion so the layout is deterministic:
+
+  Read 1 file, ran 2 shell commands (ctrl+o to expand)
+
+⏺ Rather than eyeball pixels, let me measure the actual geometry — that turns
+  four spacing complaints into numbers:
+
+  Ran 1 shell command (ctrl+o to expand)
+
+⏺ Desktop numbers confirm two of your points and expose a bug I hadn't seen: the
+  wash is centered on the column, not the lens — off by ~105px. Getting the
+  mobile numbers:
+
+  Ran 4 shell commands (ctrl+o to expand)
+
+⏺ Measured — this is useful. On both widths the layout gaps are exactly uniform
+  (20px icon→title, 56px between rows on mobile, 104px on desktop), so two of
+  your four are perceptual rather than layout. But the measurements found a real
+  bug and confirmed the other two:
+
+  Ran 3 shell commands (ctrl+o to expand)
+
+⏺ Now normalizing the icons themselves — the layout gap is identical for every
+  row, but each glyph's ink ends at a different height inside its lens, which is
+  what reads as inconsistent:
+
+  Read 1 file, ran 1 shell command (ctrl+o to expand)
+
+⏺ The copy changed under me — that's your edit, leaving it. Verifying the new
+  spacing numerically rather than by eye:
+
+  Ran 1 shell command (ctrl+o to expand)
+
+⏺ Desktop verified: wash centers now match lens centers exactly, row gaps are
+  136px, and the gap below the last row is also 136px. Mobile:
+
+  Ran 1 shell command (ctrl+o to expand)
+
+⏺ All four verified numerically at both widths — gaps uniform, wash concentric
+  with its lens, and the space below the last row now equals the space between
+  rows. Checking what changed in the copy so the commit describes it honestly:
+  Ran 2 shell commands (ctrl+o to expand)
+
+⏺ Pushed. I measured the section instead of eyeballing it, and that reframed two
+  of your four points.
+
+  Two were real bugs:
+
+  The gap under the last row was 72px against 104px between rows — so the
+  closing block genuinely read as a sixth feature. There's now one value,
+  --pv-row-gap, that both the rows and .home-cta take: 136px desktop, 96px
+  stacked. Measured equal at both widths.
+
+  The wash was centered on the column, not the lens — I hadn't spotted this. It
+  lived in .art, a half-width grid cell, so at 1440px each glow sat ~105px to
+  one side of the lens it belonged to, mirrored on the flipped rows. Moving it
+  inside .lens makes it concentric by construction. Every washCx now equals its
+  lensCx.
+
+  Two measured as already uniform — and this is worth stating plainly, because
+  the fix isn't where it looks like it should be. Lens-to-heading was exactly
+  20px on every mobile row, and row gaps exactly 56px, no variance at all. What
+  varies is where each drawing's ink stops inside its lens: the rocket's exhaust
+  reached 58 of 64 units while the planet stopped at 49 — an ~11px spread at
+  render size, measured against a heading the eye reads from the ink, not the
+  box. So the planet grew, the key's bow dropped and its shaft shortened, and
+  the rocket's exhaust came up; every glyph now ends within ~3px of the others.
+  Stacked lens-to-heading went to 28px so the pair still reads tighter than the
+  gap between pairs.
+
+  Spacing between features is up to 136px, per your first point.
+
+  Two notes:
+
+  - Your copy edits landed in the same commit — I couldn't split same-file
+  changes non-interactively, so the message names them as revisions rather than
+  claiming them.
+  - I built a geometry probe for this (injects a measuring script into a copy of
+  the build, dumps the DOM). It's what caught the wash offset, which no
+  screenshot at this scale would have shown. Worth keeping for the next spacing
+  pass.
+
+  bin/lint still unrun — Docker unresponsive, no shell files in any of these
+  commits.
+
+✻ Sautéed for 20m 34s
+
+※ recap: Goal: an alternative poster-style homepage for the ParaSpace VitePress site, now on branch poster-lander as PR #35 with hero, five feature rows, and spacing fixes all pushed. Next: your review of the latest spacing pass, or say what to adjust.
+
+⏺ Background command "Run lint and CLI tests" was stopped
+
+⏺ Background command "Run lint in background" was stopped
+
+⏺ Background command "Wait for lint to finish" was stopped
+
+⏺ Those are the three lint attempts from earlier — all killed without output,
+  confirming lint never ran. Let me retry now in case Docker recovered:
+
+  Ran 1 shell command (ctrl+o to expand)
+
+⏺ Docker is responding now. Running the gate:
+
+  Ran 2 shell commands (ctrl+o to expand)
+
+⏺ Background command "Run bin/lint in background" completed (exit code 0)
+
+⏺ bin/lint passes clean — exit 0. The earlier failures were Docker being
+  unresponsive while trying to pull the shellcheck image, not anything in the
+  tree. Running the CLI test tier too, since that's the other half of npm run 
+  check:
+
+  Ran 1 shell command (ctrl+o to expand)
+
+⏺ One failure. Checking whether it's mine or pre-existing:
+
+  Ran 1 shell command (ctrl+o to expand)
+
+⏺ _para: command not found — a shell-completion test, nothing my changes touch.
+  Confirming it fails on main too:
+
+  Ran 2 shell commands (ctrl+o to expand)
+
+⏺ Docker came back, so I could finally close out the check I'd been flagging as
+  unrun all session.
+
+  bin/lint passes — exit 0. The earlier failures were the daemon being
+  unresponsive while trying to pull the shellcheck image, not anything in the
+  tree. It's pulled and cached now, so future runs are fast.
+
+  CLI tests: 73 passed, 1 failed — and the failure is pre-existing on main. I
+  ran it in a detached worktree at main to check: identical result, same single
+  failure. It's mod completes one level at a time, failing with _para: command 
+  not found in test/cli/test_mod.sh:190 — a shell-completion test that never
+  sources the completion function in this environment. Nothing my branch touches
+  (my diff is .vitepress/, index.md, and the deleted icon files; no shell at
+  all).
+
+  So: not something I introduced, and not something to fix inside a lander PR —
+  but worth knowing it's red on main, since npm run check runs lint && test:cli
+  and is wired into preversion and prepublishOnly. That means npm version and
+  npm publish would currently fail on this machine. Whether it also fails in CI
+  depends on how the completion function gets loaded there; I didn't chase that
+  down since it's outside this branch's scope. Happy to look if you want it as
+  its own fix.
+
+  Branch state: 7 commits ahead of main, working tree clean, everything pushed
+  to PR #35. The three killed background tasks were the stale lint attempts from
+  earlier; nothing was lost with them.
+
+✻ Sautéed for 2m 31s
+
+※ recap: We rebuilt the ParaSpace homepage as a poster lander with five glowing feature rows, and the latest spacing fixes are committed and pushed to PR #35. Next: you review the PR and tell me what to adjust.
+
+❯ [Image #1] I'm still seeing this in mobile view -- see how "Thin wrapper" is  
+  much closer to the green orb than "A real terminal" is?                       
+  ⎿  [Image #1]
+
+⏺ Your screenshot shows it clearly, and it's the same class of problem I only
+  half-fixed: I aligned where each glyph's ink ends, but not how tall each glyph
+  is. Let me measure the actual rendered ink boxes rather than reason from path
+  data:
+
+  Ran 1 shell command (ctrl+o to expand)
+
+⏺ Measured — and this reframes it. The gap from ink-bottom to heading is nearly
+  uniform already (69.5–72.5px, a 3px spread). What's actually varying is glyph 
+  size: the rocket renders 54.4px tall against the console's 44.9px — 21%
+  bigger. A bigger glyph in the same orb reads as crowding its heading.
+
+  Ran 1 shell command (ctrl+o to expand)
+
+⏺ Glyph heights are now uniform: 46.8–47.1px (was 44.9–54.4). Verifying the
+  icons still read correctly at their new scales:
+
+  Read 1 file, ran 1 shell command (ctrl+o to expand)
+⏺ Icons read consistently now. Committing:
+
+  Ran 1 shell command (ctrl+o to expand)
+
+⏺ Fixed and pushed. Your eye was right, but the cause wasn't spacing — and my
+  previous fix aimed at the wrong variable.
+
+  Measuring the rendered ink boxes: ink-bottom to heading was already within 3px
+  across all five rows, and the lens boxes are identical to the pixel. So the
+  gap genuinely wasn't varying.
+
+  What varied was how big each drawing is. At natural proportions the glyphs
+  ranged 21% in height — the rocket rendered 54.4px tall against the monitor's
+  44.9px, because a rocket is a tall thing and a monitor is a wide one. A larger
+  glyph inside an identical orb reads as closer to everything around it, which
+  is exactly what you saw on "Thin wrapper."
+
+  Each glyph is now scaled to one optical height with the stroke divided back
+  out, so they keep a single weight rather than the tall ones going spindly.
+  Measured after: 46.8–47.1px, a 0.3px spread.
+
+  Two things worth saying about how I got here:
+
+  - Last round I normalized where each glyph's ink ended and told you that was
+  the fix. It wasn't — it addressed a 2-unit difference while a 9.5px size
+  difference sat untouched. The getBoundingClientRect measurement is what
+  actually found it; path arithmetic couldn't, because stroke width, caps and
+  joins all render outside the geometry you can read off the d attribute.
+  - There's a residual 2.5px of variation in ink-bottom-to-heading, from where
+  each drawing sits inside its own box. The rocket is now the furthest by 1.4px
+  rather than the closest. That's under a percent of a row, and correcting it
+  would mean five more hand-tuned constants that can drift — so I left it and am
+  telling you rather than quietly adding them. If it still reads wrong to you,
+  that's the next dial.
+
+  Also, the earlier notification cleared up the lint situation: bin/lint now
+  passes (exit 0) — Docker had just been unresponsive while pulling the
+  shellcheck image. CLI tests are 73 passed / 1 failed, and I confirmed in a
+  detached worktree that the same test fails on main, so it's pre-existing and
+  unrelated to this branch.
+
+✻ Churned for 7m 57s
+
+❯ [Image #2] ok next spacing/height bug -- on my Macbook Air M1 with Chrome on  
+  full-screen, the hero appears a little too low.. it cuts off the little       
+  subdomains.                                                                   
+  ⎿  [Image #2]
+
+⏺ That's a real fit bug at ~800px viewport height. Let me measure the poster's
+  actual geometry at your window size rather than infer it:
+
+  Ran 1 shell command (ctrl+o to expand)
+
+⏺ Found it, and it's a double-count. .VPContent already pads by the nav height
+  (64px), and .inner adds var(--vp-nav-height) again — so the whole hero sits
+  exactly 64px lower than intended. It also means .poster starts below the nav,
+  so the paper sheet doesn't bleed behind it:
+
+  Ran 1 shell command (ctrl+o to expand)
+
+⏺ The window heights include browser chrome, so the real viewport is ~87px
+  shorter — and the fix needs to go further. Tying the composition to one dial
+  so the wordmark, lens size and lens position stay in proportion at any height:
+
+  Ran 1 shell command (ctrl+o to expand)
+
+⏺ At your viewport (829): hosts end at 670 with 159px to spare, circles clear
+  the top edge by 11px, and the wordmark sits exactly 101px below the lens
+  centre — the original composition, preserved. Checking the range:
+
+  Ran 1 shell command (ctrl+o to expand)
+
+❯ Are we doing the wrong thing with all this computation? Don't we want to use  
+  units like vh and vw?                                                         
+
+  Read 1 file, ran 3 shell commands (ctrl+o to expand)
+
+⏺ Fits at your viewport now, host list included, with the circles clearing the
+  top edge. Committing:
+
+  Ran 1 shell command (ctrl+o to expand)
+
+⏺ Fixed and pushed — and your question caught something real, though not quite
+  where you aimed it.
+
+  On vh/vw: we already are. The dial is --pv-hero-top: clamp(120px, 20svh + 
+  40px, 296px). The calc() chain doesn't replace viewport units — it derives two
+  values from that one viewport-relative dial:
+
+  --pv-hero-top: clamp(120px, 20svh + 40px, 296px);
+  --pv-eye:      calc(var(--pv-hero-top) + 16px);
+  --pv-lens-d:   clamp(264px, min(42vw, calc(var(--pv-eye) * 1.9)), 540px);
+
+  And the derivation is the fix, not the problem. The bug was the opposite of 
+  too much computation — it was three values tuned independently. --pv-eye was
+  already viewport-relative (20vh + 132px) while the wordmark's offset was a
+  hard 296px. So as the window got shorter they drifted apart and the wordmark
+  slid down the Venn. Now the lenses sit a fixed 16px above the wordmark's
+  centre because that relationship is stated, not re-tuned in two places.
+
+  Your instinct was right about one thing though: vh was wrong. I switched to
+  svh. On a phone, vh is the tall viewport you only get once the address bar has
+  scrolled away — so sizing to it puts content under a bar that's still there
+  when you land. That's precisely the class of bug you reported, just on a
+  different device. A vh declaration precedes it as fallback.
+
+  The actual cause of your screenshot was dumber than either: .VPContent already
+  pads the page by the navbar height, and .inner added var(--vp-nav-height) a
+  second time. The hero sat exactly one navbar too low. That also meant the
+  poster started below the bar, so the printed sheet began an inch down the page
+  instead of bleeding behind it — visible as a pale strip above the cream in
+  light mode, which I'd missed entirely.
+
+  Measured at 1470×829: host list ends 159px clear of the fold, circles clear
+  the top by 11px, wordmark 101px below the lens centre — the same relationship
+  the old fixed numbers were tuned to.
+
+  One limit worth stating: below roughly 500px of viewport height it still won't
+  fit, because ~293px of copy, buttons and host list sits below the wordmark
+  regardless. That's a short window scrolling, not a layout fault, and I'd
+  rather not compress the type for it.
+
+  Where I'd push back on going further: I considered dropping the clamps
+  entirely for a min-height: 100svh flex-centred hero. It's tempting and it's
+  the standard pattern — but the grain and vignette currently paint over the
+  lenses and under the text, and centring the hero would require moving the
+  lenses into the copy flow, which breaks that ordering. Not worth it for the
+  same result.
+
+✻ Cogitated for 15m 12s
+
+※ recap: We're rebuilding the ParaSpace lander as a soft-focus Venn poster on branch poster-lander, now at 10 commits on PR #35. The hero fit fix is pushed and verified; next is your review of the current state.
+
+❯ Ok I mean it looks perfect now. Next task -- I think the lens circles need    
+  some help. I think it'd be neat if the outer glow faded to 0% opacity , like  
+  blurry disappated into the bg rather than having definition.                  
+
+⏺ Good catch, and there's a concrete cause. The halo element is border-radius: 
+  50% with a farthest-corner gradient — so the circle clips the gradient at ~71%
+  of its length, while the gradient is still at ~7% opacity. It's not fading
+  out; it's being cut off mid-ramp. That step is the "definition" you're seeing.
+
+  Read 1 file, ran 1 shell command (ctrl+o to expand)
+
+⏺ The outer disc boundary is gone — the light now dissipates. Checking the print
+  pass, where multiply makes any residual edge more obvious:
+
+  Ran 1 shell command (ctrl+o to expand)
+
+❯ Also the lens in the middle of the feature icons -- I think we can make 2     
+  improvements:                                                                 
+                                                                                
+  1. Can dim / lower opacity even more -- it doesn't need to be as strong as    
+  the hero lens effect                                                          
+  2. The yellow glow feels very defined and strange -- greatly reduce it and    
+  make it fade faster to transparent.                                           
+
+  Read 1 file (ctrl+o to expand)
+⏺ Light dissipates cleanly too. Now your feature-lens notes — and the yellow
+  core has the same clipping defect as the halo did:
+
+  Read 1 file, ran 2 shell commands (ctrl+o to expand)
+
+⏺ Feature lenses are much quieter now and the yellow is a whisper. Checking
+  light, where multiply behaves differently:
+
+  Read 1 file, ran 2 shell commands (ctrl+o to expand)
+
+⏺ Both done and pushed. The outer edge turned out to be a bug rather than a
+  styling choice, and the same bug was in three places.
+
+  The halo wasn't fading — it was being clipped. It's a circular element
+  carrying a radial gradient, and a radial gradient defaults to farthest-corner:
+  the ramp is measured to the corner of the box, while border-radius: 50% cuts
+  at the side. So the gradient was still ~7% opaque where the circle ended — a
+  hard step exactly where the light was supposed to have finished. closest-side
+  measures the ramp to the same place the clip happens, so it reaches zero
+  there.
+
+  Two things on top of that:
+
+  - The stops now trace a bell, not a straight ramp. A linear falloff holds one
+  slope all the way out and the eye finds where that slope stops. A curve that
+  flattens as it goes gives it nothing to find — that's what makes it dissipate
+  rather than end.
+  - The halo reaches further (inset -40% vs -16%), so there's room for a tail.
+
+  Your feature-lens notes: strength down from 0.4 of the hero to 0.24, and the
+  warm core from 20% to 8%, front-loaded so it's gone well before the glass. It
+  reads as warmth on the ink now instead of a yellow disc behind it. The core
+  had the identical clip defect, as did the wash tying the rows together — both
+  are sized to the side now.
+
+  What I deliberately left alone: the thin rim hoop. That's the "blurred
+  liquid-glass definition, like they're related to lenses" from your original
+  brief, and it's what keeps a circle reading as glass once the halo has
+  dissolved. If you want that softened too, it's --pv-rim (thickness) and
+  --pv-blur (how out-of-focus) on .pv-lens — say the word.
+
+  One thing worth flagging on the light pass: with the halo no longer clipped,
+  the plates spread wider and lighter, so the paper reads airier than before —
+  noticeably so at the top corners. I think it's an improvement, but it is a
+  change to the print pass you didn't ask for, so tell me if it's gone too pale.
+
+  Branch is 11 commits ahead on PR #35.
+
+✻ Brewed for 8m 32s
+
+❯ Ok as a last round, can we make sure that all the color scheme code is clean  
+  and there is not a lot of residual stuff from the old design?                 
+
+⏺ Let me audit this mechanically rather than by reading — every custom property
+  defined vs. actually used, across the whole theme:
+
+  Ran 1 shell command (ctrl+o to expand)
+
+⏺ No orphans in either direction — every custom property is both defined and
+  used. Now checking for dead selectors and stale prose from the old design:
+
+  Ran 1 shell command (ctrl+o to expand)
+
+⏺ Three stale comments and a claim that's no longer true. Let me also check for
+  hardcoded colors that should be palette references:
+
+  Ran 1 shell command (ctrl+o to expand)
+
+⏺ Found four pieces of residue. Fixing them:
+
+  Ran 1 shell command (ctrl+o to expand)
+
+⏺ That last one is a real duplicate — the brand gold written twice, once as hex
+  and once as rgba. Folding it:
+
+  Ran 1 shell command (ctrl+o to expand)
+
+⏺ Two more: an orphaned comment left over from the old composition model, and
+  the brand gold written out twice more in the button block.
+
+  Ran 2 shell commands (ctrl+o to expand)
+
+⏺ Rule list is clean — nothing targets removed markup. Final sweep for stale
+  phrasing in the components:
+
+  Ran 2 shell commands (ctrl+o to expand)
+
+⏺ Lint passes. The capture server dropped — restarting for the regression check:
+
+  Ran 3 shell commands (ctrl+o to expand)
+
+❯ I verified -- let's just push                                                 
+
+  Ran 1 shell command (ctrl+o to expand)
+
+⏺ Pushed — PR #35 is at 12 commits, working tree clean.
+
+  The audit was mechanical rather than by eye: I extracted every custom property
+  definition and every var() reference across the theme, config and shiki file,
+  and diffed them. No orphans in either direction — nothing defined-but-unused,
+  nothing used-but-undefined. And no rule in custom.css targets markup that no
+  longer exists; the sky, the feature cards and the hero image slot took their
+  selectors with them when they went.
+
+  What was actually left:
+
+  - The brand gold written out three more times as literals — once as an rgba()
+  for --vp-c-brand-soft in each theme, and twice more in the dark button block.
+  Those now reference the brand values, so there's one place to change the gold.
+  - The terminal restating two colours the theme already names — the poster's
+  paper and its own foreground, plus a hand-typed copy of the underglow yellow
+  in its bloom. All var() now.
+  - An orphaned comment describing the old composition model, sitting directly
+  above the block that replaced it.
+  - Comments that had gone false: still counting six feature rows, still
+  pointing at a Quick start section that came off the lander, and still
+  explaining how the terminal sits above a nebula and a cloud deck that don't
+  exist any more.
+  - --pv-mix and --pv-halo had no note saying what they're for.
+
+  bin/lint passes clean.
+
+  One thing I should flag rather than let pass silently: I did not get a visual 
+  regression screenshot of this last change. My capture tooling started failing
+  — Chrome exiting without writing a file even after clearing its profile locks
+  — and you stopped me mid-diagnosis. The changes are comment edits plus
+  literal-to-var() substitutions I verified are exact colour matches, and the
+  build succeeds, so the risk is low. But "low risk" isn't "verified," and you
+  said you'd checked it yourself, so that's the basis for this one going out
+  rather than my own screenshot.
+✻ Cogitated for 40s
+
+※ recap: We rebuilt the ParaSpace lander as a poster-style homepage (Venn lenses, drawn wordmark, five feature rows) on branch poster-lander, PR #35, now 12 commits with the final color-code cleanup pushed. Next: review the PR and merge when you're happy.
+
+❯ /export                                                                       
+  ⎿  Conversation copied to clipboard

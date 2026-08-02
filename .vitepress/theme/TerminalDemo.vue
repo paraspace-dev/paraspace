@@ -1,6 +1,40 @@
+<script setup>
+/**
+ * The commands, running. A session that provisions two workspaces, and a stack
+ * of panes behind it that grows by one every time a workspace comes up.
+ *
+ * The whole timeline is paused until the terminal is on screen: it sits below
+ * the poster's fold, so a session that starts on page load is a session that
+ * already ended by the time anyone scrolls to it.
+ */
+import { onMounted, ref } from 'vue'
+
+const root = ref(null)
+
+/*
+ * Same reveal as the feature rows: added by script and only ever by script, so
+ * a reader with no JS gets the terminal running rather than an empty pane.
+ */
+onMounted(() => {
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+
+  root.value.classList.add('js')
+  const io = new IntersectionObserver(
+    ([entry]) => {
+      if (!entry.isIntersecting) return
+      entry.target.classList.add('in')
+      io.disconnect()
+    },
+    { rootMargin: '0px 0px -12% 0px', threshold: 0.25 },
+  )
+  io.observe(root.value)
+})
+</script>
+
 <template>
-  <div class="para-hero">
-    <!-- ws2 and ws3, one color plate each -->
+  <div ref="root" class="para-hero">
+    <!-- ws1 and ws2, one color plate each. They start congruent with the front
+         window and spring out as their workspace goes live. -->
     <div class="ghost g2" aria-hidden="true" />
     <div class="ghost g1" aria-hidden="true" />
 
@@ -15,13 +49,13 @@
       </div>
       <div class="term-body">
         <div class="line cmd c1"><span class="typed">para up ws1</span></div>
-        <div class="line out" style="--d: 1.5s"><span class="ok">✓</span> container launched</div>
-        <div class="line out" style="--d: 2s"><span class="ok">✓</span> cloned + provisioned</div>
-        <div class="line out" style="--d: 2.5s"><span class="arrow">→</span> <span class="url">https://ws1.paraspace.dev</span></div>
+        <div class="line out" style="--d: 1.9s"><span class="ok">✓</span> container launched</div>
+        <div class="line out" style="--d: 2.4s"><span class="ok">✓</span> cloned + provisioned</div>
+        <div class="line out" style="--d: 2.9s"><span class="arrow">→</span> <span class="url">https://ws1.paraspace.dev</span></div>
         <div class="line cmd c2"><span class="typed">para up ws2</span></div>
-        <div class="line out" style="--d: 4.6s"><span class="ok">✓</span> container launched</div>
-        <div class="line out" style="--d: 5.1s"><span class="arrow">→</span> <span class="url">https://ws2.paraspace.dev</span></div>
-        <div class="line cmd c3" style="--d: 5.7s"><span class="cursor" /></div>
+        <div class="line out" style="--d: 5s"><span class="ok">✓</span> container launched</div>
+        <div class="line out" style="--d: 5.5s"><span class="arrow">→</span> <span class="url">https://ws2.paraspace.dev</span></div>
+        <div class="line cmd c3" style="--d: 6.1s"><span class="cursor" /></div>
       </div>
     </div>
   </div>
@@ -107,22 +141,39 @@ html:not(.dark) .para-hero {
 }
 
 /* Sits exactly on the terminal to start with, so the only thing separating the
-   layers is the translate — an even 14px up and right, one step per layer. */
+   layers is the translate — an even 14px up and right, one step per layer, and
+   --d is the line that puts it there: each pane arrives on its workspace's URL. */
 .ghost {
   position: absolute;
   inset: 28px 28px 0 0;
+  animation: spring 0.9s cubic-bezier(0.22, 1.5, 0.36, 1) var(--d) both;
 }
 
 .ghost.g1 {
+  --step: 14px;
+  --d: 2.9s;
   background: var(--gb-ghost-fill);
   border: 1px solid var(--gb-ghost-line);
-  transform: translate(14px, -14px);
 }
 
 .ghost.g2 {
+  --step: 28px;
+  --d: 5.5s;
   background: none;
   border: 1px solid var(--gb-ghost-line-far);
-  transform: translate(28px, -28px);
+}
+
+/* Out of the front window, up the diagonal. The overshoot in the curve is what
+   makes it a pane being dealt rather than a pane sliding. */
+@keyframes spring {
+  from {
+    transform: none;
+    opacity: 0;
+  }
+  to {
+    transform: translate(var(--step), calc(var(--step) * -1));
+    opacity: 1;
+  }
 }
 
 
@@ -194,10 +245,10 @@ html:not(.dark) .term {
   vertical-align: bottom;
   width: 0;
 }
-.c1 { --d: 0.3s; }
-.c1 .typed { animation: typing 1s steps(11, end) 0.3s forwards; }
-.c2 { --d: 3.4s; }
-.c2 .typed { animation: typing 1s steps(11, end) 3.4s forwards; }
+.c1 { --d: 0.7s; }
+.c1 .typed { animation: typing 1s steps(11, end) 0.7s forwards; }
+.c2 { --d: 3.8s; }
+.c2 .typed { animation: typing 1s steps(11, end) 3.8s forwards; }
 
 @keyframes typing {
   from { width: 0; }
@@ -225,11 +276,45 @@ html:not(.dark) .term {
   50% { opacity: 0; }
 }
 
+/* ---- Reveal ------------------------------------------------------------- */
+
+/*
+ * The terminal arrives the way the feature rows below it do — a rise and a
+ * fade, one gesture, once.
+ */
+.para-hero.js {
+  opacity: 0;
+  transform: translateY(28px);
+  transition:
+    opacity 0.7s ease,
+    transform 0.7s cubic-bezier(0.16, 0.84, 0.28, 1);
+}
+
+.para-hero.js.in {
+  opacity: 1;
+  transform: none;
+}
+
+/* And the session waits for it. One rule holds every clock in here — the typing,
+   the output lines, the two panes, the cursor — so there is no timeline that can
+   start early. */
+.para-hero.js * {
+  animation-play-state: paused;
+}
+
+.para-hero.js.in * {
+  animation-play-state: running;
+}
+
 /* ---- Motion preferences ------------------------------------------------ */
 
 @media (prefers-reduced-motion: reduce) {
   .line { animation: none; opacity: 1; }
   .typed { animation: none; width: 11ch; }
   .cursor { animation: none; }
+  .ghost {
+    animation: none;
+    transform: translate(var(--step), calc(var(--step) * -1));
+  }
 }
 </style>

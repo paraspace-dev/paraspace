@@ -10,25 +10,33 @@
  *
  * Stroked, not filled: butt caps land the terminals flush on the baseline and
  * the right edge, and round joins give the E its corners for free.
+ *
+ * Two places that isn't enough. R's leg is a diagonal, and a butt cap on a
+ * diagonal is cut square to the stroke — which leaves a stub hanging off the
+ * end rather than a foot standing on the line. The leg runs at 45 degrees
+ * straight through the baseline and the wordmark is clipped there instead, so
+ * the ground does the cutting. And C's ellipse is as wide as every other body,
+ * but its gap sat over the widest point, so the letter read narrow beside its
+ * neighbours; the terminals come round far enough to put ink where the width
+ * actually is.
  */
 const GLYPHS = {
   p: 'M8.5 100V39a30.5 30.5 0 0 1 61 0v29H8.5',
   a: 'M8.5 100V39a30.5 30.5 0 0 1 61 0v61M8.5 68h61',
-  r: 'M8.5 100V39a30.5 30.5 0 0 1 61 0v29H8.5M36 68l33.5 26',
+  r: 'M8.5 100V39a30.5 30.5 0 0 1 61 0v29H8.5M34 68l36 36',
   s: 'M69.5 29.25a30.5 20.75 0 1 0-30.5 20.75 30.5 20.75 0 1 1-30.5 20.75',
-  c: 'M56.5 16a30.5 41.5 0 1 0 0 68',
+  c: 'M65 28a30.5 41.5 0 1 0 0 44',
   e: 'M78 8.5H8.5V91.5H78M8.5 50H56',
 }
 
 /* Every body is 78 wide on a 100 advance, so the wordmark sets solid and the
    tracking is one number rather than a per-pair judgement. C is the exception:
-   it's open on its right, so it carries air no other letter does and gives
-   back 13 units. */
+   even closed up it stops short of the right edge, so it gives back 6 units. */
 const LETTERS = []
 let pen = 0
 for (const ch of 'paraspace') {
   LETTERS.push({ d: GLYPHS[ch], x: pen })
-  pen += ch === 'c' ? 87 : 100
+  pen += ch === 'c' ? 94 : 100
 }
 
 const WIDTH = LETTERS[LETTERS.length - 1].x + 78
@@ -50,7 +58,13 @@ const WIDTH = LETTERS[LETTERS.length - 1].x + 78
         <stop class="s2" offset="100%" />
       </linearGradient>
 
-      <g id="pv-word">
+      <!-- The baseline, as a hard edge. Every other terminal already stops on
+           it; this is what lets R's leg run through and be cut flush. -->
+      <clipPath id="pv-baseline">
+        <rect x="-40" y="-40" width="2000" height="140" />
+      </clipPath>
+
+      <g id="pv-word" clip-path="url(#pv-baseline)">
         <path v-for="(l, i) in LETTERS" :key="i" :d="l.d" :transform="`translate(${l.x} 0)`" />
       </g>
     </defs>

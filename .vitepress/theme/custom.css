@@ -1,38 +1,25 @@
 /**
- * ParaSpace theme: Gruvbox-flavored brand colors with a 70s space-race feel.
+ * ParaSpace theme: gruvbox brand colors, softened, in two physics.
+ *
+ * The landing page is a teaser one-sheet — two lenses overlapping like a Venn
+ * (see Poster.vue) — and it prints twice. Dark is a CRT: the lenses combine
+ * additively and the wordmark carries RGB fringing. Light is a faded photo
+ * print: the same two plates overprint like ink and the fringe becomes
+ * misregistration. The palettes below are those two passes, not one recolored.
+ *
  * Palette reference: https://github.com/morhetz/gruvbox
  */
 
 /*
- * The hero's display face, self-hosted from public/fonts/ (SIL OFL, license
- * alongside the file), so the page makes no third-party request and works
- * offline. Anton SC draws its small caps rather than faking them: the
- * lowercase codepoints map to real small-cap glyphs, which is why nothing here
- * asks for font-variant-caps — that would shrink letters that are already
- * small caps. It earns the display job in the hero and nowhere else, since
- * heavy type makes a reference page harder to scan, so the docs stay on the
- * body face. Latin subset only; the unicode-range hands anything outside it
- * back to the stack.
- */
-@font-face {
-  font-family: 'Anton SC';
-  font-style: normal;
-  font-weight: 400;
-  font-display: swap;
-  src: url('/fonts/anton-sc-latin-400.woff2') format('woff2');
-  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA,
-    U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193,
-    U+2212, U+2215, U+FEFF, U+FFFD;
-}
-
-/*
- * Body and code: IBM Plex Sans and Plex Mono, self-hosted alongside the display
- * face. They're siblings by design, which is the point — the prose and the
- * commands inside it are the same voice at two widths, and Plex Mono has enough
- * character to carry a terminal without being a novelty. The theme entry pulls
- * vitepress/theme-without-fonts so the default Inter isn't shipped underneath
- * these. Sans is the variable file: one download covers 400 through 700, which
- * is every weight the theme asks for.
+ * Body and code: IBM Plex Sans and Plex Mono, self-hosted from public/fonts/
+ * (SIL OFL, license alongside the files), so the page makes no third-party
+ * request and works offline. They're siblings by design, which is the point —
+ * the prose and the commands inside it are the same voice at two widths. The
+ * theme entry pulls vitepress/theme-without-fonts so the default Inter isn't
+ * shipped underneath them. Sans is the variable file: one download covers 400
+ * through 700, which is every weight the theme asks for. There is no display
+ * face to load — the wordmark is drawn (see Wordmark.vue). Latin subset only;
+ * the unicode-range hands anything outside it back to the stack.
  */
 @font-face {
   font-family: 'IBM Plex Sans';
@@ -70,95 +57,118 @@
 }
 
 :root {
-  --para-display: 'Anton SC', var(--vp-font-family-base);
-
   --vp-font-family-base: 'IBM Plex Sans', ui-sans-serif, system-ui, sans-serif,
     'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
   --vp-font-family-mono: 'IBM Plex Mono', ui-monospace, 'Menlo', 'Monaco',
     'Consolas', 'Liberation Mono', 'Courier New', monospace;
 
-  --vp-c-brand-1: #d65d0e;
-  --vp-c-brand-2: #e56b12;
-  --vp-c-brand-3: #fe8019;
-  --vp-c-brand-soft: rgba(214, 93, 14, 0.14);
+  /*
+   * The brand is gruvbox gold, which is the light under the Venn (--pv-under),
+   * the inline-code color, and the yellow the code blocks already highlight
+   * with. That is the whole argument for it: the page carries two lens hues and
+   * one warm, and every warm thing on it is the same warm. Brand-1 is the
+   * faded cut of the gold, deep enough to carry small text on a white docs
+   * page — and it is the same value as --vp-code-color below, deliberately.
+   */
+  --vp-c-brand-1: #94600e;
+  --vp-c-brand-2: #a4620f;
+  --vp-c-brand-3: #b57614;
+  --vp-c-brand-soft: rgba(148, 96, 14, 0.14);
 
-  /* Gruvbox orange is mid-luminance; dark text keeps the buttons readable. */
-  --vp-button-brand-bg: #fe8019;
+  /* Gold is high-luminance; dark text keeps the buttons readable. */
+  --vp-button-brand-bg: #d79921;
   --vp-button-brand-text: #1d2021;
   --vp-button-brand-border: transparent;
-  --vp-button-brand-hover-bg: #ff9633;
+  --vp-button-brand-hover-bg: #e5a92f;
   --vp-button-brand-hover-text: #1d2021;
   --vp-button-brand-hover-border: transparent;
-  --vp-button-brand-active-bg: #d65d0e;
+  --vp-button-brand-active-bg: #b57614;
   --vp-button-brand-active-text: #1d2021;
   --vp-button-brand-active-border: transparent;
 
-  --vp-home-hero-name-color: transparent;
-  /* The gold end of the ramp is bright enough to disappear into the cumulus
-     deck, which left "Space" fading out of the wordmark in light mode. Light
-     takes the deep end of the same gruvbox ramp; dark keeps the bright one. */
-  --vp-home-hero-name-background: linear-gradient(120deg, #d65d0e 30%, #b57614);
+  --vp-code-color: var(--vp-c-brand-1);
 
-  /* Inline code defaults to the brand color, which makes it read as a link;
-     gruvbox gold stays in the site's warm family while reading as its own
-     thing (faded variant for light-bg contrast). */
-  --vp-code-color: #94600e;
-
-  /* Prose links are blue, not the brand orange: against a page this warm,
-     orange links blur into the inline code and the headings, while the blue
-     reads as the one interactive thing on the line. The exact value is the
-     identifier blue the code blocks use for shell arguments (see
-     ../shiki-gruvbox.ts) — a workspace name in a snippet and a link in a
-     sentence are the same blue, so the page has one blue, not two. */
+  /* Prose links are blue, not the brand gold: against a page this warm, a warm
+     link blurs into the inline code and the headings, while the blue reads as
+     the one interactive thing on the line. The exact value is the identifier
+     blue the code blocks use for shell arguments (see ../shiki-gruvbox.ts) — a
+     workspace name in a snippet and a link in a sentence are the same blue, so
+     the page has one blue, not two. */
   --para-link: #076678;
   --para-link-hover: #0e7285;
   --vp-code-link-color: var(--para-link);
   --vp-code-link-hover-color: var(--para-link-hover);
 
-  /* Nebula palette, for the dark theme's night sky. Deep-space values on hues
-     gruvbox already owns (purple #b16286, light purple #d3869b, blue #458588)
-     so it reads as the same brand, not a purple bolt-on. Gas 4 is the existing
-     brand orange doing double duty as the nebula's warm core. */
-  --neb-plum: #4b2a63;
-  --neb-rose: #d3869b;
-  --neb-gas-1: #4b2a63;
-  --neb-gas-2: #b16286;
-  --neb-gas-3: #427b86;
-  --neb-gas-4: #fe8019;
-  --neb-fil-1: #5a2a6b;
-  --neb-fil-2: #b16286;
-  --neb-fil-3: #427b86;
+  /* ---- Poster: the print pass ------------------------------------------ */
 
-  /* Daytime palette, for the light theme. Light mode doesn't try to be a
-     nebula — white has no darkness for gas to glow against, so it read as
-     either candy or a smudge every way it was tried. It's a late-afternoon sky
-     instead: aqua overhead off gruvbox blue #458588, paling downward, with a
-     cumulus deck (see Sky.vue) filling everything below its own contour, so the
-     blue only ever shows above the cloud. */
-  --sky-high: #5794a8;
-  --sky-mid: #a2cad7;
-  --sky-low: #e6f1f4;
+  /* Aged stock, not white — the paper the plates were printed on. */
+  --pv-paper: #f1ead6;
+  --pv-lens-a: #37809f;
+  --pv-lens-b: #4f9256;
+  --pv-d: 1.5;
+  --pv-under: #dfae4a;
+  /* Ink on paper is subtractive, so the plates darken where they cross —
+     which is also what makes the intersection the densest thing on the page. */
+  --pv-blend: multiply;
+  --pv-mix: #6a927c;
+  --pv-halo: #9dbcae;
+  --pv-muted: #6a5f54;
+  --pv-lede: #574f47;
+  --pv-edge: rgba(191, 168, 120, 0.4);
+  --pv-grain: 0.11;
+  --pv-grain-blend: multiply;
+  --pv-crown: rgba(255, 253, 244, 0.5);
 
-  /* Washed out, not luminous: the daytime moon is barely brighter than the sky
-     around it. Venus reads as a clean point because planets don't scintillate. */
-  --moon-lit: #fbf8ee;
-  --moon-dim: #dfe3e0;
-  --moon-mare: #b9bfc2;
-  --venus-core: #fffdf2;
+  --pv-ink-1: #3c3836;
+  --pv-ink-2: #4f5b52;
+  --pv-fringe-1: #4aa6bb;
+  --pv-fringe-2: #c0708f;
+
+  /* Composition. --pv-eye is the lenses' shared center line, measured from the
+     top of the page; the wordmark lands just under it. */
+  --pv-lens-d: clamp(272px, 42vw, 540px);
+  --pv-eye: clamp(196px, 20vh + 132px, 312px);
+  --pv-field-h: clamp(1300px, 100vh + 820px, 2000px);
+  --pv-burn-h: clamp(760px, 100vh + 220px, 1160px);
 }
 
 .dark {
-  --vp-c-brand-1: #fe8019;
-  --vp-c-brand-2: #f57812;
-  --vp-c-brand-3: #d65d0e;
-  --vp-c-brand-soft: rgba(254, 128, 25, 0.16);
+  /* On the CRT the gold can run at full strength — nothing has to survive a
+     white background, so brand and inline code land on the same value. */
+  --vp-c-brand-1: #fabd2f;
+  --vp-c-brand-2: #f0b429;
+  --vp-c-brand-3: #d79921;
+  --vp-c-brand-soft: rgba(250, 189, 47, 0.16);
 
-  --vp-code-color: #fabd2f;
-
-  --vp-home-hero-name-background: linear-gradient(120deg, #fe8019 30%, #fabd2f);
+  --vp-button-brand-bg: #fabd2f;
+  --vp-button-brand-hover-bg: #ffcd52;
+  --vp-button-brand-active-bg: #d79921;
 
   --para-link: #83a598;
   --para-link-hover: #a2bfb4;
+
+  /* ---- Poster: the CRT pass -------------------------------------------- */
+
+  /* Video black lifts; a true #000 reads as a hole rather than a screen. */
+  --pv-paper: #14151a;
+  --pv-lens-a: #5ea3bd;
+  --pv-lens-b: #8ec07c;
+  --pv-under: #fabd2f;
+  --pv-blend: screen;
+  --pv-d: 1;
+  --pv-mix: #a8dcc8;
+  --pv-halo: #8ec07c;
+  --pv-muted: #b3a493;
+  --pv-lede: #cbc2ad;
+  --pv-edge: rgba(8, 9, 12, 0.62);
+  --pv-grain: 0.05;
+  --pv-grain-blend: screen;
+  --pv-crown: rgba(232, 248, 255, 0.34);
+
+  --pv-ink-1: #f6ecd2;
+  --pv-ink-2: #c9ddd2;
+  --pv-fringe-1: #4fc3dc;
+  --pv-fringe-2: #fb4934;
 }
 
 /*
@@ -187,82 +197,23 @@
 }
 
 /*
- * The terminal demo's decorations (orbit, stars, glow) intentionally spill
- * outside their box. Clip them at the hero section's edge so they can't widen
- * the page and open a phantom right gutter on small screens. `clip` (not
- * `hidden`) keeps the vertical glow and creates no scroll container.
+ * The lenses are wider than the page at small widths and the terminal's stack
+ * spills past its box; clip both at the page edge so neither opens a phantom
+ * right gutter. `clip` on one axis only — `hidden` would create a scroll
+ * container and cut the poster's own vertical bleed.
  */
-.VPHome .VPHero {
+.VPHome {
   overflow-x: clip;
-}
-
-/*
- * The hero image slot holds the terminal demo, which sizes itself; undo the
- * default theme's fixed-size circular image treatment.
- */
-.VPHome .VPHero .image-container {
-  width: min(480px, 100%);
-  height: auto;
-  transform: none;
-  margin: 0 auto;
-}
-
-.VPHome .VPHero .image-bg {
-  display: none;
-}
-
-/*
- * Below 960px the default theme floats the image above the text with negative
- * margins (sized for a small logo) — the terminal collides with the navbar and
- * H1 there. Let it fall below the text block and clear it instead.
- */
-@media (max-width: 959px) {
-  .VPHome .VPHero .image {
-    order: 3;
-    margin: 32px 0 0;
-  }
-}
-
-/*
- * The wordmark and the headline are the poster; everything under them is the
- * caption. The face ships one weight, so both lines ask for exactly that — any
- * other and the browser synthesizes a bold over the top. Tracking is neutral on
- * purpose — a starting point to tune by eye, not a correction applied blind.
- */
-.VPHome .VPHero .name,
-.VPHome .VPHero .text {
-  font-family: var(--para-display);
-  font-weight: 400;
-  letter-spacing: 0.01em;
-  line-height: 1.05;
-}
-
-/*
- * The sky layer lives in the `layout-top` slot, so it needs .Layout as its
- * containing block.
- */
-.Layout {
-  position: relative;
-}
-
-/*
- * Extra headroom under the navbar on the landing page. The default leaves an
- * 80px band between the nav and the headline, which is too little sky to place
- * the moon and Venus in without them crowding the terminal's top corner — and
- * the hero reads better with the room regardless.
- */
-@media (min-width: 960px) {
-  .VPHome .VPHero {
-    padding-top: calc(var(--vp-nav-height) + var(--vp-layout-top-height, 0px) + 132px);
-  }
+  overflow-y: visible;
+  margin-bottom: 64px;
 }
 
 /*
  * Above 960px the default theme already drops the navbar's background on
- * `home.top`; below it the bar stays opaque and cuts a gray band across the
- * nebula. Let it go transparent there too — the nebula is darkest overhead in
- * dark mode and palest in light, so the nav controls keep their contrast
- * either way. `screen-open` keeps its background: the mobile menu needs it.
+ * `home.top`; below it the bar stays opaque and cuts a band across the poster.
+ * Let it go transparent there too — the paper is pale and the CRT is dark, so
+ * the nav controls keep their contrast either way. `screen-open` keeps its
+ * background: the mobile menu needs it.
  */
 .VPNavBar.home.top:not(.screen-open),
 .VPNavBar.home.top:not(.screen-open) .content-body {
@@ -274,29 +225,76 @@
 }
 
 /*
- * Feature cards as glass panes lit by whichever sky is behind them: the fill
- * fades to fully transparent toward the bottom-right so the sky shows through,
- * and the 1px border is a gradient that dissolves along the same diagonal — the
- * card looks lit from the top-left rather than outlined. backdrop-filter does
- * the actual glass work on whatever passes behind. Light mode picks up the
- * afternoon sky's cool blue; dark mode picks up the nebula's rose and plum.
+ * One button, used by the poster and by the call to action that closes the
+ * page. Brand orange is the page's one warm interactive thing — against the
+ * blue-green lenses it's the complement, which is why it's the only fill.
+ */
+.para-btn {
+  display: inline-block;
+  padding: 0 22px;
+  border-radius: 20px;
+  line-height: 38px;
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+  text-decoration: none;
+  transition:
+    background-color 0.25s,
+    border-color 0.25s,
+    color 0.25s;
+}
+
+.para-btn.brand {
+  background-color: var(--vp-button-brand-bg);
+  color: var(--vp-button-brand-text);
+}
+
+.para-btn.brand:hover {
+  background-color: var(--vp-button-brand-hover-bg);
+}
+
+/* The quiet one: an outline in the lens tint, so the second action belongs to
+   the poster rather than borrowing the theme's gray chip. */
+.para-btn.alt {
+  border: 1px solid color-mix(in srgb, var(--pv-mix) 55%, transparent);
+  line-height: 36px;
+  color: var(--vp-c-text-1);
+}
+
+.para-btn.alt:hover {
+  border-color: color-mix(in srgb, var(--pv-mix) 90%, transparent);
+  color: var(--vp-c-text-1);
+}
+
+/*
+ * The terminal, one screen down from the poster: what the two circles actually
+ * are, in commands. It sizes itself, so this only places it.
+ */
+.VPHome .para-hero {
+  margin-top: 96px;
+  margin-bottom: 104px;
+}
+
+/*
+ * Feature cards, lit by the lenses above them: the fill fades out toward the
+ * bottom-right so the page shows through, and the 1px rim is a gradient that
+ * dissolves along the same diagonal — the card looks lit from the top-left
+ * rather than outlined.
  */
 .VPHome .VPFeature {
   position: relative;
+  border-radius: 16px;
   border-color: transparent;
   background: linear-gradient(
     168deg,
     color-mix(in srgb, var(--vp-c-bg-soft) 96%, transparent) 0%,
-    color-mix(in srgb, var(--vp-c-bg-soft) 68%, transparent) 54%,
+    color-mix(in srgb, var(--vp-c-bg-soft) 62%, transparent) 56%,
     transparent 100%
   );
-  backdrop-filter: blur(10px) saturate(1.1);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.75),
-    0 20px 44px -30px color-mix(in srgb, var(--sky-high) 62%, transparent);
   transition:
     box-shadow 0.25s,
     transform 0.25s;
+  box-shadow: 0 18px 40px -32px color-mix(in srgb, var(--pv-mix) 70%, transparent);
 }
 
 .VPHome .VPFeature::before {
@@ -307,8 +305,8 @@
   padding: 1px;
   background: linear-gradient(
     168deg,
-    color-mix(in srgb, var(--sky-high) 62%, transparent),
-    color-mix(in srgb, var(--sky-high) 24%, transparent) 46%,
+    color-mix(in srgb, var(--pv-mix) 62%, transparent),
+    color-mix(in srgb, var(--pv-mix) 22%, transparent) 46%,
     transparent 76%
   );
   /* Two-layer mask minus the content box = a 1px gradient ring. */
@@ -326,67 +324,35 @@
 
 .VPHome .VPFeature:hover {
   transform: translateY(-2px);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.9),
-    0 26px 52px -28px color-mix(in srgb, var(--sky-high) 78%, transparent);
+  box-shadow: 0 24px 48px -30px color-mix(in srgb, var(--pv-mix) 85%, transparent);
 }
 
 .VPHome .VPFeature:hover::before {
   background: linear-gradient(
     168deg,
-    color-mix(in srgb, var(--sky-high) 82%, transparent),
-    color-mix(in srgb, var(--sky-high) 34%, transparent) 46%,
+    color-mix(in srgb, var(--pv-mix) 88%, transparent),
+    color-mix(in srgb, var(--pv-mix) 34%, transparent) 46%,
     transparent 78%
   );
 }
 
-.dark .VPHome .VPFeature::before {
-  background: linear-gradient(
-    168deg,
-    color-mix(in srgb, var(--neb-rose) 38%, transparent),
-    color-mix(in srgb, var(--neb-plum) 16%, transparent) 46%,
-    transparent 76%
-  );
-}
-
-.dark .VPHome .VPFeature:hover::before {
-  background: linear-gradient(
-    168deg,
-    color-mix(in srgb, var(--neb-rose) 60%, transparent),
-    color-mix(in srgb, var(--neb-plum) 26%, transparent) 46%,
-    transparent 78%
-  );
-}
-
-.dark .VPHome .VPFeature {
-  background: linear-gradient(
-    168deg,
-    color-mix(in srgb, var(--vp-c-bg-soft) 88%, transparent) 0%,
-    color-mix(in srgb, var(--vp-c-bg-soft) 48%, transparent) 54%,
-    transparent 100%
-  );
-  box-shadow:
-    inset 0 1px 0 color-mix(in srgb, var(--neb-rose) 16%, transparent),
-    0 20px 44px -30px color-mix(in srgb, var(--neb-plum) 70%, transparent);
-}
-
-.dark .VPHome .VPFeature:hover {
-  box-shadow:
-    inset 0 1px 0 color-mix(in srgb, var(--neb-rose) 28%, transparent),
-    0 26px 52px -28px color-mix(in srgb, var(--neb-plum) 85%, transparent);
-}
-
-/* The icon chip is a lit tile on the pane: near-white with a sky tint in light
-   mode, which also puts the orange glyphs against their complement, and
-   plum-cast in dark mode. */
+/* The icon sits in a lens of its own — same circle, same glow, small enough
+   that six of them read as a row of apertures rather than six more diagrams. */
 .VPHome .VPFeature .icon {
-  background: color-mix(in srgb, var(--sky-mid) 20%, var(--vp-c-bg));
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--sky-high) 26%, transparent);
+  border-radius: 50%;
+  background: radial-gradient(
+    circle at 38% 32%,
+    color-mix(in srgb, var(--pv-mix) 26%, var(--vp-c-bg)),
+    color-mix(in srgb, var(--pv-mix) 8%, var(--vp-c-bg))
+  );
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--pv-mix) 32%, transparent);
+  transition: box-shadow 0.25s;
 }
 
-.dark .VPHome .VPFeature .icon {
-  background: color-mix(in srgb, var(--neb-plum) 14%, var(--vp-c-default-soft));
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--neb-rose) 14%, transparent);
+.VPHome .VPFeature:hover .icon {
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--pv-mix) 58%, transparent),
+    0 0 22px -4px color-mix(in srgb, var(--pv-mix) 60%, transparent);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -410,18 +376,13 @@
 }
 
 /*
- * The page used to end on a paragraph and then a few hundred pixels of empty
- * page. It closes on a call to action instead, cut from the same glass as the
- * feature panes, and the layout's trailing margin comes in behind it.
+ * The page closes on a call to action cut from the same glass as the feature
+ * panes; the layout's trailing margin comes in behind it.
  */
-.Layout .VPHome {
-  margin-bottom: 64px;
-}
-
 .VPHome .home-cta {
   margin-top: 72px;
   padding: 44px 32px;
-  border-radius: 12px;
+  border-radius: 16px;
   text-align: center;
   background: linear-gradient(
     168deg,
@@ -429,12 +390,7 @@
     color-mix(in srgb, var(--vp-c-bg-soft) 62%, transparent) 60%,
     transparent 100%
   );
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--sky-high) 26%, transparent);
-  backdrop-filter: blur(10px) saturate(1.1);
-}
-
-.dark .VPHome .home-cta {
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--neb-rose) 18%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--pv-mix) 30%, transparent);
 }
 
 /* No rule above it and no top gap: the band is its own thing, not a section. */
@@ -458,37 +414,4 @@
   justify-content: center;
   gap: 12px;
   margin-top: 24px;
-}
-
-.VPHome .home-cta-btn {
-  display: inline-block;
-  padding: 0 20px;
-  border-radius: 20px;
-  line-height: 38px;
-  font-size: 14px;
-  font-weight: 600;
-  text-decoration: none;
-  transition:
-    background-color 0.25s,
-    color 0.25s;
-}
-
-.VPHome .home-cta-btn.brand {
-  background-color: var(--vp-button-brand-bg);
-  color: var(--vp-button-brand-text);
-}
-
-.VPHome .home-cta-btn.brand:hover {
-  background-color: var(--vp-button-brand-hover-bg);
-  color: var(--vp-button-brand-hover-text);
-}
-
-.VPHome .home-cta-btn.alt {
-  background-color: var(--vp-button-alt-bg);
-  color: var(--vp-button-alt-text);
-}
-
-.VPHome .home-cta-btn.alt:hover {
-  background-color: var(--vp-button-alt-hover-bg);
-  color: var(--vp-button-alt-hover-text);
 }

@@ -11,14 +11,13 @@ export default defineConfig({
   cleanUrls: true,
   lastUpdated: true,
 
-  // The three faces the first screen actually paints: the hero display, the
-  // body sans, and the mono the hero terminal is set in. Preloaded so none of
-  // them swaps under the reader — the rest of Plex Mono's weights can wait for
-  // the stylesheet. Fonts are fetched in CORS mode even same-origin, hence the
-  // crossorigin attribute.
+  // The two faces the first screen actually paints: the body sans and the mono
+  // the poster's host list is set in. Preloaded so neither swaps under the
+  // reader — the rest of Plex Mono's weights can wait for the stylesheet. The
+  // wordmark needs no font at all; it's drawn (see theme/Wordmark.vue). Fonts
+  // are fetched in CORS mode even same-origin, hence the crossorigin attribute.
   head: (
     [
-      '/fonts/anton-sc-latin-400.woff2',
       '/fonts/ibm-plex-sans-latin-var.woff2',
       '/fonts/ibm-plex-mono-latin-400.woff2',
     ] as const

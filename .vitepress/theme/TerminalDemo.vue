@@ -1,9 +1,5 @@
 <template>
   <div class="para-hero">
-    <div class="space" aria-hidden="true">
-      <span class="orbit"><span class="sat" /></span>
-    </div>
-
     <!-- ws2 and ws3, one color plate each -->
     <div class="ghost g2" aria-hidden="true" />
     <div class="ghost g1" aria-hidden="true" />
@@ -32,14 +28,13 @@
 </template>
 
 <style scoped>
-/* Gruvbox dark-hard terminal on the nebula; gruvbox light on the daytime sky —
-   see the light override below the palette. */
+/* Gruvbox dark-hard terminal under the CRT poster; gruvbox light under the
+   print one — see the light override below the palette. */
 .para-hero {
   --gb-bg: #1d2021;
   --gb-bg-soft: #282828;
   --gb-fg: #ebdbb2;
   --gb-gray: #928374;
-  --gb-orange: #fe8019;
   --gb-yellow: #fabd2f;
   --gb-green: #b8bb26;
   --gb-aqua: #8ec07c;
@@ -61,7 +56,7 @@
 }
 
 /*
- * Daylight runs the whole terminal on gruvbox light. These are the same nine
+ * The print pass runs the whole terminal on gruvbox light. These are the same
  * inks the code blocks further down the page are highlighted with (see
  * .vitepress/shiki-gruvbox.ts) — a command in the hero and the same command in
  * Quick start are then literally the same color, which is the argument for
@@ -74,83 +69,20 @@ html:not(.dark) .para-hero {
   --gb-bg-soft: #ebdbb2;
   --gb-fg: #3c3836;
   --gb-gray: #7c6f64;
-  --gb-orange: #af3a03;
   --gb-yellow: #b57614;
   --gb-green: #79740e;
   --gb-aqua: #427b86;
   --gb-red: #9d0006;
 }
 
-/* The page nebula supplies the ambient color now; this is just the warm bloom
-   that lifts the terminal off it. */
+/* The warm bloom that lifts the terminal off the page. */
 .para-hero::before {
   content: '';
   position: absolute;
   inset: -6%;
-  background: radial-gradient(closest-side at 45% 55%, rgba(254, 128, 25, 0.2), transparent 72%);
+  background: radial-gradient(closest-side at 45% 55%, rgba(250, 189, 47, 0.18), transparent 72%);
   filter: blur(38px);
   pointer-events: none;
-}
-
-/* ---- Space dressing ---------------------------------------------------- */
-
-.space {
-  position: absolute;
-  inset: -12%;
-  pointer-events: none;
-}
-
-/* Mission-diagram orbit: dashed ellipse + a small satellite tracing it. The
-   starfield belongs to the page nebula (Nebula.vue) — a second, denser field
-   clustered on the terminal read as a smudge. */
-.orbit {
-  position: absolute;
-  inset: 6% -4%;
-  border: 1px dashed color-mix(in srgb, var(--gb-gray) 45%, transparent);
-  border-radius: 50%;
-  transform: rotate(-14deg);
-}
-
-/* Gruvbox gray is a mid tone picked to sit on the nebula; on the bright sky it
-   lands close enough to the cloud to vanish. Light mode draws the ring in the
-   same dark ink as the satellite. */
-html:not(.dark) .orbit {
-  border-color: color-mix(in srgb, #3c3836 38%, transparent);
-}
-
-.sat {
-  position: absolute;
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--gb-aqua);
-  box-shadow: 0 0 8px 1px color-mix(in srgb, var(--gb-aqua) 60%, transparent);
-  offset-path: ellipse(50% 50% at 50% 50%);
-  animation: orbit 26s linear infinite;
-}
-
-/*
- * Bright-aqua glows nicely against the nebula, but on the daytime sky it lands
- * within ~1.2:1 of the aqua behind it and disappears — and so would the brand
- * orange, at almost the same luminance. The orbit crosses both mid-aqua sky and
- * white cloud, so no single bright tint covers the range: light mode uses a dark
- * marker, which is what an object silhouetted against a bright sky looks like
- * anyway, with a thin light rim so it keeps an edge on either backdrop. The glow
- * goes too, since a bloom on a bright sky reads as fuzz rather than light.
- */
-html:not(.dark) .sat {
-  background: #3c3836;
-  box-shadow: 0 0 0 1.5px rgba(255, 255, 255, 0.6);
-}
-
-/* No offset-path support → keep the ring, skip the satellite. */
-@supports not (offset-path: ellipse(50% 50% at 50% 50%)) {
-  .sat { display: none; }
-}
-
-@keyframes orbit {
-  from { offset-distance: 0%; }
-  to { offset-distance: 100%; }
 }
 
 /* ---- Parallel-universe terminal stack ---------------------------------- */
@@ -242,9 +174,12 @@ html:not(.dark) .term {
   animation: appear 0.01s linear var(--d, 0s) forwards;
 }
 
+/* The prompt is the terminal's own chrome rather than a token the code blocks
+   below also render, so it takes the site's gold and leaves the nine inks it
+   shares with them untouched. */
 .cmd::before {
   content: '$ ';
-  color: var(--gb-orange);
+  color: var(--gb-yellow);
   /* 600, not 700: that's the bold cut of Plex Mono the page loads, and asking
      for a weight no loaded face has leaves the choice to each engine's font
      matching — some pick the 600, some smear a synthetic bold over it. */
@@ -295,7 +230,6 @@ html:not(.dark) .term {
 @media (prefers-reduced-motion: reduce) {
   .line { animation: none; opacity: 1; }
   .typed { animation: none; width: 11ch; }
-  .sat { animation: none; }
   .cursor { animation: none; }
 }
 </style>

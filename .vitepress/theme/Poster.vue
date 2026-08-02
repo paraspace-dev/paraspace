@@ -19,8 +19,8 @@ import Wordmark from './Wordmark.vue'
   <div class="poster">
     <div class="field" aria-hidden="true">
       <div class="under" />
-      <div class="lens a" />
-      <div class="lens b" />
+      <div class="lens a pv-lens" />
+      <div class="lens b pv-lens" />
       <div class="grain" />
       <div class="vignette" />
     </div>
@@ -71,10 +71,8 @@ import Wordmark from './Wordmark.vue'
 /* ---- The lenses -------------------------------------------------------- */
 
 /*
- * The lens box is the circle you actually see the edge of; both the light it
- * throws and the glass itself are drawn off it. The halo is a radial gradient
- * rather than a blurred disc, which keeps the drift transform-only and leaves
- * the copy legible where it crosses the falloff.
+ * Placement, blend and motion only — the halo and the glass come from .pv-lens
+ * in custom.css, which the feature rows use too.
  */
 .lens {
   position: absolute;
@@ -83,31 +81,11 @@ import Wordmark from './Wordmark.vue'
   width: var(--pv-lens-d);
   height: var(--pv-lens-d);
   margin: calc(var(--pv-lens-d) / -2);
-  border-radius: 50%;
   mix-blend-mode: var(--pv-blend);
   transform: translateX(var(--dx));
   animation:
     split 1.5s cubic-bezier(0.16, 0.84, 0.28, 1) both,
     breathe var(--dur) ease-in-out 1.5s infinite alternate;
-}
-
-/* The emanation, which runs well past the glass — the reason the light reads
-   as coming out of the lens instead of being trapped in a disc. */
-.lens::before {
-  content: '';
-  position: absolute;
-  inset: -16%;
-  border-radius: 50%;
-  /* --pv-d is the one density knob: ink on paper has to be laid down harder
-     than light on a screen to read as the same strength. */
-  background: radial-gradient(
-    circle at 50% 50%,
-    color-mix(in srgb, var(--c) calc(var(--pv-d) * 40%), transparent) 0%,
-    color-mix(in srgb, var(--c) calc(var(--pv-d) * 30%), transparent) 30%,
-    color-mix(in srgb, var(--c) calc(var(--pv-d) * 16%), transparent) 55%,
-    color-mix(in srgb, var(--c) calc(var(--pv-d) * 5%), transparent) 74%,
-    transparent 90%
-  );
 }
 
 /*
@@ -129,25 +107,6 @@ import Wordmark from './Wordmark.vue'
   --dx: 36%;
   --dx-drift: 37.5%;
   --dur: 61s;
-}
-
-/* The glass itself, inside the glow it throws: a hoop bright enough to hold the
-   circle's edge, blurred so it reads as a lens seen out of focus rather than a
-   drawn outline. It is the only hard shape on the poster, which is why the
-   Venn stays a Venn once the halos have faded into the page. */
-.lens::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: 50%;
-  box-shadow:
-    inset 0 0 0 2px color-mix(in srgb, var(--c) 78%, transparent),
-    /* The crown catches more light than the base, which is what stops the
-       hoop reading as a soap bubble. */
-    inset 0 14px 26px -14px var(--pv-crown),
-    inset 0 0 70px 14px color-mix(in srgb, var(--c) 16%, transparent),
-    0 0 46px 4px color-mix(in srgb, var(--c) 16%, transparent);
-  filter: blur(3.5px);
 }
 
 /* One circle becomes two: para in one gesture. */

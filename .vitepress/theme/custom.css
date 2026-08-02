@@ -172,7 +172,7 @@
 }
 
 /*
- * Links in prose only. Nav, sidebar, and buttons keep the brand orange — the
+ * Links in prose only. Nav, sidebar, and buttons keep the brand gold — the
  * blue is for things inside a paragraph that you can click.
  */
 .vp-doc a {
@@ -181,19 +181,6 @@
 
 .vp-doc a:hover {
   color: var(--para-link-hover);
-}
-
-/*
- * Feature-card details render outside .vp-doc, so inline <code> there gets no
- * default styling; mirror the theme's inline-code treatment.
- */
-.VPFeature .details code {
-  border-radius: 4px;
-  padding: 3px 6px;
-  font-family: var(--vp-font-family-mono);
-  font-size: 0.875em;
-  color: var(--vp-code-color);
-  background-color: var(--vp-code-bg);
 }
 
 /*
@@ -222,6 +209,62 @@
 
 .VPNavBar.home.top:not(.screen-open) .divider-line {
   background-color: transparent;
+}
+
+/*
+ * The lens: the page's one round primitive. It runs at poster scale behind the
+ * wordmark (two of them, overlapping) and again at icon scale down the feature
+ * rows, so the light in the hero and the light beside each feature are the same
+ * construction rather than two things that resemble each other.
+ *
+ * The element's own box is the glass and --c is its hue. The halo runs past the
+ * glass, which is what makes the light read as coming out of a lens instead of
+ * filling a disc. The five dials below are defaulted for the poster; the small
+ * one turns them down.
+ */
+.pv-lens {
+  --pv-rim: 2px;
+  --pv-blur: 3.5px;
+  --pv-glow: 70px;
+  --pv-cast: 46px;
+  --pv-crown-y: 14px;
+
+  position: relative;
+  border-radius: 50%;
+}
+
+.pv-lens::before {
+  content: '';
+  position: absolute;
+  inset: -16%;
+  border-radius: 50%;
+  /* --pv-d is the density knob: ink on paper has to be laid down harder than
+     light on a screen to read as the same strength. */
+  background: radial-gradient(
+    circle at 50% 50%,
+    color-mix(in srgb, var(--c) calc(var(--pv-d) * 40%), transparent) 0%,
+    color-mix(in srgb, var(--c) calc(var(--pv-d) * 30%), transparent) 30%,
+    color-mix(in srgb, var(--c) calc(var(--pv-d) * 16%), transparent) 55%,
+    color-mix(in srgb, var(--c) calc(var(--pv-d) * 5%), transparent) 74%,
+    transparent 90%
+  );
+}
+
+/* The glass itself: a hoop bright enough to hold the circle's edge, blurred so
+   it reads as a lens seen out of focus rather than a drawn outline. The crown
+   catches more light than the base, which is what stops it reading as a bubble. */
+.pv-lens::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  box-shadow:
+    inset 0 0 0 var(--pv-rim) color-mix(in srgb, var(--c) 78%, transparent),
+    inset 0 var(--pv-crown-y) calc(var(--pv-crown-y) * 1.9) calc(var(--pv-crown-y) * -1)
+      var(--pv-crown),
+    inset 0 0 var(--pv-glow) calc(var(--pv-glow) / 5) color-mix(in srgb, var(--c) 16%, transparent),
+    0 0 var(--pv-cast) calc(var(--pv-cast) / 11) color-mix(in srgb, var(--c) 16%, transparent);
+  filter: blur(var(--pv-blur));
 }
 
 /*
@@ -290,100 +333,8 @@
   margin-bottom: 104px;
 }
 
-/*
- * Feature cards, lit by the lenses above them: the fill fades out toward the
- * bottom-right so the page shows through, and the 1px rim is a gradient that
- * dissolves along the same diagonal — the card looks lit from the top-left
- * rather than outlined.
- */
-.VPHome .VPFeature {
-  position: relative;
-  border-radius: 16px;
-  border-color: transparent;
-  background: linear-gradient(
-    168deg,
-    color-mix(in srgb, var(--vp-c-bg-soft) 96%, transparent) 0%,
-    color-mix(in srgb, var(--vp-c-bg-soft) 62%, transparent) 56%,
-    transparent 100%
-  );
-  transition:
-    box-shadow 0.25s,
-    transform 0.25s;
-  box-shadow: 0 18px 40px -32px color-mix(in srgb, var(--pv-mix) 70%, transparent);
-}
-
-.VPHome .VPFeature::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  padding: 1px;
-  background: linear-gradient(
-    168deg,
-    color-mix(in srgb, var(--pv-mix) 62%, transparent),
-    color-mix(in srgb, var(--pv-mix) 22%, transparent) 46%,
-    transparent 76%
-  );
-  /* Two-layer mask minus the content box = a 1px gradient ring. */
-  -webkit-mask:
-    linear-gradient(#000 0 0) content-box,
-    linear-gradient(#000 0 0);
-  mask:
-    linear-gradient(#000 0 0) content-box,
-    linear-gradient(#000 0 0);
-  -webkit-mask-composite: xor;
-  mask-composite: exclude;
-  pointer-events: none;
-  transition: background 0.25s;
-}
-
-.VPHome .VPFeature:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 24px 48px -30px color-mix(in srgb, var(--pv-mix) 85%, transparent);
-}
-
-.VPHome .VPFeature:hover::before {
-  background: linear-gradient(
-    168deg,
-    color-mix(in srgb, var(--pv-mix) 88%, transparent),
-    color-mix(in srgb, var(--pv-mix) 34%, transparent) 46%,
-    transparent 78%
-  );
-}
-
-/* The icon sits in a lens of its own — same circle, same glow, small enough
-   that six of them read as a row of apertures rather than six more diagrams. */
-.VPHome .VPFeature .icon {
-  border-radius: 50%;
-  background: radial-gradient(
-    circle at 38% 32%,
-    color-mix(in srgb, var(--pv-mix) 26%, var(--vp-c-bg)),
-    color-mix(in srgb, var(--pv-mix) 8%, var(--vp-c-bg))
-  );
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--pv-mix) 32%, transparent);
-  transition: box-shadow 0.25s;
-}
-
-.VPHome .VPFeature:hover .icon {
-  box-shadow:
-    inset 0 0 0 1px color-mix(in srgb, var(--pv-mix) 58%, transparent),
-    0 0 22px -4px color-mix(in srgb, var(--pv-mix) 60%, transparent);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .VPHome .VPFeature:hover {
-    transform: none;
-  }
-}
-
-/*
- * The markdown below the feature grid inherits the home layout's 1280px
- * container, so Install and Quick start ran the full width of the page: a
- * one-line install command in a very wide box, and prose at ~110 characters a
- * line. Match the docs measure instead — 816px less the 64px gutters is the
- * same 688px a docs page gets, which also shortens the h2 rules so the landing
- * page stops looking like a doc page.
- */
+/* The closing call to action inherits the home layout's 1280px container; give
+   it the docs measure so it doesn't run the full width of the page. */
 @media (min-width: 960px) {
   .VPHome .vp-doc.container {
     max-width: 816px;

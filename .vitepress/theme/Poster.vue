@@ -61,7 +61,7 @@ import Wordmark from './Wordmark.vue'
 /* The sheet everything above the fold is printed on. Full-bleed without 100vw:
    .VPHome is the page's full width already, and its own overflow-x rule keeps
    the lenses from opening a right gutter. It runs past the terminal and into
-   the feature grid, then dissolves — a sheet that ended on a line would read as
+   the feature rows, then dissolves — a sheet that ended on a line would read as
    a band pasted onto the page. */
 .field {
   position: absolute;

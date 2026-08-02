@@ -94,17 +94,17 @@ onMounted(() => {
 
 /*
  * The print pass runs the whole terminal on gruvbox light. These are the same
- * inks the code blocks further down the page are highlighted with (see
- * .vitepress/shiki-gruvbox.ts) — a command in the hero and the same command in
- * Quick start are then literally the same color, which is the argument for
- * doing this at all. It also settles the stack: the ghost plates derive their
+ * inks the docs' code blocks are highlighted with (see
+ * .vitepress/shiki-gruvbox.ts), so a command on the lander and the same command
+ * in the docs are literally the same color, which is the argument for doing
+ * this at all. It also settles the stack: the ghost plates derive their
  * fill and line from --gb-bg and --gb-gray, so they turn to paper and pencil
  * on their own, with no separate light-mode treatment to keep in sync.
  */
 html:not(.dark) .para-hero {
   /* The surface is the poster's old paper, so the terminal is the one warm
      object on a near-white sheet instead of a yellower cream on a cream one. */
-  --gb-bg: #f1ead6;
+  --gb-bg: var(--pv-paper);
   --gb-bg-soft: #e6dcc4;
   --gb-fg: #3c3836;
   --gb-gray: #7c6f64;
@@ -119,7 +119,11 @@ html:not(.dark) .para-hero {
   content: '';
   position: absolute;
   inset: -6%;
-  background: radial-gradient(closest-side at 45% 55%, rgba(250, 189, 47, 0.18), transparent 72%);
+  background: radial-gradient(
+    closest-side at 45% 55%,
+    color-mix(in srgb, var(--pv-under) 18%, transparent),
+    transparent 72%
+  );
   filter: blur(38px);
   pointer-events: none;
 }
@@ -204,10 +208,10 @@ html:not(.dark) .para-hero {
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
 }
 
-/* A dark terminal needed a heavy shadow to lift off the nebula. A cream one
-   needs only enough to sit above the cloud, or it reads as soot. */
+/* A dark terminal needs a heavy shadow to lift off the void. A cream one needs
+   only enough to sit above the paper, or it reads as soot. */
 html:not(.dark) .term {
-  box-shadow: 0 10px 28px -14px rgba(60, 56, 54, 0.45);
+  box-shadow: 0 10px 28px -14px color-mix(in srgb, var(--gb-fg) 45%, transparent);
 }
 
 .term-bar {

@@ -1,6 +1,6 @@
 <script setup>
 /**
- * The six things para gives you, alternating down the page.
+ * The five things para gives you, alternating down the page.
  *
  * Each one sits in a lens — the same primitive the hero is built from (see
  * .pv-lens in custom.css) — and takes the hue of the hero circle on its side:
@@ -8,7 +8,7 @@
  * then walk down the page, which is the whole reason the section reads as part
  * of the poster rather than a list underneath it.
  *
- * There is no rule or spine connecting them. These six aren't a sequence, and a
+ * There is no rule or spine connecting them. These five aren't a sequence, and a
  * connector would claim they were; the glows overlap instead.
  */
 import { onMounted, ref } from 'vue'
@@ -46,7 +46,7 @@ const root = ref(null)
 /*
  * The reveal is added by script and only ever by script: without it every row
  * is already in its finished state, so a reader with no JS — or one who asked
- * for less motion — gets the page rather than six empty gaps.
+ * for less motion — gets the page rather than five empty gaps.
  */
 onMounted(() => {
   if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return

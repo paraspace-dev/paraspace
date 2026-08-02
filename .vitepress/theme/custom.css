@@ -73,7 +73,7 @@
   --vp-c-brand-1: #94600e;
   --vp-c-brand-2: #a4620f;
   --vp-c-brand-3: #b57614;
-  --vp-c-brand-soft: rgba(148, 96, 14, 0.14);
+  --vp-c-brand-soft: color-mix(in srgb, var(--vp-c-brand-1) 14%, transparent);
 
   /* Gold is high-luminance; dark text keeps the buttons readable. The fill runs
      brighter than --vp-c-brand-1 on purpose: as a background it gains contrast
@@ -114,6 +114,9 @@
   /* Ink on paper is subtractive, so the plates darken where they cross —
      which is also what makes the intersection the densest thing on the page. */
   --pv-blend: multiply;
+  /* The two plates crossed — what the intersection reads as. It tints anything
+     that belongs to the poster but isn't a lens: the outlined button, the ring
+     around the closing block. --pv-halo is the wordmark's own glow. */
   --pv-mix: #6a927c;
   --pv-halo: #9dbcae;
   --pv-muted: #6a5f54;
@@ -132,8 +135,6 @@
      gap as between rows, or the closing block reads as the sixth one. */
   --pv-row-gap: 136px;
 
-  /* Composition. --pv-eye is the lenses' shared center line, measured from the
-     top of the page; the wordmark lands just under it. */
   /*
    * The poster's vertical composition, from one dial. --pv-hero-top is how far
    * under the navbar the wordmark starts, and it has to be viewport-relative:
@@ -163,11 +164,11 @@
   --vp-c-brand-1: #fabd2f;
   --vp-c-brand-2: #f0b429;
   --vp-c-brand-3: #d79921;
-  --vp-c-brand-soft: rgba(250, 189, 47, 0.16);
+  --vp-c-brand-soft: color-mix(in srgb, var(--vp-c-brand-1) 16%, transparent);
 
-  --vp-button-brand-bg: #fabd2f;
+  --vp-button-brand-bg: var(--vp-c-brand-1);
   --vp-button-brand-hover-bg: #ffcd52;
-  --vp-button-brand-active-bg: #d79921;
+  --vp-button-brand-active-bg: var(--vp-c-brand-3);
 
   --para-link: #83a598;
   --para-link-hover: #a2bfb4;

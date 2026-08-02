@@ -201,11 +201,15 @@ onMounted(() => {
   margin: calc(var(--d) * -1.55);
   border-radius: 50%;
   pointer-events: none;
+  /* Same reason as the halo in custom.css: sized to the side and taken to zero
+     at the clip, so it has no edge of its own to find. */
   background: radial-gradient(
-    circle at 50% 50%,
+    circle closest-side at 50% 50%,
     color-mix(in srgb, var(--c) calc(var(--pv-d) * 9%), transparent) 0%,
-    color-mix(in srgb, var(--c) calc(var(--pv-d) * 4%), transparent) 44%,
-    transparent 76%
+    color-mix(in srgb, var(--c) calc(var(--pv-d) * 6%), transparent) 34%,
+    color-mix(in srgb, var(--c) calc(var(--pv-d) * 3%), transparent) 60%,
+    color-mix(in srgb, var(--c) calc(var(--pv-d) * 1%), transparent) 82%,
+    transparent 100%
   );
 }
 
@@ -225,7 +229,7 @@ onMounted(() => {
 }
 
 .lens {
-  --pv-fade: 0.4;
+  --pv-fade: 0.24;
   --pv-rim: 2px;
   --pv-blur: 1.7px;
   --pv-glow: 26px;
@@ -237,16 +241,22 @@ onMounted(() => {
   height: var(--d);
 }
 
-/* The warm core: the underglow from the hero, pooled behind each icon so the
-   glyph is lit rather than painted. */
+/*
+ * The warm core: the underglow from the hero, pooled behind each icon so the
+ * glyph is lit rather than painted. It wants to be barely there — enough to
+ * warm the ink and no more. Sized to the side and taken to zero at the clip,
+ * like the halo, and front-loaded so it is gone well before the glass.
+ */
 .core {
   position: absolute;
-  inset: 20%;
+  inset: 24%;
   border-radius: 50%;
   background: radial-gradient(
-    circle at 50% 52%,
-    color-mix(in srgb, var(--pv-under) calc(var(--pv-d) * 20%), transparent),
-    transparent 72%
+    circle closest-side at 50% 52%,
+    color-mix(in srgb, var(--pv-under) calc(var(--pv-d) * 8%), transparent) 0%,
+    color-mix(in srgb, var(--pv-under) calc(var(--pv-d) * 4%), transparent) 28%,
+    color-mix(in srgb, var(--pv-under) calc(var(--pv-d) * 1.2%), transparent) 58%,
+    transparent 100%
   );
 }
 

@@ -270,17 +270,30 @@
 .pv-lens::before {
   content: '';
   position: absolute;
-  inset: -16%;
+  inset: -40%;
   border-radius: 50%;
-  /* --pv-d is the density knob: ink on paper has to be laid down harder than
-     light on a screen to read as the same strength. */
+  /*
+   * `closest-side` matters: the default `farthest-corner` puts the gradient's
+   * end past the corner of the box, so the circular clip cuts the ramp while it
+   * is still around 7% — a hard edge exactly where the glow was supposed to
+   * stop existing. Sized to the side instead, it reaches zero at the clip.
+   *
+   * The stops trace a bell rather than a straight ramp. A linear falloff has a
+   * constant slope, and the eye finds the place where that slope stops; a curve
+   * that flattens as it goes has no such place, which is what lets the light
+   * dissipate instead of ending. --pv-d is the density knob (ink has to be laid
+   * down harder than light) and --pv-fade takes the whole lens down.
+   */
   background: radial-gradient(
-    circle at 50% 50%,
+    circle closest-side at 50% 50%,
     color-mix(in srgb, var(--c) calc(var(--pv-d) * var(--pv-fade) * 40%), transparent) 0%,
-    color-mix(in srgb, var(--c) calc(var(--pv-d) * var(--pv-fade) * 30%), transparent) 30%,
-    color-mix(in srgb, var(--c) calc(var(--pv-d) * var(--pv-fade) * 16%), transparent) 55%,
-    color-mix(in srgb, var(--c) calc(var(--pv-d) * var(--pv-fade) * 5%), transparent) 74%,
-    transparent 90%
+    color-mix(in srgb, var(--c) calc(var(--pv-d) * var(--pv-fade) * 35%), transparent) 18%,
+    color-mix(in srgb, var(--c) calc(var(--pv-d) * var(--pv-fade) * 27%), transparent) 36%,
+    color-mix(in srgb, var(--c) calc(var(--pv-d) * var(--pv-fade) * 18%), transparent) 52%,
+    color-mix(in srgb, var(--c) calc(var(--pv-d) * var(--pv-fade) * 10%), transparent) 68%,
+    color-mix(in srgb, var(--c) calc(var(--pv-d) * var(--pv-fade) * 4.5%), transparent) 82%,
+    color-mix(in srgb, var(--c) calc(var(--pv-d) * var(--pv-fade) * 1.5%), transparent) 92%,
+    transparent 100%
   );
 }
 

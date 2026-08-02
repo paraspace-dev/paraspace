@@ -120,6 +120,7 @@
   --pv-mix: #6a927c;
   --pv-halo: #9dbcae;
   --pv-muted: #6a5f54;
+  --pv-sub: #453c33;
   --pv-lede: #574f47;
   --pv-edge: rgba(191, 168, 120, 0.4);
   --pv-grain: 0.11;
@@ -185,6 +186,7 @@
   --pv-mix: #a8dcc8;
   --pv-halo: #8ec07c;
   --pv-muted: #b3a493;
+  --pv-sub: #e3d8c3;
   --pv-lede: #cbc2ad;
   --pv-edge: rgba(8, 9, 12, 0.62);
   --pv-grain: 0.05;

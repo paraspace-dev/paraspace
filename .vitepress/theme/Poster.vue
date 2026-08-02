@@ -205,15 +205,22 @@ import Wordmark from './Wordmark.vue'
 }
 
 /* Poster billing: the one line of tracked caps on the page, so it stays the
-   subtitle and never becomes a texture. */
+   subtitle and never becomes a texture. It sits on the lenses, where the tracking
+   that makes it a poster line also makes it the hardest thing here to read — so
+   it carries the weight and contrast the rest of the caption doesn't need. */
 .billing {
   margin: 28px 0 0;
-  font-size: 13px;
-  font-weight: 500;
-  letter-spacing: 0.32em;
-  text-indent: 0.32em;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.26em;
+  text-indent: 0.26em;
   text-transform: uppercase;
-  color: var(--pv-muted);
+  color: var(--pv-sub);
+  /* The same halo the wordmark carries, at a fraction of its reach — enough to
+     lift the line off whichever lens it is crossing, not enough to notice as
+     an effect. It does almost nothing on the print pass, which is correct: pale
+     ink on pale paper has nothing to glow against. */
+  text-shadow: 0 0 14px color-mix(in srgb, var(--pv-halo) 45%, transparent);
   animation: lift 1s ease-out 0.66s both;
 }
 
@@ -270,9 +277,9 @@ import Wordmark from './Wordmark.vue'
 
 @media (max-width: 767px) {
   .billing {
-    font-size: 11px;
-    letter-spacing: 0.24em;
-    text-indent: 0.24em;
+    font-size: 12px;
+    letter-spacing: 0.2em;
+    text-indent: 0.2em;
   }
 
   .lede {

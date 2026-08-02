@@ -132,7 +132,7 @@ onMounted(() => {
         <div class="lens pv-lens">
           <span class="wash" />
           <span class="core" />
-          <svg class="ico" viewBox="0 0 64 64" aria-hidden="true">
+          <svg class="ico" :class="row.key" viewBox="0 0 64 64" aria-hidden="true">
             <use :href="`#pv-i-${row.key}`" />
           </svg>
         </div>
@@ -250,6 +250,27 @@ onMounted(() => {
   );
 }
 
+/*
+ * Optical sizing. Drawn at their natural proportions the glyphs range 21% in
+ * height — a rocket is a tall thing and a monitor is a wide one — and the tall
+ * ones read as crowding the heading below even though every gap here is
+ * identical to the pixel. Each is scaled to one optical height, with the stroke
+ * divided back out so they all keep the same weight. The numbers come from
+ * measuring the rendered ink, not from the path data.
+ */
+.ico use {
+  transform-box: fill-box;
+  transform-origin: center;
+  transform: scale(var(--s));
+  stroke-width: calc(2.6 / var(--s));
+}
+
+.ico.planet { --s: 1.04; }
+.ico.key { --s: 0.91; }
+.ico.sputnik { --s: 1.01; }
+.ico.rocket { --s: 0.86; }
+.ico.console { --s: 1.05; }
+
 .ico {
   position: absolute;
   top: 21%;
@@ -259,7 +280,6 @@ onMounted(() => {
   overflow: visible;
   fill: none;
   stroke: url(#pv-i-grad);
-  stroke-width: 2.6;
   stroke-linecap: round;
   stroke-linejoin: round;
 }

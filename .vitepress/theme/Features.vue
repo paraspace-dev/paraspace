@@ -17,22 +17,22 @@ const ROWS = [
   {
     key: 'planet',
     title: 'Sandboxed',
-    body: 'Set your coding agent to YOLO mode and enjoy peace of mind. Each workspace runs in an unprivileged system container — boot is fast, memory and compute are shared, and you can run containerized stacks inside it. Run a dozen at once and none of them can see another\'s branch, database, or half-finished edits.',
+    body: 'Set your agent harness to <code>--yolo</code> mode and enjoy peace of mind. Each workspace runs in an unprivileged system container — fast boot up, minimal resource usage, and you can run containerized stacks inside it. Run many at once and none of them can see another\'s branch, database, or half-finished edits.',
   },
   {
     key: 'key',
     title: 'Authenticate once',
-    body: 'Run <code>gh auth login</code> in one workspace and every workspace on the project is authenticated — including the one you create next week, and after a reboot. One revocable key per project, and never your host\'s.',
+    body: 'Run <code>gh auth login</code> in one workspace and every workspace on the project is authenticated. Also share your config for neovim, tmux, github etc across workspaces.',
   },
   {
     key: 'sputnik',
     title: 'Workspace subdomains',
-    body: '<code>https://fix-login.paraspace.dev</code> the moment it\'s up — no DNS to set up; local TLS &amp; CA trust is automatic. Your stack keeps its usual ports, so hot reload and WebSockets need no configuration.',
+    body: 'Access <code>https://fix-login.paraspace.dev</code> the moment it\'s up — no DNS to set up; local TLS &amp; CA trust is automatic. Your stack keeps its usual ports, so hot reload and WebSockets need no configuration.',
   },
   {
     key: 'rocket',
     title: 'Thin wrapper',
-    body: 'It\'s just bash. Your project has total control over virtually every aspect of the parallel workspace lifecycle, from building the image and booting the stack, to custom verbs and execution hooks.',
+    body: 'It\'s just bash. Run <code>para init</code>, then your project has total control over virtually every aspect of the parallel workspace lifecycle, from building the image and booting the stack, to custom verbs and execution hooks.',
   },
   {
     key: 'console',
@@ -82,23 +82,23 @@ onMounted(() => {
 
         <mask id="pv-m-planet">
           <rect width="64" height="64" fill="#fff" />
-          <path d="M16.5 34a13.5 13.5 0 0 1 27 0Z" fill="#000" />
+          <path d="M15 35a15 15 0 0 1 30 0Z" fill="#000" />
         </mask>
 
         <g id="pv-i-planet">
-          <circle cx="30" cy="34" r="13.5" />
-          <path class="soft" d="M20 43.5A13.5 13.5 0 0 0 39.5 24.5" />
+          <circle cx="30" cy="35" r="15" />
+          <path class="soft" d="M19.4 45.6A15 15 0 0 0 40.6 24.4" />
           <g mask="url(#pv-m-planet)">
-            <ellipse cx="30" cy="34" rx="24.5" ry="8" transform="rotate(-17 30 34)" />
+            <ellipse cx="30" cy="35" rx="24.5" ry="8" transform="rotate(-17 30 35)" />
           </g>
           <circle class="lit" cx="52" cy="14" r="1.8" />
           <path class="soft" d="M50 22.5v4M48 24.5h4" />
         </g>
 
         <g id="pv-i-key">
-          <circle cx="32" cy="17.5" r="9.5" />
-          <circle cx="32" cy="17.5" r="3.4" />
-          <path d="M32 27v27M32 40.5h8.5M32 47.5h6" />
+          <circle cx="32" cy="19" r="9.5" />
+          <circle cx="32" cy="19" r="3.4" />
+          <path d="M32 28.5v24M32 41.5h8.5M32 48h6" />
         </g>
 
         <g id="pv-i-sputnik">
@@ -116,7 +116,7 @@ onMounted(() => {
           <path
             d="M22.8 32.6c-4.3 2.4-6.6 6.7-6.6 11.9l6.3-3.4M41.2 32.6c4.3 2.4 6.6 6.7 6.6 11.9l-6.3-3.4"
           />
-          <path class="soft" d="M28.5 50.5 32 57l3.5-6.5" />
+          <path class="soft" d="M28.5 47.5 32 52.5l3.5-5" />
         </g>
 
         <g id="pv-i-console">
@@ -129,8 +129,8 @@ onMounted(() => {
 
     <article v-for="(row, i) in ROWS" :key="row.key" class="row" :class="{ flip: i % 2 === 1 }">
       <div class="art">
-        <span class="wash" />
         <div class="lens pv-lens">
+          <span class="wash" />
           <span class="core" />
           <svg class="ico" viewBox="0 0 64 64" aria-hidden="true">
             <use :href="`#pv-i-${row.key}`" />
@@ -171,7 +171,7 @@ onMounted(() => {
 /* Far enough apart that each lens belongs to the paragraph beside it and not to
    the one below; the wash is what keeps them from reading as separate. */
 .row + .row {
-  margin-top: 104px;
+  margin-top: var(--pv-row-gap);
 }
 
 .art {
@@ -188,8 +188,9 @@ onMounted(() => {
  * What ties the rows together. The lens throws light a lens-width or so; this
  * throws it three, faintly enough to be a wash rather than a second glow, so
  * one row's light reaches the next and the section reads as one lit column
- * instead of six lamps. It's first in the row, so it paints behind the lens
- * without a negative z-index that would drop it behind the poster's sheet.
+ * instead of five lamps. It lives inside the lens so it can only ever be
+ * concentric with it, and comes first so it paints behind without a negative
+ * z-index that would drop it behind the poster's sheet.
  */
 .wash {
   position: absolute;
@@ -347,10 +348,12 @@ onMounted(() => {
 /* ---- Narrow ------------------------------------------------------------- */
 
 @media (max-width: 767px) {
+  /* Stacked, the lens sits directly above its own heading, so the gap inside a
+     pair has to stay clearly smaller than --pv-row-gap between them. */
   .row {
     grid-template-columns: 1fr;
     justify-items: center;
-    gap: 20px;
+    gap: 28px;
     text-align: center;
   }
 
@@ -363,10 +366,6 @@ onMounted(() => {
   .art,
   .row.flip .art {
     justify-content: center;
-  }
-
-  .row + .row {
-    margin-top: 56px;
   }
 
   .copy p {

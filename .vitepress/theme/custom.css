@@ -124,6 +124,10 @@
   --pv-fringe-1: #4aa6bb;
   --pv-fringe-2: #c0708f;
 
+  /* The rhythm of the feature section. The gap below the last row is the same
+     gap as between rows, or the closing block reads as the sixth one. */
+  --pv-row-gap: 136px;
+
   /* Composition. --pv-eye is the lenses' shared center line, measured from the
      top of the page; the wordmark lands just under it. */
   --pv-lens-d: clamp(272px, 42vw, 540px);
@@ -189,6 +193,12 @@
  * right gutter. `clip` on one axis only — `hidden` would create a scroll
  * container and cut the poster's own vertical bleed.
  */
+@media (max-width: 767px) {
+  :root {
+    --pv-row-gap: 96px;
+  }
+}
+
 .VPHome {
   overflow-x: clip;
   overflow-y: visible;
@@ -350,7 +360,7 @@
  * panes; the layout's trailing margin comes in behind it.
  */
 .VPHome .home-cta {
-  margin-top: 72px;
+  margin-top: var(--pv-row-gap);
   padding: 44px 32px;
   border-radius: 16px;
   text-align: center;

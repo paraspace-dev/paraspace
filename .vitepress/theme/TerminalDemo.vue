@@ -80,7 +80,10 @@ onMounted(() => {
 
   position: relative;
   width: 100%;
-  max-width: 440px;
+  /* 440 where there's room, and the page's own 24px gutter where there isn't.
+     The stack travels to the right edge and the front window sits on the left
+     one, so a full-width hero is a hero touching glass on both sides. */
+  max-width: min(440px, 100% - 48px);
   margin: 0 auto;
   /* Headroom for the stack, on the two sides it actually travels: two layers
      up and to the right at 14px each. Keep this in step with .ghost's inset

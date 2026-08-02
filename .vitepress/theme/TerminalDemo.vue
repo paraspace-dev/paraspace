@@ -146,21 +146,23 @@ html:not(.dark) .para-hero {
 .ghost {
   position: absolute;
   inset: 28px 28px 0 0;
-  animation: spring 0.9s cubic-bezier(0.22, 1.5, 0.36, 1) var(--d) both;
+  border: 1px solid var(--line);
+  animation:
+    spring 0.9s cubic-bezier(0.22, 1.5, 0.36, 1) var(--d) both,
+    fresh 1.8s ease-out var(--d) both;
 }
 
 .ghost.g1 {
   --step: 14px;
+  --line: var(--gb-ghost-line);
   --d: 2.9s;
   background: var(--gb-ghost-fill);
-  border: 1px solid var(--gb-ghost-line);
 }
 
 .ghost.g2 {
   --step: 28px;
+  --line: var(--gb-ghost-line-far);
   --d: 5.5s;
-  background: none;
-  border: 1px solid var(--gb-ghost-line-far);
 }
 
 /* Out of the front window, up the diagonal. The overshoot in the curve is what
@@ -173,6 +175,20 @@ html:not(.dark) .para-hero {
   to {
     transform: translate(var(--step), calc(var(--step) * -1));
     opacity: 1;
+  }
+}
+
+/* Brand new: the outline arrives lit in the prompt's own gold and cools to a
+   hairline, so a pane says it's just up once and then joins the stack. */
+@keyframes fresh {
+  0%,
+  20% {
+    border-color: var(--gb-yellow);
+    box-shadow: 0 0 20px 0 color-mix(in srgb, var(--gb-yellow) 45%, transparent);
+  }
+  100% {
+    border-color: var(--line);
+    box-shadow: 0 0 0 0 transparent;
   }
 }
 

@@ -17,17 +17,12 @@ const ROWS = [
   {
     key: 'planet',
     title: 'Sandboxed',
-    body: 'Set your coding agent to YOLO mode and enjoy peace of mind. Each workspace runs in an unprivileged system container. Boot up is fast, system memory and compute are shared, and you can run containerized stacks inside it.',
+    body: 'Set your coding agent to YOLO mode and enjoy peace of mind. Each workspace runs in an unprivileged system container — boot is fast, memory and compute are shared, and you can run containerized stacks inside it. Run a dozen at once and none of them can see another\'s branch, database, or half-finished edits.',
   },
   {
     key: 'key',
     title: 'Authenticate once',
     body: 'Run <code>gh auth login</code> in one workspace and every workspace on the project is authenticated — including the one you create next week, and after a reboot. One revocable key per project, and never your host\'s.',
-  },
-  {
-    key: 'helmet',
-    title: 'Made for agents',
-    body: 'Run a dozen at once and none of them can see another\'s branch, database, or half-finished edits. Every task stays a separate PR, and <code>para ls</code> shows you the whole fleet.',
   },
   {
     key: 'sputnik',
@@ -106,12 +101,6 @@ onMounted(() => {
           <path d="M32 27v27M32 40.5h8.5M32 47.5h6" />
         </g>
 
-        <g id="pv-i-helmet">
-          <path d="M15.5 45.5V30a16.5 16.5 0 0 1 33 0v15.5z" />
-          <path d="M22 29.5h20v7a5.5 5.5 0 0 1-5.5 5.5h-9A5.5 5.5 0 0 1 22 36.5z" />
-          <path class="soft" d="M26.5 33a6.5 4.5 0 0 1 5.5-2.5" />
-        </g>
-
         <g id="pv-i-sputnik">
           <circle cx="28" cy="27" r="9" />
           <path d="M22 33.5 12 47M34 33.5 44 47M25 35.5 21 50M31 35.5 35 50" />
@@ -162,7 +151,7 @@ onMounted(() => {
   position: relative;
   margin: 0 auto;
   padding: 0 24px;
-  max-width: 980px;
+  max-width: 900px;
 
   /* Lens diameter; the wash is sized off it so the two stay in proportion. */
   --d: clamp(132px, 16vw, 180px);
@@ -179,16 +168,20 @@ onMounted(() => {
   gap: 48px;
 }
 
-/* Rows overlap by design: at this spacing consecutive halos meet, so the light
-   runs down the page instead of stopping at each row. */
+/* Far enough apart that each lens belongs to the paragraph beside it and not to
+   the one below; the wash is what keeps them from reading as separate. */
 .row + .row {
-  margin-top: 40px;
+  margin-top: 104px;
 }
 
 .art {
   position: relative;
   display: flex;
-  justify-content: center;
+  justify-content: flex-end;
+}
+
+.row.flip .art {
+  justify-content: flex-start;
 }
 
 /*
@@ -231,6 +224,7 @@ onMounted(() => {
 }
 
 .lens {
+  --pv-fade: 0.4;
   --pv-rim: 2px;
   --pv-blur: 1.7px;
   --pv-glow: 26px;
@@ -364,6 +358,11 @@ onMounted(() => {
      down and the alternating hue carries the rhythm on its own. */
   .row.flip .art {
     order: 0;
+  }
+
+  .art,
+  .row.flip .art {
+    justify-content: center;
   }
 
   .row + .row {

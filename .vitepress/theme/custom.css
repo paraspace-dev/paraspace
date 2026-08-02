@@ -219,10 +219,12 @@
  *
  * The element's own box is the glass and --c is its hue. The halo runs past the
  * glass, which is what makes the light read as coming out of a lens instead of
- * filling a disc. The five dials below are defaulted for the poster; the small
- * one turns them down.
+ * filling a disc. The dials below are defaulted for the poster; --pv-fade is
+ * the one that matters most away from it, because a lens beside a paragraph has
+ * to be quieter than a lens the page is built around.
  */
 .pv-lens {
+  --pv-fade: 1;
   --pv-rim: 2px;
   --pv-blur: 3.5px;
   --pv-glow: 70px;
@@ -242,10 +244,10 @@
      light on a screen to read as the same strength. */
   background: radial-gradient(
     circle at 50% 50%,
-    color-mix(in srgb, var(--c) calc(var(--pv-d) * 40%), transparent) 0%,
-    color-mix(in srgb, var(--c) calc(var(--pv-d) * 30%), transparent) 30%,
-    color-mix(in srgb, var(--c) calc(var(--pv-d) * 16%), transparent) 55%,
-    color-mix(in srgb, var(--c) calc(var(--pv-d) * 5%), transparent) 74%,
+    color-mix(in srgb, var(--c) calc(var(--pv-d) * var(--pv-fade) * 40%), transparent) 0%,
+    color-mix(in srgb, var(--c) calc(var(--pv-d) * var(--pv-fade) * 30%), transparent) 30%,
+    color-mix(in srgb, var(--c) calc(var(--pv-d) * var(--pv-fade) * 16%), transparent) 55%,
+    color-mix(in srgb, var(--c) calc(var(--pv-d) * var(--pv-fade) * 5%), transparent) 74%,
     transparent 90%
   );
 }
@@ -259,11 +261,13 @@
   inset: 0;
   border-radius: 50%;
   box-shadow:
-    inset 0 0 0 var(--pv-rim) color-mix(in srgb, var(--c) 78%, transparent),
+    inset 0 0 0 var(--pv-rim) color-mix(in srgb, var(--c) calc(var(--pv-fade) * 78%), transparent),
     inset 0 var(--pv-crown-y) calc(var(--pv-crown-y) * 1.9) calc(var(--pv-crown-y) * -1)
       var(--pv-crown),
-    inset 0 0 var(--pv-glow) calc(var(--pv-glow) / 5) color-mix(in srgb, var(--c) 16%, transparent),
-    0 0 var(--pv-cast) calc(var(--pv-cast) / 11) color-mix(in srgb, var(--c) 16%, transparent);
+    inset 0 0 var(--pv-glow) calc(var(--pv-glow) / 5)
+      color-mix(in srgb, var(--c) calc(var(--pv-fade) * 16%), transparent),
+    0 0 var(--pv-cast) calc(var(--pv-cast) / 11)
+      color-mix(in srgb, var(--c) calc(var(--pv-fade) * 16%), transparent);
   filter: blur(var(--pv-blur));
 }
 

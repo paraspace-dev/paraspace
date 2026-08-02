@@ -70,7 +70,7 @@ seam, decide breaking-vs-additive deliberately and update both the constant and
 - The `zsh` `skel/` is intentionally not linted (ShellCheck parses only sh/bash).
 - `plans/` holds design notes for in-flight work; not shipped in the npm `files`.
 
-## House style: code a human wrote on purpose
+## House style
 
 The bar is that someone who knows bash but not para can read any function top to
 bottom and be right about what it does. `bin/para` is the reference. The rules
@@ -116,13 +116,39 @@ below are not aesthetic preferences — each one is a mess the rewrite cleaned u
   it (`para doctor`), or the doc. And verbs converge: `up`, `down` and `rm` warn
   and succeed when the world is already in the state you asked for.
 
-## Docs style: written for a reader, not a reviewer
+## Docs style
 
 `README.md` and `docs/` are a published spec, not internal notes. **If you
 change a command, flag, `Parafile` var, hook semantic, or the image contract,
 update the relevant page in the same change** — drift between `bin/para` and
-the docs is a bug. See [`plans/docs-rewrite.md`](./plans/docs-rewrite.md) for
-the in-flight rewrite and the page-by-page targets.
+the docs is a bug.
+
+### Do not write AI slop
+
+Write for human readers.
+
+- M-dashes are banned.
+- Colons are mostly banned except in rare cases, e.g. "Related: ...".
+- Cut filler phrases. Remove throat-clearing openers ("Here's the thing:"),
+  emphasis crutches ("Let that sink in."), business jargon ("navigate the
+  landscape"), and meta-commentary ("In this section, we'll explore...").
+- Avoid binary contrasts ("Not X. Y."), negative listings ("Not a X. Not a Y. A
+  Z."), dramatic fragmentation ("Speed. That's it. That's the tradeoff."),
+  self-posed rhetorical questions ("The result? Devastating."), and
+  anaphora/tricolon abuse. Prefer active constructions with named actors. "The
+  complaint becomes a fix" is wrong. "The team fixed it" is right.
+- Do not stack short punchy fragments for manufactured emphasis. Do not write
+  listicles disguised as prose ("The first wall... The second wall...").
+
+Banned words:
+
+- barrel
+- seam
+- load-bearing
+- quietly
+- delve
+
+### Quality bar
 
 The bar is that someone who has never read the source can do the thing the page
 is about. These rules are the prose version of **House style** above, and each
@@ -167,8 +193,8 @@ one was a mess that a full rewrite had to clean up.
 
 ### The three surfaces
 
-One owner each — don't triple-write the install block, fix it where it's owned
-and link:
+Each piece of information lives in one place. If another doc references it,
+link to the doc that owns that information.
 
 - **root `README.md`** — the npm/GitHub funnel: what it is, install, one quick
   start, pointers.

@@ -21,6 +21,22 @@ pick one over `para`.
 
 ## What you get
 
+### Many at once, because nothing is reserved
+
+A workspace is a container, not a virtual machine: it shares your kernel and
+reserves nothing up front. Idle, it costs almost nothing; busy, it borrows from
+the same pool as everything else and gives it back when it stops. That is what
+makes a dozen open at once ordinary rather than a luxury. (On macOS the Linux VM
+underneath reserves once for the whole machine, not once per workspace — [How it
+works](./how-it-works.md#macos-one-extra-layer).)
+
+It is a *system* container, so it holds containers of its own: your Compose
+stack boots inside it on its own Docker daemon, with no host socket and no
+`--privileged`. The isolation holds at every layer, and one kernel serves all of
+them. [Prior art](./prior-art.md#on-nested-containers) has the mechanics.
+
+Parallel spaces, each one full of spaces: that's the name.
+
 ### It runs on your machine, in a real terminal
 
 The common shape for "agents in a sandbox" is a browser tab: the agent's TUI in

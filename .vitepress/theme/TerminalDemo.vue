@@ -102,8 +102,10 @@ onMounted(() => {
  * on their own, with no separate light-mode treatment to keep in sync.
  */
 html:not(.dark) .para-hero {
-  --gb-bg: #fbf1c7;
-  --gb-bg-soft: #ebdbb2;
+  /* The surface is the poster's old paper, so the terminal is the one warm
+     object on a near-white sheet instead of a yellower cream on a cream one. */
+  --gb-bg: #f1ead6;
+  --gb-bg-soft: #e6dcc4;
   --gb-fg: #3c3836;
   --gb-gray: #7c6f64;
   --gb-yellow: #b57614;

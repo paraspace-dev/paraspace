@@ -101,8 +101,10 @@
 
   /* ---- Poster: the print pass ------------------------------------------ */
 
-  /* Aged stock, not white — the paper the plates were printed on. */
-  --pv-paper: #f1ead6;
+  /* One shade off white — enough to read as stock under the plates, not enough
+     to become a band across the page. The warm cream it used to be now belongs
+     to the terminal, so the poster has one warm object rather than two. */
+  --pv-paper: #faf8f2;
   --pv-lens-a: #37809f;
   --pv-lens-b: #4f9256;
   --pv-d: 1.5;
@@ -130,8 +132,25 @@
 
   /* Composition. --pv-eye is the lenses' shared center line, measured from the
      top of the page; the wordmark lands just under it. */
-  --pv-lens-d: clamp(272px, 42vw, 540px);
-  --pv-eye: clamp(196px, 20vh + 132px, 312px);
+  /*
+   * The poster's vertical composition, from one dial. --pv-hero-top is how far
+   * under the navbar the wordmark starts, and it has to be viewport-relative:
+   * a fixed value that frames well on a desktop pushes the host list off the
+   * bottom of a laptop.
+   *
+   * The other two follow it rather than being tuned separately. The lenses
+   * centre 16px above the wordmark's own centre, which is what puts the
+   * wordmark across their lower third; and their diameter is capped so the
+   * circles can never reach past the top of the page and get cut flat by the
+   * edge of the sheet.
+   */
+  --pv-hero-top: clamp(120px, 20vh + 40px, 296px);
+  /* svh, not vh: on a phone `vh` is the tall viewport you get once the address
+     bar has scrolled away, so sizing to it puts content under a bar that is
+     still there on arrival. The line above is the fallback. */
+  --pv-hero-top: clamp(120px, 20svh + 40px, 296px);
+  --pv-eye: calc(var(--pv-hero-top) + 16px);
+  --pv-lens-d: clamp(264px, min(42vw, calc(var(--pv-eye) * 1.9)), 540px);
   --pv-field-h: clamp(1300px, 100vh + 820px, 2000px);
   --pv-burn-h: clamp(760px, 100vh + 220px, 1160px);
 }
@@ -196,6 +215,7 @@
 @media (max-width: 767px) {
   :root {
     --pv-row-gap: 96px;
+    --pv-hero-top: clamp(88px, 14svh + 46px, 168px);
   }
 }
 

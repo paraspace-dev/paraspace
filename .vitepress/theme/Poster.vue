@@ -46,8 +46,16 @@ import Wordmark from './Wordmark.vue'
 </template>
 
 <style scoped>
+/*
+ * .VPContent already pads the page down by the navbar's height, so the poster
+ * pulls back up through it: the sheet then starts at the top of the page and
+ * bleeds behind the (transparent) bar, and .inner puts the height back before
+ * the copy starts. Without this the hero sat a navbar too low and the paper
+ * began below one.
+ */
 .poster {
   position: relative;
+  margin-top: calc(var(--vp-nav-height) * -1);
 }
 
 /* The sheet everything above the fold is printed on. Full-bleed without 100vw:
@@ -181,7 +189,7 @@ import Wordmark from './Wordmark.vue'
 
 .inner {
   position: relative;
-  padding: calc(var(--vp-nav-height) + 296px) 24px 0;
+  padding: calc(var(--vp-nav-height) + var(--pv-hero-top)) 24px 0;
   margin: 0 auto;
   max-width: 940px;
   text-align: center;
@@ -261,10 +269,6 @@ import Wordmark from './Wordmark.vue'
 /* ---- Narrow ------------------------------------------------------------- */
 
 @media (max-width: 767px) {
-  .inner {
-    padding-top: calc(var(--vp-nav-height) + 168px);
-  }
-
   .billing {
     font-size: 11px;
     letter-spacing: 0.24em;

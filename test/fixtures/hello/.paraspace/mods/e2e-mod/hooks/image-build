@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
-# A mod's build hook, run in the builder after the project's. This is the seam
+# A mod's build hook, run in the builder after the project's. This is the path
 # with the least margin for error: the builder's .paraspace/ is at /opt, not in
 # a $HOME that exists yet, so a wrong $PARA_HOOKS here reads an absent directory
 # behind some `[ -f ]` guard and seeds nothing, silently.

@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
-# para boot hook — runs INSIDE the workspace after provision. Brings the stack up.
+# para boot hook, run INSIDE the workspace after provision. Brings the stack up.
 #
 # Readiness contract: return zero only once every routed service is actually
 # listening. `docker compose up -d --wait` blocks until healthchecked services
-# are healthy (and plain ones are running) — which is what para gates routing on.
+# are healthy (and plain ones are running), which is what para gates routing on.
 
 . "$PARA_HOOKS/helpers"
 

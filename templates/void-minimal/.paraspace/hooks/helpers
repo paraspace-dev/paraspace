@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# Shared helpers for the para hooks. Sourced, not executed — each hook does:
+# Shared helpers for the para hooks. Sourced, not executed, so each hook does:
 #   . "$PARA_HOOKS/helpers"
 # so the hook bodies read as WHAT they do, not how they print it.
 
-# Color, but only on a terminal — para captures hook output to logs.
+# Color, but only on a terminal, because para captures hook output to logs.
 if [ -t 2 ]; then
   _hd=$'\033[36;1m'; _wn=$'\033[33m'; _er=$'\033[31m'; _off=$'\033[0m'
 else
@@ -19,7 +19,7 @@ die()   { printf '%serror:%s %s\n' "$_er" "$_off" "$*" >&2; exit 1; }
 # reads it too, and gives a hook no tty when it is set.)
 interactive() { [ -z "${PARA_NONINTERACTIVE:-}" ] && [ -t 0 ]; }
 
-# Print a prompt and wait for Enter — only when someone can answer.
+# Print a prompt and wait for Enter, only when someone can answer.
 pause() { if interactive; then printf '%s ' "$*" >&2; read -r _ || true; fi; }
 
 # No route helpers here on purpose: para injects $PARA_ROUTES space-separated,

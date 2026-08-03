@@ -2,18 +2,18 @@
 
 Your `provision` hook clones the repo. Now you need an ssh config, a credential
 helper, or an `insteadOf` rewrite to an internal mirror in place **before** it
-does — and you'd rather not paste that into the middle of a hook you already
+does, and you'd rather not paste that into the middle of a hook you already
 have, especially if it came from someone else.
 
 Open a point where the ordering matters:
 
 ```sh
-# .paraspace/hooks/provision — the line just before you clone
+# .paraspace/hooks/provision, the line just before you clone
 "$PARA_RUN_HOOK" clone:before
 ```
 
 Anything named `clone:before` now runs at exactly that moment. para never learns
-the name — you invent it and you place it.
+the name. You invent it and you place it.
 
 ## Filling one
 
@@ -27,7 +27,7 @@ git config --global url."git@github.com:".insteadOf https://github.com/
 EOF
 ```
 
-More than one file can answer to a name: `hooks/<name>` runs first, then that
+More than one file can answer to a name. `hooks/<name>` runs first, then that
 same name under each [mod](./mods.md)'s `hooks/`. **Mods run in no particular
 order**, so write each one so it doesn't care what else filled the point. This
 is how every hook name resolves, `provision` and `boot` included.
@@ -46,7 +46,7 @@ clone:after   clone:before   provision
 
 ## Passing things is the part that bites
 
-A point is for slotting in *behavior*, not for handing over data — the hooks it
+A point is for slotting in *behavior*, not for handing over data. The hooks it
 runs are separate processes, so:
 
 - **Ordinary variables don't travel.** A `repo_url=…` three lines above the call
@@ -62,7 +62,7 @@ runs are separate processes, so:
 - **Don't re-source `~/.paraspace/env`** to get para's variables "back". It
   holds your project's values, so doing that mid-run silently repoints
   `$PARA_HOOKS` at your `hooks/` even when the hook reading it came from
-  somewhere else — wrong files, no error.
+  somewhere else, so wrong files and no error.
 
 ## Reading a failure
 
@@ -79,13 +79,13 @@ error: hook failed (exit 7): hooks/provision
 
 Read it top down. **The first line is where it actually broke**, and the
 `stack:` beside it is the route para took to get there. Everything under it is
-the unwind. The exit status is the failing hook's own, carried up untouched — so
+the unwind. The exit status is the failing hook's own, carried up untouched, so
 `exit 7` reaches you as 7. A hook that opens no point fails in a single line,
 with no stack.
 
 **Your hook needs `set -e` for any of that to fire.** `"$PARA_RUN_HOOK" …` exits
 non-zero when something it ran failed, but a hook that doesn't stop on error
-carries on past it and can still exit 0 — and then `para up` reports a ready
+carries on past it and can still exit 0, and then `para up` reports a ready
 workspace with the error sitting in your scrollback. Every bundled template
 opens with `set -euo pipefail`. Start yours there too.
 

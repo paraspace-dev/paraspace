@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # e2e: assertions against the shared primary workspace ($PARA_WS), brought up
-# once by test/run. These are read-only — they must not stop, remove, or
+# once by test/run. These are read-only, so they must not stop, remove, or
 # otherwise disturb it (lifecycle tests use their own workspaces).
 
 # The whole point: an HTTP request over TLS, through para's Caddy, to the busybox
-# httpd inside the container — returning the exact sentinel the boot hook wrote,
+# httpd inside the container, returning the exact sentinel the boot hook wrote,
 # tagged with THIS workspace's name (proving it routed to the right container).
 test_http_route_serves_the_sentinel() {
   assert_serves "$PARA_WS" || return 1
@@ -14,7 +14,7 @@ test_http_route_serves_the_sentinel() {
 
 test_subdomain_route_serves_the_same_workspace() {
   # The fixture declares TWO routes (8080 and api:8080) and until now only the
-  # apex was ever requested — so route_host's `sub:port` branch, the entire
+  # apex was ever requested, so route_host's `sub:port` branch, the entire
   # subdomain mechanism, was asserted only as a string a hook received. Any
   # change that yields a different-but-valid hostname kept the tier green while
   # every subdomain URL para prints 404s.
@@ -27,7 +27,7 @@ test_routes_reach_the_provision_hook() {
   # Two things at once. PARA_ROUTES rides para's blanket PARA_* forwarder into
   # hooks like any other key; and the fixture declares its routes in the
   # MULTI-LINE spelling, so what the hook receives also proves the
-  # canonicalization — newlines and indentation in, one space-separated token
+  # canonicalization, with newlines and indentation in, one space-separated token
   # list out, which is what the container stamp and `for r in $PARA_ROUTES` both
   # expect.
   local got; got="$("$PARA" sh "$PARA_WS" -c 'cat ~/routes-seen' 2>/dev/null)"
@@ -38,7 +38,7 @@ test_routes_reach_the_provision_hook() {
 
 # shellcheck disable=SC2016  # the guest expands these, not us
 test_guest_paths_are_injected() {
-  # PARA_HOOKS/PARA_SKEL are guest-only — para appends them to ~/.paraspace/env
+  # PARA_HOOKS/PARA_SKEL are guest-only, so para appends them to ~/.paraspace/env
   # so a hook names what it reads instead of rebuilding the layout out of $HOME.
   # Assert the value AND that it resolves: an export pointing at nothing would
   # still read as "set", and every template's `. "$PARA_HOOKS/helpers"` rides on it.
@@ -47,7 +47,7 @@ test_guest_paths_are_injected() {
   local found; found="$("$PARA" sh "$PARA_WS" -c '[ -f "$PARA_HOOKS/helpers" ] && echo ok' 2>/dev/null)"
   assert_eq "ok" "$found" "the helpers every hook sources is reachable through it" || return 1
 
-  # Exported even though the hello fixture ships no skel/ — the variable names
+  # Exported even though the hello fixture ships no skel/, because the variable names
   # the path either way, which is what lets a hook guard with a plain [ -f ].
   local skel; skel="$("$PARA" sh "$PARA_WS" -c 'echo "$PARA_SKEL"' 2>/dev/null)"
   assert_eq "/home/$PARA_USER/.paraspace/skel" "$skel" "PARA_SKEL names the guest skel dir" || return 1
@@ -66,7 +66,7 @@ test_guest_paths_are_injected() {
 test_image_carries_no_project_tree() {
   # image build pushes .paraspace/ to /opt to build from, then removes it before
   # publishing. Without that one line every workspace cloned from the image finds
-  # the project's whole tree in there — including the generated env, so every
+  # the project's whole tree in there, including the generated env, so every
   # PARA_* and whatever the user's config carries.
   local found
   found="$("$PARA" sh "$PARA_WS" -c 'if [ -e /opt/.paraspace ]; then echo leaked; fi' 2>/dev/null)"
@@ -74,7 +74,7 @@ test_image_carries_no_project_tree() {
 }
 
 test_a_stray_hook_stack_does_not_stop_the_hooks() {
-  # para_env forwards every PARA_* the caller exported — including one that only
+  # para_env forwards every PARA_* the caller exported, including one that only
   # the runner is supposed to set. Inherited, PARA_HOOK_STACK reads as "we are
   # already inside that hook", so the cycle guard fires on the first hook of
   # every `up` and the workspace converges having run nothing.
@@ -106,7 +106,7 @@ test_workspace_is_listed_and_running() {
   local names; names="$("$PARA" ls --names 2>/dev/null)"
   assert_contains "$names" "$PARA_WS" "ls --names includes the workspace" || return 1
   # Bind the state to THIS workspace's row (field 2), not "RUNNING appears
-  # somewhere" — otherwise another row being RUNNING could mask a bad state here.
+  # somewhere", since otherwise another row being RUNNING could mask a bad state here.
   local state; state="$("$PARA" ls 2>/dev/null | awk -v n="$PARA_WS" '$1==n{print $2}')"
   assert_eq "RUNNING" "$state" "the workspace's row reports RUNNING"
 }
@@ -114,7 +114,7 @@ test_workspace_is_listed_and_running() {
 test_sh_c_runs_as_the_workspace_user() {
   # $PARA_USER/UID/GID are pinned by the sandbox (see test/lib/sandbox.sh) and
   # reach both the fixture's hooks/image-build and para's runtime chowns, so assert
-  # against them rather than a literal — that's what makes the ids overridable.
+  # against them rather than a literal, which is what makes the ids overridable.
   local uid; uid="$("$PARA" sh "$PARA_WS" -c 'id -u' 2>/dev/null)"
   assert_eq "$PARA_UID" "$uid" "workspace user is uid $PARA_UID" || return 1
   local gid; gid="$("$PARA" sh "$PARA_WS" -c 'id -g' 2>/dev/null)"
@@ -132,7 +132,7 @@ test_shared_volume_is_mounted() {
 
 test_sh_c_propagates_exit_status() {
   # para sh -c must exit with the guest command's status, so it composes. The
-  # `|| return 1` is load-bearing: the harness runs tests without `set -e`, so a
+  # `|| return 1` matters: the harness runs tests without `set -e`, so a
   # non-final assert whose result isn't checked would be masked by the trailing
   # `exit 0` and the test could never fail on broken propagation.
   assert_fails "$PARA" sh "$PARA_WS" -c 'exit 7' || return 1
@@ -140,8 +140,8 @@ test_sh_c_propagates_exit_status() {
 }
 
 test_project_commands_extend_para() {
-  # The extension seam: a project drops an executable in .paraspace/commands/
-  # and `para <verb>` runs it — on the HOST, with every PARA_* exported, args
+  # The extension point: a project drops an executable in .paraspace/commands/
+  # and `para <verb>` runs it on the HOST, with every PARA_* exported, args
   # passed through. The fixture's `hello` reports its context with no argument,
   # and calls back into `para sh` with one.
   local out
@@ -175,7 +175,7 @@ test_a_mods_command_extends_para_too() {
   assert_contains "$out" "skel=unset"                     "and guest paths stay unset out here" || return 1
   assert_contains "$out" "mod-command-reached-the-guest"  "PARA_BIN composes from a mod's command" || return 1
 
-  # Listed, and credited to the mod — a verb you didn't write says where it came from.
+  # Listed, and credited to the mod, so a verb you didn't write says where it came from.
   assert_contains "$("$PARA" commands 2>/dev/null)" "modhello" "para commands lists it" || return 1
   assert_contains "$("$PARA" --help 2>&1)" "[e2e-mod]" "para --help names the owning mod"
 }
@@ -184,7 +184,7 @@ test_a_mods_command_extends_para_too() {
 test_the_pushed_env_stays_private() {
   # push_paraspace widens the tree so a build hook can read $PARA_SKEL after a
   # `su -`, and pushes env at 0600 afterwards. Swap those two and every PARA_*
-  # the Parafile carries — tokens included — goes world-readable in the guest.
+  # the Parafile carries, tokens included, goes world-readable in the guest.
   local mode; mode="$("$PARA" sh "$PARA_WS" -c 'stat -c %a ~/.paraspace/env' 2>/dev/null)"
   assert_eq "600" "$mode" "the generated env is readable only by its owner"
 }
@@ -193,7 +193,7 @@ test_the_pushed_env_stays_private() {
 test_image_build_reads_skel_after_a_restrictive_umask() {
   # push_paraspace hands the builder the host checkout's own modes, so a tree
   # written under `umask 077` lands 0700 and the $PARA_USER a build hook steps
-  # down to cannot read $PARA_SKEL through it — which is the whole stated reason
+  # down to cannot read $PARA_SKEL through it, which is the whole stated reason
   # the tree goes to /opt rather than root's 0700 $HOME.
   local img="para-umasktest-$$" proj rc=0
   proj="$(scratch)/hello"
@@ -214,8 +214,8 @@ test_image_build_reads_skel_after_a_restrictive_umask() {
 }
 
 test_image_build_status_and_rm_lifecycle() {
-  # The full `para image` seam on its OWN throwaway alias, so it never disturbs
-  # the shared 'alpine-minimal' the other tests ride on. One build — cheap here
+  # The full `para image` surface on its OWN throwaway alias, so it never disturbs
+  # the shared 'alpine-minimal' the other tests ride on. One build, cheap here
   # because the fixture is Docker-free (no stack images to pre-pull), so it's the
   # tiny-Alpine build, not the multi-minute Docker case. Only the published alias
   # is overridden; base/bootstrap/payload still come from the fixture's Parafile.
@@ -232,7 +232,7 @@ test_image_build_status_and_rm_lifecycle() {
 
   # Read path: status names the image, when it was built, and its base. `built`
   # and `base` are both read back out of incus, and each prints the literal
-  # 'unknown' if its read broke — which is what the last assert is for.
+  # 'unknown' if its read broke, which is what the last assert is for.
   out="$(env PARA_IMAGE="$img" "$PARA" image status 2>&1)"
   assert_contains "$out" "$img"               "status names the image"          || rc=1
   assert_contains "$out" "images:alpine/edge" "status reports the stamped base" || rc=1
@@ -252,7 +252,7 @@ test_image_build_status_and_rm_lifecycle() {
   fi
   assert_eq "e2e-mod-was-here" "$marker" "the mod's image-build hook reached the image" || rc=1
 
-  # rm deletes it — verify the image is actually gone afterwards.
+  # rm deletes it, so verify the image is actually gone afterwards.
   env PARA_IMAGE="$img" "$PARA" image rm >/dev/null 2>&1 \
     || { echo "  'para image rm' failed" >&2; rc=1; }
   incus image info "$img" >/dev/null 2>&1 && { echo "  image survived 'para image rm'" >&2; rc=1; }

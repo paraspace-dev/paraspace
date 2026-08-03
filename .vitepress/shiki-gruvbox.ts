@@ -2,7 +2,7 @@
  * Gruvbox syntax themes for Shiki.
  *
  * VitePress defaults to github-light/github-dark, which colors shell command
- * words indigo — a hue this site owns nowhere else, so every code block read as
+ * words indigo, a hue this site owns nowhere else, so every code block read as
  * a visitor. Shiki bundles no gruvbox, so these are the two palettes the rest of
  * the theme already uses (see theme/custom.css), mapped onto TextMate scopes:
  * red keywords, green commands and strings, blue variables, yellow types, gray
@@ -91,7 +91,7 @@ function theme(name: string, type: 'light' | 'dark', p: Palette): ThemeRegistrat
       },
       {
         /* A shell argument is scoped `string.unquoted.argument`, but on this
-           site those tokens are the workspace names and paths — the nouns a
+           site those tokens are the workspace names and paths, the nouns a
            reader scans for, and where the prose link color comes from. They
            read as identifiers, so they take the identifier blue rather than
            the string green the scope name would suggest. */

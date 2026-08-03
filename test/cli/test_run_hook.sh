@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
-# CLI-tier tests for libexec/run-hook — the guest-side loop that turns one hook
+# CLI-tier tests for libexec/run-hook, the guest-side loop that turns one hook
 # name into the project's hook plus each mod's. No incus: the runner takes its
 # root from its own path, so it runs on the host against a fixture directory.
 #
 # Every test here builds a .paraspace/-shaped tree, drops run-hook into it the
 # way push_paraspace does, and runs it. Hooks record what they saw by appending
-# to files, because that is the only channel a hook has — it writes to the
+# to files, because that is the only channel a hook has. It writes to the
 # filesystem and never to its caller.
 # shellcheck disable=SC2016  # hook bodies expand when the hook runs, not here
 
-# a_paraspace [<mod>...] — a fixture tree with run-hook in place, echoed as a
+# a_paraspace [<mod>...]: a fixture tree with run-hook in place, echoed as a
 # path. Owners get an empty hooks/ each; a test fills in the hooks it needs.
 a_paraspace() {
   local root mod
@@ -21,7 +21,7 @@ a_paraspace() {
   printf '%s\n' "$root"
 }
 
-# a_hook <owner-dir> <name> <body> — no exec bit, deliberately: para runs a hook
+# a_hook <owner-dir> <name> <body>: no exec bit, deliberately, since para runs a hook
 # with `bash <path>`, and a checkout with core.fileMode=false has no exec bit to
 # give. A test that chmod'd here would stop guarding that.
 a_hook() {
@@ -29,7 +29,7 @@ a_hook() {
   printf '%s\n' "$3" > "$1/hooks/$2"
 }
 
-# run_the_hook <root> <name> — run the runner, capturing output and status into
+# run_the_hook <root> <name>: run the runner, capturing output and status into
 # HOOK_OUT/HOOK_RC. Never `if ! …`, for the same reason the runner doesn't.
 run_the_hook() {
   HOOK_OUT="$("$1/run-hook" "$2" 2>&1)"
@@ -40,7 +40,7 @@ run_the_hook() {
 
 test_run_hook_stops_at_a_failing_middle_command() {
   # THE test, and what it guards is the status: `if ! bash "$hook"; then
-  # status=$?` reports the status of the `!` — zero — so the runner prints
+  # status=$?` reports the status of the `!`, which is zero, so the runner prints
   # `hook failed` and exits 0, and `run_hook`'s `|| die` never fires.
   # The missing tail line is a weaker guard than it looks: a sourced hook that
   # sets its own `-e` still stops, because the `set` builtin re-arms errexit.
@@ -69,7 +69,7 @@ test_run_hook_propagates_the_hooks_exit_status() {
 
 test_run_hook_fails_on_a_helpers_style_die() {
   # How a hook actually fails: helpers' die(), from a function, after a source.
-  # The bare `exit 3` above is the top-level case only — this is the one every
+  # The bare `exit 3` above is the top-level case only. This is the one every
   # bundled template's hooks reach for.
   local root; root="$(a_paraspace)"
   printf '%s\n' 'die() { echo "error: $*" >&2; exit 1; }' > "$root/hooks/helpers"
@@ -111,7 +111,7 @@ test_run_hook_runs_every_owner_project_first() {
   # alpha has no provision hook: it must be skipped, not error.
   ( cd "$(dirname "$root")" && run_the_hook "$root" provision
     assert_eq 0 "$HOOK_RC" "resolution succeeded" || exit 1
-    # Order between mods is explicitly not promised — only that the project ran
+    # Order between mods is explicitly not promised, only that the project ran
     # first, and that the mod with no such hook contributed nothing.
     assert_eq "project" "$(head -n1 order)" "the project's hook ran first" || exit 1
     assert_eq "2" "$(wc -l < order | tr -d ' ')" "exactly the two owners with the hook ran" )
@@ -119,7 +119,7 @@ test_run_hook_runs_every_owner_project_first() {
 
 test_run_hook_reports_an_absent_hook_without_failing() {
   # An unfilled hook is the normal state, so it reports as a note rather than a
-  # warning — refusing where absence is a bug is the host's job, which is what
+  # warning, since refusing where absence is a bug is the host's job, which is what
   # cmd_image_build's own check is for.
   local root; root="$(a_paraspace)"
   run_the_hook "$root" provision
@@ -152,7 +152,7 @@ test_run_hook_gives_each_owner_its_own_paths() {
 }
 
 test_run_hook_gives_a_hook_its_own_path_as_dollar_zero() {
-  # $0 is the hook, so `. "$(dirname "$0")/helpers"` resolves — it names the same
+  # $0 is the hook, so `. "$(dirname "$0")/helpers"` resolves, naming the same
   # directory $PARA_HOOKS does. A sourced hook would see the runner here instead,
   # and every hook written against the older spelling would break.
   local root; root="$(a_paraspace)"
@@ -165,7 +165,7 @@ test_run_hook_gives_a_hook_its_own_path_as_dollar_zero() {
 }
 
 test_run_hook_passes_a_hook_no_arguments() {
-  # A sourced hook would inherit the runner's $1 — the hook name. A hook takes
+  # A sourced hook would inherit the runner's $1, the hook name. A hook takes
   # no arguments; everything it needs is a PARA_*.
   local root; root="$(a_paraspace)"
   a_hook "$root" provision "$(printf '%s\n' 'echo "count=$#"')"
@@ -202,8 +202,8 @@ test_run_hook_reaches_every_owner_from_a_nested_point() {
 
 test_run_hook_traces_a_failure_through_nested_points() {
   # A hook three points deep used to fail with a path and no answer to "how did
-  # para get here". Every level reports as the failure unwinds — the per-level
-  # line names the FILE, the stack names the POINTS — and the exit status is
+  # para get here". Every level reports as the failure unwinds, where the
+  # per-level line names the FILE and the stack names the POINTS, and the exit status is
   # carried up unchanged rather than flattened to 1.
   local root; root="$(a_paraspace)"
   a_hook "$root" provision    "$(printf '%s\n' '#!/usr/bin/env bash' 'set -euo pipefail' '"$PARA_RUN_HOOK" clone:before')"
@@ -218,7 +218,7 @@ test_run_hook_traces_a_failure_through_nested_points() {
 
 test_run_hook_does_not_trace_a_flat_failure() {
   # The inverse, and the one that matters more: a provision that opens no point
-  # fails in ONE line. Without this the tracing quietly becomes noise on the
+  # fails in ONE line. Without this the tracing becomes noise on the
   # path every project actually takes.
   local root; root="$(a_paraspace)"
   a_hook "$root" provision "$(printf '%s\n' '#!/usr/bin/env bash' 'exit 1')"
@@ -264,7 +264,7 @@ test_run_hook_leaves_stdin_with_the_hook() {
 # ------------------------------------------------------------------ packaging
 
 test_run_hook_is_packaged() {
-  # package.json's `files` lists bin/para, not bin/ — so every tree para pushes
+  # package.json's `files` lists bin/para, not bin/, so every tree para pushes
   # has to be named there. Its own assert, not one combined check: "something is
   # missing" costs another five minutes to diagnose.
   local repo out; repo="$(cd "$(dirname "$PARA")/.." && pwd)"

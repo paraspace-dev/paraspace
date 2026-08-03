@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # e2e: what adding a mod to a project whose shared volume is ALREADY seeded
-# actually does. Not a claim that it's desirable — docs/mods.md calls it
+# actually does. Not a claim that it's desirable, since docs/mods.md calls it
 # half-applied and gives the manual path out; this asserts that IS the reality,
 # so nobody "fixes" it by accident.
 #
@@ -21,7 +21,7 @@ _a_project_with_a_late_mod() {
 set -euo pipefail
 # Its own new path. Nothing else claims it, so it lands on any volume.
 echo late-mod-ok > "$PARA_SHARED/late-mod-marker"
-# A path the base already wrote, guarded on the DESTINATION — the shape most
+# A path the base already wrote, guarded on the DESTINATION, the shape most
 # mods are written in, and the one that silently does nothing on a live volume.
 if [ ! -e "$PARA_SHARED/late-conflict" ]; then
   echo late-mod-wrote-this > "$PARA_SHARED/late-conflict"
@@ -33,7 +33,7 @@ EOF
 # para_do, but against a project dir other than the sandbox's fixture. It also
 # exports a bogus PARA_MOD_DIR, because para sets that for a mod's own command
 # and such a command calling back into `para up` is the ordinary way to write
-# one — so this is the real path by which a host directory could reach a guest.
+# one, so this is the real path by which a host directory could reach a guest.
 _up_with_project() { # _up_with_project <project-dir> <workspace>
   local out line
   if ! out="$(env PARA_PROJECT_DIR="$1" PARA_MOD_DIR=/on/the/host "$PARA" up "$2" 2>&1)"; then
@@ -48,14 +48,14 @@ test_a_mod_added_to_a_seeded_volume_is_half_applied() {
   proj="$(_a_project_with_a_late_mod)"
 
   # Stand in for something the base seeded before the mod existed. The suite's
-  # own /para/shared/marker is off limits — another test reads it back.
+  # own /para/shared/marker is off limits, because another test reads it back.
   "$PARA" sh "$PARA_WS" -c 'echo base-wrote-this > /para/shared/late-conflict' \
     >/dev/null 2>&1 || return 1
 
   _up_with_project "$proj" "$ws" || return 1
 
   # The `up` above carried a host PARA_MOD_DIR; guest_env must have dropped it.
-  # It has to ride an `up` to test anything — `para sh` never regenerates
+  # It has to ride an `up` to test anything, since `para sh` never regenerates
   # ~/.paraspace/env, so asserting on an `sh` proves only that incus doesn't
   # forward the host environment.
   got="$("$PARA" sh "$ws" -c 'echo "${PARA_MOD_DIR-unset}"' 2>/dev/null)"

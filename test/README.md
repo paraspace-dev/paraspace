@@ -4,20 +4,20 @@ Real tests for `para`. Two tiers, one entrypoint:
 
 ```sh
 test/run            # both tiers (e2e is skipped with a note if incus is absent)
-test/run --cli      # CLI tier only — no incus, fast, runs in CI
-test/run --e2e      # e2e tier only — needs a reachable incus daemon
+test/run --cli      # CLI tier only. No incus, fast, runs in CI
+test/run --e2e      # e2e tier only. Needs a reachable incus daemon
 test/run route      # only tests whose description matches the regex "route"
 test/run '^image build'      # …so anchors and alternation work too
 ```
 
 A description is the test's function name with `test_` dropped and underscores
-as spaces, so it is only ever letters, digits and spaces — a plain word behaves
+as spaces, so it is only ever letters, digits and spaces, and a plain word behaves
 as the substring match it looks like.
 
 `npm test`, `npm run test:cli`, and `npm run test:e2e` map to the same.
 
 > **Run the e2e tier locally before you merge.** Only the CLI tier runs in CI
-> ([`.github/workflows/test.yml`](../.github/workflows/test.yml)) — the e2e tier
+> ([`.github/workflows/test.yml`](../.github/workflows/test.yml)), and the e2e tier
 > needs a live incus daemon that GitHub-hosted runners don't have, so **nothing
 > automated will catch an e2e regression for you.** Whenever you touch the
 > `up`/route/lifecycle/volume mechanism, run `test/run --e2e` (or `test/run`) on
@@ -28,20 +28,21 @@ as the substring match it looks like.
 
 ## What each tier covers
 
-**CLI tier** (`test/cli/`) — no incus. Argument handling, `para --help`, and
+**CLI tier** (`test/cli/`) needs no incus. Argument handling, `para --help`, and
 `para init` (pure filesystem). This is what runs on every push
 ([`.github/workflows/test.yml`](../.github/workflows/test.yml)), alongside the
 ShellCheck gate ([`bin/lint`](../bin/lint)).
 
-**e2e tier** (`test/e2e/`) — the real mechanism, exercised through actual `para`
+**e2e tier** (`test/e2e/`) is the real mechanism, exercised through actual `para`
 commands against a live Incus workspace:
 
-- the routing path — `para up` → the project's hooks → the boot readiness
-  contract → Caddy TLS → the container's bridge IP → the app — asserted with a
+- the routing path (`para up` → the project's hooks → the boot readiness
+  contract → Caddy TLS → the container's bridge IP → the app), asserted with a
   real HTTPS request that returns the boot hook's sentinel (`test_workspace`,
   `test_idempotency`). Note this is the *Docker-free* path: the fixture serves
   with busybox `httpd`, so it does **not** exercise para's nested-Docker/compose
-  boot (the image contract's core), only the incus/Caddy/hook/volume seams;
+  boot (the image contract's core), only the incus, Caddy, hook and volume
+  contracts;
 - `para sh -c` running as the workspace user (`$PARA_USER`/`$PARA_UID`, pinned by
   the sandbox), byte-clean, exit-status-propagating;
 - the `down` → `up` (resume) → `rm` lifecycle (`test_lifecycle`);
@@ -52,7 +53,7 @@ commands against a live Incus workspace:
 
 `test/fixtures/hello/` is the smallest real para project: an Alpine box that
 serves a fixed sentinel over HTTP with busybox `httpd`. It is **not** a template
-(it never ships in the npm package) and it does **not** use Docker — that keeps
+(it never ships in the npm package) and it does **not** use Docker, which keeps
 the published image ~5.5 MB and the whole path Docker-free.
 
 The image is built by **`para image build`**, from the fixture's own
@@ -62,19 +63,19 @@ The image is built by **`para image build`**, from the fixture's own
 (`images:alpine/edge` + `apk add --no-cache bash`), published as the
 `alpine-minimal` alias. That's deliberate: the fixture is the non-Void,
 Docker-free second consumer, so building it is also the only coverage
-`para image build` has — it's what proves the command carries no distro or Docker
+`para image build` has, and it proves the command carries no distro or Docker
 assumptions of its own.
 
 But the build is **cached**, and nothing invalidates that cache: an existing
 `alpine-minimal` alias is reused as-is. So in steady state most runs skip
 `para image build` entirely and prove nothing about it. **Rebuild explicitly with
 `PARA_TEST_REBUILD=1 test/run --e2e` whenever you touch the fixture's
-`hooks/image-build`, its Parafile's base/bootstrap, or `cmd_image_build` itself** —
-otherwise you're testing the image you built last time. `--no-build` skips even
+`hooks/image-build`, its Parafile's base/bootstrap, or `cmd_image_build` itself.**
+Otherwise you're testing the image you built last time. `--no-build` skips even
 the existence check.
 
 The fixture also ships **one mod**, `.paraspace/mods/e2e-mod/`, committed rather
-than installed at test time — `PARA_PROJECT_DIR` points at the tracked fixture,
+than installed at test time, because `PARA_PROJECT_DIR` points at the tracked fixture,
 so a test that vendored one would dirty the working tree and fail on a second
 run. It fills `provision`, `image-build`, a `clone:before` point, and a `commands/` verb the
 fixture's own provision hook opens, which is what gives the tier its only
@@ -86,7 +87,7 @@ half is baked into the cached image, so it is one more reason
 
 Every run is sandboxed so it never touches your real para state:
 
-- throwaway `XDG_STATE_HOME`/`XDG_CONFIG_HOME`/… under a temp dir — its own
+- throwaway `XDG_STATE_HOME`/`XDG_CONFIG_HOME`/… under a temp dir, with its own
   Caddyfile, pidfile and user config;
 - a non-default Caddy port (`9443`), so its Caddy can't collide with a real one,
   and its own Caddy **admin** endpoint (`PARA_CADDY_ADMIN`, `:19443`) so a
@@ -108,13 +109,13 @@ it all for inspection), `--failfast` (stop at the first failure).
 
 ## Known limitations of the e2e sandbox
 
-The isolation is strong but not absolute — a few things are outside what a
+The isolation is strong but not absolute, and a few things are outside what a
 throwaway XDG tree can fence off:
 
 - **The Caddyfile is machine-wide.** para reads the workspace list from incus
   rather than from a registry of its own, so the run's Caddyfile also carries
-  *your* workspaces' hostnames. Harmless — they are served on the run's own port
-  and admin endpoint — but don't write a test that asserts the Caddyfile contains
+  *your* workspaces' hostnames. Harmless, since they are served on the run's own
+  port and admin endpoint, but don't write a test that asserts the Caddyfile contains
   nothing else.
 - **Storage pools are shared with your real para, deliberately.** The sandbox
   does *not* pin `PARA_POOL`, so a run exercises the pool you actually use.
@@ -128,7 +129,7 @@ throwaway XDG tree can fence off:
   offline-capable.
 - **The e2e tier is Linux / native-incus only.** It reads the incus bridge
   (`incusbr0`) directly, which assumes a native Linux incus. para also supports
-  macOS (incus in a colima VM), but the e2e tier does not run there — use the CLI
+  macOS (incus in a colima VM), but the e2e tier does not run there, so use the CLI
   tier on macOS. (The image build itself is host-agnostic; it builds a Linux
   container through whatever incus the CLI reaches.)
 - **Interactive `para sh` is not covered.** A pty path needs util-linux `su
@@ -138,7 +139,7 @@ throwaway XDG tree can fence off:
 ## Writing a test
 
 A test is just a `test_*` bash function dropped into a file under `cli/` or
-`e2e/` — no registration, no boilerplate. The harness
+`e2e/`, with no registration and no boilerplate. The harness
 ([`lib/harness.sh`](lib/harness.sh)) autodiscovers every `test_*` function by
 name and runs each in its own subshell; a test **passes when its function returns
 zero** and **fails on any non-zero return**. The `assert_*` helpers in
@@ -147,9 +148,10 @@ zero** and **fails on any non-zero return**. The `assert_*` helpers in
 *not* be named `test_*` (prefix them `_`, like `_ls_state`) or they'll be run as
 tests. A few rules keep the suite honest:
 
-- **Pick the right tier.** If it needs no incus — argument handling, `--help`,
-  `init`, or a refusal that fires *before* any backend call (name validation,
-  contract-version and cross-project-ownership checks) — it belongs in `cli/` so
+- **Pick the right tier.** If it needs no incus (argument handling, `--help`,
+  `init`, or a refusal that fires *before* any backend call, such as name
+  validation and the contract-version and cross-project-ownership checks) it
+  belongs in `cli/` so
   CI actually runs it. Anything that boots a workspace goes in `e2e/`.
 - **Write order-independent tests.** Execution order is **not** guaranteed: the
   harness runs functions in `declare -F` (alphabetical-by-name) order, not file or
@@ -161,19 +163,19 @@ tests. A few rules keep the suite honest:
 - **Check every step's exit status.** The harness deliberately does *not* run
   tests under `set -e` (they routinely run commands expected to fail). So a
   non-final assert whose result you don't check is silently masked by the
-  function's later success — end such lines with `|| return 1`. Use `para_do` for
+  function's later success, so end such lines with `|| return 1`. Use `para_do` for
   mutating para calls (it stays quiet on success and surfaces para's output on
   failure) and `assert_fails` for "para must reject this".
 - **Wait on async state with `eventually`, never a fixed `sleep`.** Boot, routing,
   and state transitions are asynchronous; `eventually <secs> <cmd…>` retries until
   the command succeeds or the timeout elapses. For the routing path specifically,
-  use `assert_serves <ws>` — it already retries, where a bare `http_get <ws>`
+  use `assert_serves <ws>`, which already retries, where a bare `http_get <ws>`
   asks once and will flake if the request follows an `up` (which reloads Caddy).
   `http_get` is for when you need the body itself, after `assert_serves` has
   established the route is live; it curls through the run's Caddy hermetically
   (`--resolve`, para's internal CA).
 - **Bind assertions to a specific workspace.** Assert on *this* workspace's `para
-  ls` row (`awk '$1==n{print $3}'`), not "does RUNNING appear somewhere" — in a
+  ls` row (`awk '$1==n{print $3}'`), not "does RUNNING appear somewhere": in a
   shared registry another row can otherwise mask a bad state here.
 - **Keep it ShellCheck-clean.** Test files are linted by `bin/lint` (discovered by
   their shebang) exactly like `bin/para`. Run `bin/lint` before you push.

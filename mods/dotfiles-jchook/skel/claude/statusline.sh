@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
-# para: Claude Code status line — a persistent, always-visible tag telling you
+# Claude Code status line: a persistent, always-visible tag telling you
 # which workspace this claude instance is in, even when the TUI is full-screen.
 #
 # Keys off the container hostname (para-<name>), so it works no matter how
-# claude was launched — `para claude`, or `claude` inside `para sh`. Claude pipes
-# a JSON blob on stdin we have no use for, so drain it and read the hostname.
+# claude was launched, either `para claude` or `claude` inside `para sh`. Claude
+# pipes a JSON blob on stdin we have no use for, so drain it and read the hostname.
 cat >/dev/null 2>&1 || true
 
 ws="$(hostname 2>/dev/null || true)"; ws="${ws#para-}"
@@ -13,7 +13,7 @@ ws="$(hostname 2>/dev/null || true)"; ws="${ws#para-}"
 
 # A stable color per workspace name, so several open at once read as different
 # colors at a glance and not just as different text. 31–36 are the ANSI colors
-# and +60 is each one's bright twin — twelve to collide in.
+# and +60 is each one's bright twin, so twelve to collide in.
 hash="$(printf '%s' "$ws" | cksum)"; hash="${hash%% *}"
 color=$(( hash % 6 + 31 ))
 if [ $(( hash / 6 % 2 )) -eq 1 ]; then color=$(( color + 60 )); fi

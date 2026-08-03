@@ -36,7 +36,7 @@ test_down_up_resume_and_rm() {
   assert_stops_serving "$ws" || return 1
   # …and the SITE is gone, not merely dead. A stale block still points at a
   # bridge IP that alloc_ip will hand to the next workspace, which then answers
-  # on this workspace's hostname — and "it stopped serving" cannot see that,
+  # on this workspace's hostname, and "it stopped serving" cannot see that,
   # because a deleted container stops answering either way.
   assert_not_contains "$(cat "$XDG_STATE_HOME/para/Caddyfile")" "$ws.${PARA_DOMAIN:-paraspace.dev}" \
     "rm regenerated the Caddyfile without the workspace" || return 1

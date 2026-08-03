@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
-# para boot hook — runs INSIDE the workspace after provision. Per para's readiness
+# para boot hook, run INSIDE the workspace after provision. Per para's readiness
 # contract it must return zero only once every routed service is actually
 # listening, so `para up` (and the harness) can trust its exit code.
 #
@@ -21,11 +21,11 @@ printf 'para-e2e-ok %s\n' "$PARA_NAME" > "$docroot/index.html"
 
 # busybox httpd daemonizes (no -f), binding 0.0.0.0:$port so para's Caddy can reach
 # it at the container's bridge IP. Re-running boot (idempotent up) would fail to
-# bind the in-use port, which is fine — an httpd is already up; we only need to
+# bind the in-use port, which is fine, since an httpd is already up; we only need to
 # guarantee it's listening before we return.
 #
 # Absolute path on purpose: hooks run as $PARA_USER via `su -`, whose PATH
-# is /bin:/usr/bin — it does NOT include /usr/sbin, where busybox-extras installs
+# is /bin:/usr/bin, which does NOT include /usr/sbin, where busybox-extras installs
 # the httpd symlink. A bare `httpd` would be "command not found".
 /usr/sbin/httpd -p "$port" -h "$docroot" 2>/dev/null || true
 

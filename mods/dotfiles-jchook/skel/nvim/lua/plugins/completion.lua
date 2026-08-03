@@ -1,5 +1,5 @@
 return {
-  -- Snippet engine — LuaSnip + the converted UltiSnips snippets.
+  -- Snippet engine: LuaSnip + the converted UltiSnips snippets.
   -- Kept lazy so its plugin/luasnip.lua doesn't auto-source before our config
   -- runs (causes a `loaded_fts` nil error during BufWinEnter at startup).
   -- blink.cmp pulls it in on InsertEnter via the dependency below.

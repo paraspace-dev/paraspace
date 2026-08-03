@@ -4,7 +4,7 @@
  * wordmark sitting on the intersection, and a warm bed of light underneath.
  *
  * The diagram is the product. Two workspaces on one machine share the host,
- * the kernel and the project's credentials — that's the overlap — and share
+ * the kernel and the project's credentials, which is the overlap, and share
  * nothing else, which is the two crescents. The lenses separate out of a single
  * circle on load for the same reason.
  *
@@ -29,8 +29,8 @@ import Wordmark from './Wordmark.vue'
       <h1 class="mark"><Wordmark /></h1>
       <p class="billing">Parallel dev workspaces on your machine</p>
       <p class="lede">
-        Every task gets a full, isolated copy of your project — its own clone, its own stack, its
-        own https URL. Run coding agents in parallel without collisions.
+        Every task gets a full, isolated copy of your project, with its own clone, its own stack
+        and its own https URL. Run coding agents in parallel without collisions.
       </p>
       <div class="actions">
         <a class="para-btn brand" href="/docs/getting-started">Get started</a>
@@ -61,7 +61,7 @@ import Wordmark from './Wordmark.vue'
 /* The sheet everything above the fold is printed on. Full-bleed without 100vw:
    .VPHome is the page's full width already, and its own overflow-x rule keeps
    the lenses from opening a right gutter. It runs past the terminal and into
-   the feature rows, then dissolves — a sheet that ended on a line would read as
+   the feature rows, then dissolves, since a sheet that ended on a line would read as
    a band pasted onto the page. */
 .field {
   position: absolute;
@@ -79,7 +79,7 @@ import Wordmark from './Wordmark.vue'
 /* ---- The lenses -------------------------------------------------------- */
 
 /*
- * Placement, blend and motion only — the halo and the glass come from .pv-lens
+ * Placement, blend and motion only, since the halo and the glass come from .pv-lens
  * in custom.css, which the feature rows use too.
  */
 .lens {
@@ -136,7 +136,7 @@ import Wordmark from './Wordmark.vue'
 
 /* ---- Underglow, grain, vignette ---------------------------------------- */
 
-/* The warm bed the Venn sits in — low, wide, and centered under the
+/* The warm bed the Venn sits in, low and wide and centered under the
    intersection, so the page has one light source and it's the overlap. */
 .under {
   position: absolute;
@@ -170,7 +170,7 @@ import Wordmark from './Wordmark.vue'
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.82' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)'/%3E%3C/svg%3E");
 }
 
-/* Edge burn around the poster only — it reaches as far as the composition
+/* Edge burn around the poster only, reaching as far as the composition
    does, not as far as the sheet does. */
 .vignette {
   position: absolute;
@@ -199,14 +199,14 @@ import Wordmark from './Wordmark.vue'
   margin: 0 auto;
   max-width: 880px;
   /* The wordmark's own glow, and the only place a filter is allowed near the
-     lenses — it would otherwise trap their blend inside a stacking context. */
+     lenses, which would otherwise trap their blend inside a stacking context. */
   filter: drop-shadow(0 0 34px color-mix(in srgb, var(--pv-halo) 45%, transparent));
   animation: lift 1s ease-out 0.5s both;
 }
 
 /* Poster billing: the one line of tracked caps on the page, so it stays the
    subtitle and never becomes a texture. It sits on the lenses, where the tracking
-   that makes it a poster line also makes it the hardest thing here to read — so
+   that makes it a poster line also makes it the hardest thing here to read, so
    it carries the weight and contrast the rest of the caption doesn't need. */
 .billing {
   margin: 28px 0 0;
@@ -216,7 +216,7 @@ import Wordmark from './Wordmark.vue'
   text-indent: 0.26em;
   text-transform: uppercase;
   color: var(--pv-sub);
-  /* The same halo the wordmark carries, at a fraction of its reach — enough to
+  /* The same halo the wordmark carries, at a fraction of its reach, enough to
      lift the line off whichever lens it is crossing, not enough to notice as
      an effect. It does almost nothing on the print pass, which is correct: pale
      ink on pale paper has nothing to glow against. */

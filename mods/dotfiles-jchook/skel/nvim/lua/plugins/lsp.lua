@@ -7,7 +7,7 @@ return {
 
   -- Make lua_ls actually useful in this config: dynamically loads neovim
   -- runtime types and plugin source paths into lua_ls's workspace based on
-  -- `require` calls. Without this, lua_ls completes basic Lua only — no
+  -- `require` calls. Without this, lua_ls completes basic Lua only, with no
   -- vim.api.*, no plugin types, no go-to-def into plugin source.
   {
     "folke/lazydev.nvim",

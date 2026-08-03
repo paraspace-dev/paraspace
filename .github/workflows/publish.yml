@@ -2,7 +2,7 @@ name: publish
 
 # Publish to npm when a v* tag is pushed: `npm version <bump> && git push --follow-tags`.
 #
-# Auth is npm trusted publishing (OIDC) — no token in repo secrets. It needs a
+# Auth is npm trusted publishing (OIDC), so no token in repo secrets. It needs a
 # trusted publisher registered on npmjs.com naming this repo and this file;
 # README's Development section has the setup.
 on:
@@ -34,7 +34,7 @@ jobs:
           tag="${GITHUB_REF_NAME#v}"
           pkg="$(node -p "require('./package.json').version")"
           if [ "$tag" != "$pkg" ]; then
-            echo "$GITHUB_REF_NAME does not match package.json $pkg — release with 'npm version <bump> && git push --follow-tags'" >&2
+            echo "$GITHUB_REF_NAME does not match package.json $pkg. Release with 'npm version <bump> && git push --follow-tags'" >&2
             exit 1
           fi
 
@@ -43,7 +43,7 @@ jobs:
       - name: tag is on main
         run: |
           if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
-            echo "$GITHUB_REF_NAME is not on main — merge first, then tag main" >&2
+            echo "$GITHUB_REF_NAME is not on main. Merge first, then tag main" >&2
             exit 1
           fi
 
@@ -53,7 +53,7 @@ jobs:
 
       # npm swallows every OIDC failure and falls back to a token that isn't
       # there, so verbose is what names a misconfigured trusted publisher when
-      # the publish 401s. Provenance needs no flag — OIDC attests on its own.
+      # the publish 401s. Provenance needs no flag, since OIDC attests on its own.
       - name: publish
         run: |
           case "$GITHUB_REF_NAME" in

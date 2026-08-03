@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# CLI-tier tests — no incus. Dispatch, project commands, configuration
+# CLI-tier tests, no incus. Dispatch, project commands, configuration
 # precedence, `para init`. Fast enough to run on every push in CI.
 #
 # Fixtures come from test/lib/project.sh: `a_project` builds a throwaway project,
 # `para_in`/`assert_refuses` run para against it with the backend fenced, and the
-# harness removes everything afterwards. Tests should read as a story — arrange
+# harness removes everything afterwards. Tests should read as a story: arrange
 # one project, assert one behavior.
 #
 # Two habits worth keeping, both learned the hard way on this suite:
@@ -56,7 +56,7 @@ test_rejects_an_invalid_workspace_name() {
 # ---------------------------------------------------------- project commands
 
 test_project_commands_extend_the_verb_set() {
-  # The extension seam: an executable in .paraspace/commands/ becomes `para
+  # The extension point: an executable in .paraspace/commands/ becomes `para
   # <verb>`, running on the host with every PARA_* exported and its arguments
   # passed through untouched.
   local p; p="$(a_project)"
@@ -88,7 +88,7 @@ echo hi'
 }
 
 test_engine_verbs_shadow_project_commands() {
-  # A template must not be able to silently replace `para ls` — the engine's
+  # A template must not be able to silently replace `para ls`, since the engine's
   # namespace wins, and doctor is where that gets pointed out.
   local p; p="$(a_project)"
   a_project_command "$p" ls '#!/bin/sh
@@ -120,7 +120,7 @@ echo SHADOWED-THE-ENGINE'
 
 test_the_environment_overrides_the_parafile() {
   # The whole precedence model: a Parafile written with the `:=` idiom yields to
-  # a real environment variable. Nothing in para implements this — bash does —
+  # a real environment variable. Nothing in para implements this (bash does),
   # so the test exists to prove the idiom is what the templates should use.
   local p out
   # shellcheck disable=SC2016  # a literal Parafile line, not an expansion
@@ -158,7 +158,7 @@ test_config_init_seeds_a_user_config_and_path_finds_it() {
 test_config_edit_opens_the_file_and_seeds_it_first() {
   # `para config edit` is meant to be the only one of these anyone learns, so
   # it seeds the file on first use rather than opening nothing. $EDITOR is
-  # word-split on purpose — people set it with flags — which is the half of
+  # word-split on purpose (people set it with flags), which is the half of
   # this that quoting would silently break.
   local d path; d="$(scratch)"
   printf '#!/bin/sh\nprintf "%%s\\n" "$@" > %s/argv\n' "$d" > "$d/fake-editor"
@@ -198,7 +198,7 @@ test_config_init_refuses_to_clobber() {
 test_routes_are_canonicalized() {
   # Commas, spaces, tabs and newlines all separate entries, so a project can lay
   # several routes out to be read. Whatever the spelling, para resolves ONE
-  # canonical form — space-separated and lowercased — which is what it stamps on
+  # canonical form (space-separated and lowercased), which is what it stamps on
   # the container and injects into hooks.
   local spelling out
   for spelling in '"8080,API:3001"' '"8080, api:3001"' '"8080 api:3001"' '"
@@ -223,7 +223,7 @@ test_routes_do_not_glob_against_the_cwd() {
 test_doctor_checks_incus_can_do_what_para_needs() {
   # para reads every workspace out of incus in one query, using device keys as
   # `incus list` columns. The CAPABILITY decides, not the version number: a
-  # distro can backport, and the failure this catches is the nasty one — an
+  # distro can backport, and the failure this catches is the nasty one, an
   # incus that can't do it makes para see every workspace as address-less.
   local stub out
   stub="$(a_stub_incus 6.2 no)"
@@ -231,7 +231,7 @@ test_doctor_checks_incus_can_do_what_para_needs() {
   assert_contains "$out" "6.2 cannot select device columns" "an incapable incus is named and failed" || return 1
   assert_contains "$out" "$MIN_INCUS_EXPECTED" "the message says what to upgrade to" || return 1
   # And it keeps going. A diagnostic that stops at the first thing it cannot
-  # read is useless exactly when you need it — this reached the later checks.
+  # read is useless exactly when you need it, so this reached the later checks.
   assert_contains "$out" "storage pool" "doctor finished its report after a failed check" || return 1
 
   # Capable but older than what para is tested against: a warning, not a refusal.
@@ -247,7 +247,7 @@ test_doctor_checks_incus_can_do_what_para_needs() {
 }
 test_init_refuses_to_clobber_an_existing_project() {
   # The guard between `para init` and a user's own Parafile and hooks. Untested,
-  # it can be deleted outright and the whole tier stays green — while the first
+  # it can be deleted outright and the whole tier stays green, while the first
   # command a new user runs eats their work.
   local d out; d="$(scratch)"
   mkdir -p "$d/.paraspace/hooks"
@@ -268,7 +268,7 @@ test_up_allocates_an_ip_that_is_not_already_taken() {
   # The highest-consequence silent failure in the engine: a mis-parse here hands
   # a new workspace an address a LIVE one already holds. incus annotates the
   # runtime column as "10.9.9.200 (eth0)" and fills the device column only for
-  # instances para pinned — so an address held by a RUNNING container para did
+  # instances para pinned, so an address held by a RUNNING container para did
   # NOT create appears in the annotated form and nowhere else. That is the shape
   # this pins: .200 is such a container, .201 a stopped para workspace. Driven through `para up` with a stub incus that fails at
   # launch, so nothing is created and the requested address is still observable.
@@ -296,7 +296,7 @@ STUB
 
 test_refuses_a_contract_version_mismatch() {
   # A project pins the contract its hooks target; para refuses rather than
-  # running them under a seam that has changed underneath.
+  # running them under a contract that has changed underneath.
   local p; p="$(a_project PARA_CONTRACT=999)"
   assert_refuses "$p" "contract" || return 1
   assert_backend_untouched
@@ -315,7 +315,7 @@ test_image_defaults_to_the_project_slug() {
 test_image_build_refuses_without_a_base_image() {
   # para never picks your distro, and a para update must not change it under
   # you. Checked before the daemon, so an incomplete Parafile is what you hear
-  # about — which `assert_backend_untouched` is here to pin.
+  # about, which `assert_backend_untouched` is here to pin.
   local p; p="$(a_project)"
   mkdir -p "$p/.paraspace/hooks"
   printf 'true\n' > "$p/.paraspace/hooks/image-build"
@@ -325,7 +325,7 @@ test_image_build_refuses_without_a_base_image() {
 
 test_image_build_refuses_without_an_image_build_hook() {
   # Refusing is the host's job, not the runner's. The runner's note prints
-  # inside the builder, minutes in, and the build then publishes and exits 0 —
+  # inside the builder, minutes in, and the build then publishes and exits 0,
   # so a project that never renamed image-build.sh would get one line of
   # scrollback and a base image with no provisioning in it.
   local p; p="$(a_project 'PARA_IMAGE_BASE=images:alpine/edge')"
@@ -386,7 +386,7 @@ test_init_refuses_a_path_as_a_template_name() {
 test_a_scaffolded_project_takes_its_identity_from_the_directory() {
   # No template rewriting at scaffold time: the engine derives PARA_PROJECT from
   # the directory name, so a template ships without a project name baked in.
-  # PARA_PROJECT is unset for the same reason PARA_PROJECT_DIR is — the e2e
+  # PARA_PROJECT is unset for the same reason PARA_PROJECT_DIR is: the e2e
   # sandbox exports one, and an inherited value is exactly what this test must
   # not see. (It passed under `--cli` and failed under `--all` before this.)
   local d out; d="$(scratch)"
@@ -397,12 +397,12 @@ test_a_scaffolded_project_takes_its_identity_from_the_directory() {
 }
 
 test_bundled_helpers_do_not_drift() {
-  # hooks/helpers is byte-identical across everything this package ships — the
-  # templates and the mods — on purpose, and cannot be factored into a shared
+  # hooks/helpers is byte-identical across everything this package ships (the
+  # templates and the mods) on purpose, and cannot be factored into a shared
   # overlay: it has to sit BESIDE the hooks that source it (shellcheck follows
   # `. "$PARA_HOOKS/helpers"` by basename, through .shellcheckrc's
   # source-path=SCRIPTDIR), para pushes .paraspace/ into a workspace whole, and
-  # a mod resolves $PARA_HOOKS to its OWN directory — so it must ship one.
+  # a mod resolves $PARA_HOOKS to its OWN directory, so it must ship one.
   local repo ref="" f rc=0 n=0
   repo="$(cd "$(dirname "$PARA")/.." && pwd)"
   for f in "$repo"/templates/*/.paraspace/hooks/helpers "$repo"/mods/*/hooks/helpers; do

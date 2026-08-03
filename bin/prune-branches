@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 # ============================================================================
-# prune-branches — delete local branches whose PR is already merged or closed.
+# prune-branches - delete local branches whose PR is already merged or closed.
 #
 # A thin wrapper around `gh poi` (seachicken/gh-poi). All it adds is an
-# actionable error when gh or the extension is missing — a newcomer running
+# actionable error when gh or the extension is missing, because a newcomer running
 # `npm run prune-branches` on a fresh checkout should get install instructions,
 # not "command not found". Every flag is passed straight through to gh poi.
 #
@@ -19,7 +19,7 @@ set -euo pipefail
 #
 # Deleting is the default, not opt-in. gh poi only removes a local branch once
 # its PR is merged or closed on the remote, so the commits already survive
-# there — and `git reflog` still has the ref locally. A command named "prune"
+# there, and `git reflog` still has the ref locally. A command named "prune"
 # that doesn't prune is the worse trap: you read a list, assume it acted, and
 # the branches are all still there.
 # ============================================================================
@@ -33,7 +33,7 @@ args=()
 for arg in "$@"; do
   case "$arg" in
     # Print the header between the two `# ====` rules rather than a fixed line
-    # range — a line-numbered `sed -n '3,20p'` silently misprints the moment
+    # range, because a line-numbered `sed -n '3,20p'` silently misprints the moment
     # anyone edits the header above. Same idiom as test/run.
     -h|--help)
       awk '/^# ={10,}$/{n++; next} n==1{sub(/^# ?/, ""); print} n>1{exit}' "$0"
@@ -43,7 +43,7 @@ for arg in "$@"; do
 done
 
 if ! command -v gh >/dev/null 2>&1; then
-  echo "prune-branches: needs the GitHub CLI — https://cli.github.com/" >&2
+  echo "prune-branches: needs the GitHub CLI, https://cli.github.com/" >&2
   exit 1
 fi
 
@@ -53,7 +53,7 @@ if ! gh extension list 2>/dev/null | grep -q 'gh-poi'; then
   exit 1
 fi
 
-# ${args[@]+"${args[@]}"} expands to nothing when empty — a bare "${args[@]}"
+# ${args[@]+"${args[@]}"} expands to nothing when empty, while a bare "${args[@]}"
 # on an empty array is an unbound-variable error under `set -u` on bash 3.2
 # (macOS), which is the no-arguments case, i.e. the common one.
 exec gh poi ${args[@]+"${args[@]}"}

@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
-# harness.sh — the tiny test runner. Autodiscovers `test_*` functions and runs
+# harness.sh - the tiny test runner. Autodiscovers `test_*` functions and runs
 # each, reporting pass/fail with timing. A test PASSES when its function returns
 # zero; the assert.sh helpers return non-zero to fail.
 #
-# It does NOT exit on first failure — an e2e run is expensive to reach, so we run
+# It does NOT exit on first failure, because an e2e run is expensive to reach, so we run
 # every test and summarize, then exit non-zero if any failed. Set
 # PARA_TEST_FAILFAST=1 to stop at the first failure instead.
 
-# Colors — and the carriage return that rewrites the in-progress line — only on a
+# Colors, and the carriage return that rewrites the in-progress line, only on a
 # tty. Piped output (CI, logs) has no working \r, so _t_cr is empty there and the
 # result line is printed plainly instead of with a stray control character.
 if [ -t 1 ]; then
@@ -22,7 +22,7 @@ _t_fail=0
 declare -a _t_failed=()
 
 # Run one test function. A subshell so a test's `cd`, `set -x`, or stray exit
-# can't leak into the next — but note `set -e` is NOT applied inside: tests use
+# can't leak into the next. Note that `set -e` is NOT applied inside: tests use
 # explicit asserts and may run commands expected to fail, so an early non-zero
 # shouldn't abort the function before its assert runs.
 run_test() {
@@ -32,12 +32,12 @@ run_test() {
   # output (CI, logs) has no working \r, so skip it and print just the result.
   [ -t 1 ] && printf '%s+ %s%s ' "$_t_gray" "$desc" "$_t_off"
   start="$SECONDS"
-  # `|| rc=$?` keeps the runner's `set -e` from aborting on a failing test — the
+  # `|| rc=$?` keeps the runner's `set -e` from aborting on a failing test, since the
   # subshell's non-zero is data here, not an error to propagate.
   rc=0
   # The subshell keeps a test's `cd`/`set -x`/stray exit from leaking; the trap
   # inside it removes whatever fixtures the test created, on the failure path as
-  # well as the success one. That is why no test carries its own cleanup — and why
+  # well as the success one. That is why no test carries its own cleanup, and why
   # an early `return 1` from a failed assert cannot leak state into the next test.
   ( trap 'scratch_cleanup 2>/dev/null || true' EXIT; "$fn" ) || rc=$?
   local took=$((SECONDS - start))

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
-# para boot hook — runs INSIDE the workspace after provision. Its job is to bring
+# para boot hook, run INSIDE the workspace after provision. Its job is to bring
 # the app up and, per para's readiness contract, return zero only once every
 # routed service is actually listening.
 #
@@ -8,7 +8,7 @@ set -euo pipefail
 # The workspace comes up and `para sh <name>` gives you a shell, but the routed
 # URL (https://<name>.$PARA_DOMAIN) 502s because nothing listens on :8080 yet.
 #
-# When you add an app, start it here. For a docker stack that's one line — the
+# When you add an app, start it here. For a docker stack that's one line, and the
 # `--wait` makes it honor the readiness contract by blocking until healthchecked
 # services are healthy:
 #
@@ -19,4 +19,4 @@ set -euo pipefail
 
 . "$PARA_HOOKS/helpers"
 
-stage "Bare box — nothing to boot. Add your app's start command here."
+stage "Bare box, nothing to boot. Add your app's start command here."

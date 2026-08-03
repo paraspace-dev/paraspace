@@ -1,7 +1,7 @@
 # Cookbook
 
 Recipes for things projects actually need. Each one is a fragment for your
-`.paraspace/` — see [Project setup](./project-setup.md) for how the pieces fit
+`.paraspace/`. See [Project setup](./project-setup.md) for how the pieces fit
 together, and [Hooks](./hooks.md) for the contract they run under.
 
 ## Authenticate `gh` during provisioning
@@ -23,7 +23,7 @@ if ! gh auth status >/dev/null 2>&1; then
 fi
 ```
 
-The `PARA_NONINTERACTIVE` guard matters: `para up` runs hooks with a tty only
+The `PARA_NONINTERACTIVE` guard matters. `para up` runs hooks with a tty only
 when there's a human on both ends, and `gh auth login` hangs forever without
 one. Prompt when you can, warn when you can't, and never block.
 
@@ -33,14 +33,14 @@ To have `gh` upload the workspace key for you instead of printing it:
 gh ssh-key add ~/.ssh/id_ed25519.pub --title "para $PARA_PROJECT ($PARA_HOSTNAME)"
 ```
 
-That needs the `admin:public_key` scope — add
+That needs the `admin:public_key` scope, so add
 `--scopes admin:public_key` to the `gh auth login` above. The `void-docker-gh`
 template does all of this behind `PARA_GH_AUTH=1`; read its `provision` hook
 for the version with the error handling filled in.
 
 ## Share an agent's session
 
-Same shape as `gh` — link whatever directory the tool keeps state in:
+Same shape as `gh`. Link whatever directory the tool keeps state in:
 
 ```sh
 mkdir -p "$PARA_SHARED/claude"
@@ -63,10 +63,10 @@ ln -sfn "$PARA_SHARED/nvim" ~/.config/nvim       # shared across workspaces
 ```
 
 `skel/` is re-pushed on every `up`, so editing a dotfile in your checkout and
-re-running `para up` is the whole update loop — no image rebuild.
+re-running `para up` is the whole update loop, with no image rebuild.
 
 If someone has already packaged the set you want, vendor it instead of writing
-this by hand — `para mod add dotfiles-jchook` brings a zsh/tmux/Neovim/Claude
+this by hand. `para mod add dotfiles-jchook` brings a zsh/tmux/Neovim/Claude
 Code environment and the hooks that install it. See [Mods](./mods.md).
 
 ## Pre-pull images so the first boot is fast
@@ -104,8 +104,8 @@ fi
 docker compose exec -T db psql -U app app < "$PARA_SHARED/seed.sql"
 ```
 
-Guard it if reseeding an existing workspace would be destructive — `boot` runs
-on every `up`.
+Guard it if reseeding an existing workspace would be destructive, because
+`boot` runs on every `up`.
 
 ## Serve more than one port
 
@@ -153,7 +153,7 @@ exec "$PARA_BIN" sh "$1" -c 'docker compose logs -f --tail=100'
 ```
 
 `chmod +x` it and `para logs ws1` works. It runs on the host with every
-`PARA_*` exported — see [Commands](./commands.md#project-commands).
+`PARA_*` exported. See [Commands](./commands.md#project-commands).
 
 ## A monorepo with more than one stack
 
@@ -181,7 +181,7 @@ Keep a single `.paraspace/` and let a variable decide which services `boot`
 starts. The hooks store it in the workspace, so you pass it once:
 
 ```sh
-# .paraspace/hooks/helpers — sourced by provision and boot
+# .paraspace/hooks/helpers, sourced by provision and boot
 STACK_FILE="$HOME/.para-stack"
 if [ -n "${PARA_STACK:-}" ]; then printf '%s\n' "$PARA_STACK" > "$STACK_FILE"; fi
 if [ -f "$STACK_FILE" ]; then PARA_STACK="$(cat "$STACK_FILE")"; fi
@@ -201,7 +201,7 @@ For a verb rather than an env var, a `.paraspace/commands/docs` that exports
 
 ## Point two projects at one credential store
 
-Give them the same volume name — `: "${PARA_VOLUME:=para-home-acme}"` — and both
-projects' workspaces mount the same `/para/shared`. Only where you'd be happy
-with either project's workspaces holding the other's credentials; see
+Give them the same volume name (`: "${PARA_VOLUME:=para-home-acme}"`) and both
+projects' workspaces mount the same `/para/shared`. Only do that where you'd be
+happy with either project's workspaces holding the other's credentials; see
 [Shared authentication](./shared-auth.md#what-sharing-costs).

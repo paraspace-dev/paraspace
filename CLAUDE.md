@@ -121,6 +121,12 @@ up.
 
 ## Docs style
 
+This style applies to:
+
+- all markdown files in the repository,
+- all code comments,
+- all code output intended for human users.
+
 `README.md` and `docs/` are a published spec, not internal notes. **If you
 change a command, flag, `Parafile` var, hook semantic, or the image contract,
 update the relevant page in the same change.** Drift between `bin/para` and the

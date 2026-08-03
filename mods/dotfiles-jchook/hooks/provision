@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
-# dotfiles-jchook — provision. Runs INSIDE the workspace, after the project's own
+# dotfiles-jchook provision hook. Runs INSIDE the workspace, after the project's own
 # provision, so the shared volume is already seeded and the clone already exists.
 #
 # Puts a personal dev environment on the shared volume and links it into $HOME:
-# zsh, tmux, Neovim (the config only — plugins, parsers and LSP servers install
+# zsh, tmux, Neovim (the config only, since plugins, parsers and LSP servers install
 # themselves once, at first launch, into the shared volume every workspace uses),
 # and Claude Code's config. Each file is seeded ONCE and is yours after that:
 # edit it on the volume and every workspace of the project sees the edit.
@@ -18,7 +18,7 @@ mine="$shared/dotfiles-jchook"        # this mod's own corner, named after it
 mkdir -p "$mine" "$shared/nvim-data" "$shared/bin"
 
 # Seed <src> at <dest> unless something is already there. Nothing else writes any
-# of these, so "already there" means you put it there — the first `para up` seeds
+# of these, so "already there" means you put it there. The first `para up` seeds
 # it and no later one touches it again.
 seed() { # seed <src> <dest>
   if [ -e "$2" ]; then return 0; fi
@@ -37,11 +37,11 @@ seed "$skel/bin/open-url" "$shared/bin/open-url"
 # a link, and the link below is what decides. The base's file stays its own.
 seed "$skel/zshrc" "$mine/zshrc"
 if [ -e "$shared/zshrc" ]; then
-  info "$shared/zshrc is the base's and is no longer linked — this mod uses dotfiles-jchook/zshrc"
+  info "$shared/zshrc is the base's and is no longer linked. This mod uses dotfiles-jchook/zshrc"
 fi
 
 # A checkout with core.fileMode=false (or a tarball, or a zip) loses the exec
-# bit, and something else launches both of these — $BROWSER, and the statusline
+# bit, and something else launches both of these ($BROWSER, and the statusline
 # Claude Code shells out to.
 for f in "$shared/bin/open-url" "$shared/claude/statusline.sh"; do
   if [ -f "$f" ]; then chmod +x "$f"; fi
@@ -49,7 +49,7 @@ done
 
 # ---- link it into $HOME ----------------------------------------------------
 # `ln -sfn` onto a REAL directory nests the link inside it instead of replacing
-# it, and every tool below recreates its own config dir the first time it runs —
+# it, and every tool below recreates its own config dir the first time it runs,
 # so a workspace that predates this mod has one of those sitting there.
 relink() { # relink <target> <link>
   if [ ! -L "$2" ]; then rm -rf "$2"; fi

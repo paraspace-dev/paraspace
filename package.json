@@ -1,7 +1,7 @@
 {
   "name": "paraspace",
   "version": "0.1.0",
-  "description": "ParaSpace — parallel dev workspaces on Incus",
+  "description": "ParaSpace: parallel dev workspaces on Incus",
   "keywords": [
     "incus",
     "lxc",

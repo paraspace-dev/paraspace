@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
-# assert.sh — assertions for the para test suite. Each prints a diagnostic to
+# assert.sh - assertions for the para test suite. Each prints a diagnostic to
 # stderr and returns non-zero on failure; the harness (harness.sh) treats any
 # non-zero return from a test_* function as a failed test, so a bare `assert_*`
 # call is a hard checkpoint. Keep them small and shellcheck-clean.
 
-# assert <cmd...> — the command must succeed.
+# assert <cmd...>: the command must succeed.
 assert() {
   if ! "$@"; then echo "  assert failed: $*" >&2; return 1; fi
 }
 
-# para_do <para-args...> — run a para command for its SIDE EFFECT (up/down/rm/…).
+# para_do <para-args...>: run a para command for its SIDE EFFECT (up/down/rm/…).
 # Silent on success; on failure it echoes para's combined output and returns
 # non-zero, so a red test is debuggable instead of a bare `✗`. Use this for
 # mutating calls whose stdout you don't need; capture stdout directly (not via
@@ -19,7 +19,7 @@ para_do() {
   if ! out="$("$PARA" "$@" 2>&1)"; then
     printf '    para %s failed:\n' "$1" >&2
     # Gutter every line. A single `printf '    | %s\n' "$out"` prefixes only the
-    # first one and dumps the rest flush left — i.e. most of a multi-line failure.
+    # first one and dumps the rest flush left, i.e. most of a multi-line failure.
     while IFS= read -r line; do printf '    | %s\n' "$line" >&2; done <<<"$out"
     return 1
   fi
@@ -51,7 +51,7 @@ assert_not_contains() {
   esac
 }
 
-# assert_fails <cmd...> — the command must FAIL (non-zero). For "para rejects X".
+# assert_fails <cmd...>: the command must FAIL (non-zero). For "para rejects X".
 assert_fails() {
   if "$@" >/dev/null 2>&1; then
     echo "  assert_fails failed: '$*' unexpectedly succeeded" >&2
@@ -59,7 +59,7 @@ assert_fails() {
   fi
 }
 
-# eventually <timeout-s> <cmd...> — retry until the command succeeds or the
+# eventually <timeout-s> <cmd...>: retry until the command succeeds or the
 # timeout elapses (0.25s between tries). For race-free waits on async state
 # (an HTTP endpoint, a state transition) without a fixed sleep.
 eventually() {
@@ -86,9 +86,9 @@ http_get() { # http_get <workspace> [<sub>]
     "https://$host:$PARA_HTTPS_PORT/"
 }
 
-# assert_serves <workspace> [timeout-s] — the workspace answers through para's
+# assert_serves <workspace> [timeout-s]: the workspace answers through para's
 # Caddy with the fixture's sentinel. Routing is asynchronous (Caddy reloads on
-# every `up`), so this always retries rather than asking once — reach for it
+# every `up`), so this always retries rather than asking once. Reach for it
 # instead of a bare http_get whenever the request follows a state change.
 assert_serves() { # assert_serves <workspace> [timeout-s] [<sub>]
   local ws="$1" timeout="${2:-30}" sub="${3:-}"
@@ -96,7 +96,7 @@ assert_serves() { # assert_serves <workspace> [timeout-s] [<sub>]
     || { echo "  assert_serves: '${sub:+$sub.}$ws' never served the sentinel within ${timeout}s" >&2; return 1; }
 }
 
-# assert_stops_serving <workspace> [timeout-s] — the inverse, for after a `rm`:
+# assert_stops_serving <workspace> [timeout-s]: the inverse, for after a `rm`.
 # the site must go away, not merely the registry row.
 assert_stops_serving() {
   local ws="$1" timeout="${2:-30}"
@@ -111,7 +111,7 @@ _serves_never() { ! _serves_once "$1"; }
 # early exit can SIGPIPE curl and turn a served page into a false negative.
 #
 # Matches the sentinel WITH the workspace name ("para-e2e-ok <name>", written by
-# the fixture's boot hook from $PARA_NAME) — not the bare "para-e2e-ok" prefix.
+# the fixture's boot hook from $PARA_NAME), not the bare "para-e2e-ok" prefix.
 # The suite keeps several workspaces up at once, so the prefix alone is satisfied
 # by ANY of them: a route that pointed this workspace's host at another
 # workspace's httpd would still pass. Binding to the name makes this an assertion

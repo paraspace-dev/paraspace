@@ -1,4 +1,4 @@
-# para shared zshrc — seeded once onto the shared volume by the dotfiles-jchook
+# para shared zshrc, seeded once onto the shared volume by the dotfiles-jchook
 # mod, then yours to mutate (nothing overwrites it after the first seed).
 # This single file is shared by EVERY workspace via ~/.zshrc -> /para/shared/zshrc,
 # so edits here apply everywhere immediately. Keep it portable.
@@ -20,7 +20,7 @@ command -v fzf >/dev/null && source <(fzf --zsh)
 
 # --- prompt ------------------------------------------------------------------
 # %m is the container hostname (para-<workspace>), so every shell announces
-# which workspace you're in — the whole point of running several at once.
+# which workspace you're in, the whole point of running several at once.
 autoload -Uz vcs_info
 zstyle ':vcs_info:git:*' formats ' (%b)'
 precmd() { vcs_info }
@@ -80,7 +80,7 @@ alias .....='cd ../../../..'
 alias ......='cd ../../../../..'
 alias .......='cd ../../../../../..'
 
-# git — `gu`/`gg`/`ggg` map to the aliases this mod's image-build writes into
+# git. `gu`/`gg`/`ggg` map to the aliases this mod's image-build writes into
 # /etc/gitconfig
 alias g='git'
 alias ga='git add'

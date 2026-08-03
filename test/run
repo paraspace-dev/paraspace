@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 # ============================================================================
-# test/run — the para test suite.
+# test/run - the para test suite.
 #
 # Two tiers:
-#   cli   — no incus. Argument handling, `para init`, help. Fast; CI-safe.
-#   e2e   — the real thing: builds a ~5.5 MB Alpine image, `para up`s a workspace,
+#   cli   no incus. Argument handling, `para init`, help. Fast; CI-safe.
+#   e2e   the real mechanism. Builds a ~5.5 MB Alpine image, `para up`s a workspace,
 #           and asserts the whole path (hooks -> boot readiness -> Caddy TLS ->
 #           bridge IP -> the app) through actual para commands. Needs incus.
 #
@@ -44,7 +44,7 @@ while [ "$#" -gt 0 ]; do
     --no-build) export PARA_TEST_NO_BUILD=1; shift ;;
     --failfast) export PARA_TEST_FAILFAST=1; shift ;;
     # Print the header block between the two `# ====` banner rules, rather than a
-    # fixed line range — `sed -n '4,25p'` silently printed the wrong thing the
+    # fixed line range, because `sed -n '4,25p'` silently printed the wrong thing the
     # moment anyone added a line to the header.
     -h|--help)  awk '/^# ={10,}$/{n++; next} n==1{sub(/^# ?/, ""); print} n>1{exit}' "$0"; exit 0 ;;
     -*)         echo "unknown flag: $1" >&2; exit 2 ;;
@@ -68,20 +68,20 @@ run_e2e=0
 case "$tier" in
   cli) ;;
   e2e) [ "$incus_ok" -eq 1 ] || { echo "e2e tier needs a reachable incus daemon." >&2; exit 1; }; run_e2e=1 ;;
-  all) if [ "$incus_ok" -eq 1 ]; then run_e2e=1; else echo "${_t_gray:-}note: incus unreachable — running CLI tier only.${_t_off:-}" >&2; fi ;;
+  all) if [ "$incus_ok" -eq 1 ]; then run_e2e=1; else echo "${_t_gray:-}note: incus unreachable, running CLI tier only.${_t_off:-}" >&2; fi ;;
 esac
 
 # Arm teardown BEFORE any setup that can fail (sandbox_base creates the temp XDG
 # tree on its first line; the image build can fail after that).
-# sandbox_teardown is defensive — empty workspace list, unset volume, absent Caddy
-# are all no-ops — so it's safe for the CLI tier too.
+# sandbox_teardown is defensive (empty workspace list, unset volume, absent Caddy
+# are all no-ops), so it's safe for the CLI tier too.
 trap sandbox_teardown EXIT
 # EXIT alone is not enough: bash does NOT run an EXIT trap when the shell dies on
 # an UNtrapped fatal signal, and Ctrl-C during an e2e run is the likeliest abort
-# there is — it would leak the run's workspaces, volume, Caddy and temp tree.
+# there is, since it would leak the run's workspaces, volume, Caddy and temp tree.
 # Trapping INT/TERM to an explicit `exit` puts us back on the normal exit path,
 # which then fires the EXIT trap above. Same shape as bin/para's image build.
-trap 'echo >&2; echo "interrupted — tearing down…" >&2; exit 130' INT TERM
+trap 'echo >&2; echo "interrupted, tearing down…" >&2; exit 130' INT TERM
 
 if [ "$run_e2e" -eq 1 ]; then
   sandbox_e2e
@@ -94,7 +94,7 @@ if [ "$run_e2e" -eq 1 ]; then
   # the log and stop.
   echo "${_t_gray:-}==> provisioning shared workspace $PARA_WS (first boot)…${_t_off:-}" >&2
   if ! "$PARA" up "$PARA_WS"; then
-    echo "FATAL: 'para up $PARA_WS' failed — see output above." >&2
+    echo "FATAL: 'para up $PARA_WS' failed. See output above." >&2
     exit 1
   fi
 else
@@ -102,7 +102,7 @@ else
 fi
 
 # Source the selected tiers' test files (each defines test_* functions). The
-# paths are runtime globs, so shellcheck can't follow them — that's expected.
+# paths are runtime globs, so shellcheck can't follow them, which is expected.
 shopt -s nullglob
 # shellcheck disable=SC1090
 [ "$tier" != e2e ] && for f in "$HERE"/cli/*.sh; do . "$f"; done

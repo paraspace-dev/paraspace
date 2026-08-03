@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# e2e: `para up` is idempotent — re-running it on a live workspace reconverges
+# e2e: `para up` is idempotent, so re-running it on a live workspace reconverges
 # (re-runs provision + boot) and succeeds, still serving. Runs against the shared
 # primary workspace since a second up is harmless.
 

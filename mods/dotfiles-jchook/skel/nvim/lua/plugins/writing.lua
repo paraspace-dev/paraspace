@@ -1,5 +1,5 @@
 return {
-  -- Distraction-free writing — replaces Goyo
+  -- Distraction-free writing, replaces Goyo
   {
     "folke/zen-mode.nvim",
     cmd = "ZenMode",

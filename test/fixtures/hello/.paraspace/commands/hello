@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# summary: the fixture's demo verb — proves project commands run and can call back
+# summary: the fixture's demo verb, proving project commands run and can call back
 set -euo pipefail
 # A project command runs on the HOST, with every PARA_* exported and its
 # arguments passed through verbatim. With no argument it reports the context it

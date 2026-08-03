@@ -1,15 +1,15 @@
-# void-docker-gh — the runnable paraspace starter
+# void-docker-gh, the runnable paraspace starter
 
-A small, complete [para](../../README.md) template on Void Linux: just a
-`.paraspace/` config — no app of its own. Out of the box it points at a tiny public
+A small, complete [para](../../README.md) template on Void Linux, just a
+`.paraspace/` config with no app of its own. Out of the box it points at a tiny public
 demo repo ([`jchook/docker-caddy`](https://github.com/jchook/docker-caddy), one
 Caddy service on `:8080`), so you can watch para clone, provision, route, and
 boot before pointing it at your own project. The **`gh`** in the name is the git
 auth on offer: para prints its ssh key for you to add by hand, or (`PARA_GH_AUTH=1`)
-lets the GitHub CLI upload it for you — the path a private repo needs.
+lets the GitHub CLI upload it for you, the path a private repo needs.
 
 This is what `para init` scaffolds by default. Its sibling is
-[`void-minimal`](../void-minimal) — the barest box, installing and running
+[`void-minimal`](../void-minimal), the barest box, installing and running
 nothing, just comments showing where to start. To carry a full personal dev
 environment (zsh, tmux, Neovim, Claude Code) on top of this one, add the
 [`dotfiles-jchook`](../../mods/dotfiles-jchook) mod rather than forking:
@@ -17,7 +17,7 @@ environment (zsh, tmux, Neovim, Claude Code) on top of this one, add the
 
 ```
 void-docker-gh/
-  .paraspace/                # all the para plumbing — hidden, set-up-once
+  .paraspace/                # all the para plumbing, hidden and set-up-once
     Parafile               # the few knobs para reads (version, identity, base image, origin, routes)
     hooks/provision        # seed+link the shared volume, clone, copy .env
     hooks/boot             # docker compose up -d --wait
@@ -32,32 +32,32 @@ void-docker-gh/
 # install para once, if you haven't
 npm i -g paraspace                      # or run it from a checkout: bin/para
 
-# from a copy of this .paraspace/ (or after `para init`) — needs incus + caddy;
+# from a copy of this .paraspace/ (or after `para init`). Needs incus + caddy;
 # see the ParaSpace README for one-time host setup
 para image build                        # build the base image
 para up demo                            # clone + provision + boot a workspace
 para web demo                           # open https://demo.<your PARA_DOMAIN>
 ```
 
-On the **first** `up`, para prints this machine's para ssh key and pauses — add it
+On the **first** `up`, para prints this machine's para ssh key and pauses. Add it
 to your git host, press Enter, and the clone proceeds. (For a private repo, set
 `PARA_GH_AUTH=1` in the `Parafile` and `gh` uploads the key for you instead.)
 
 ## Make it yours
 
-Drop this `.paraspace/` into your own repo — `para init` copies it in and sets the
+Drop this `.paraspace/` into your own repo. `para init` copies it in and sets the
 project's identity (`PARA_PROJECT`) to your directory name, which the base image
 name derives from. Then edit `.paraspace/`:
 
-- **`Parafile`** — point `PARA_ORIGIN` at your repo and list your `PARA_ROUTES`
+- **`Parafile`.** Point `PARA_ORIGIN` at your repo and list your `PARA_ROUTES`
   (`"[sub:]port"` each, comma/space/newline separated). To clone somewhere other
   than `~/app`, uncomment `PARA_CLONE_DIR` in the optional block.
-- **`hooks/provision`** — grow the shared-volume seeding and `.env` handling for
+- **`hooks/provision`.** Grow the shared-volume seeding and `.env` handling for
   your stack. It's yours; make it as robust as you like.
-- **`hooks/boot`** — the readiness contract: return 0 only once every routed
+- **`hooks/boot`.** The readiness contract is to return 0 only once every routed
   service is actually listening (`docker compose up -d --wait` does this when your
   services have healthchecks).
-- **`hooks/image-build`** — add your toolchain. Keep the image contract:
+- **`hooks/image-build`.** Add your toolchain, and keep the image contract:
   docker→overlayfs, a `$PARA_USER`/`$PARA_UID` user in the `docker` group,
   bash + git.
 

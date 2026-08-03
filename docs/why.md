@@ -1,7 +1,7 @@
 # Why ParaSpace
 
 Running `n` coding agents on your project in parallel and not having to babysit
-them turn out to be the same problem: an agent needs somewhere to work that is
+them turn out to be the same problem. An agent needs somewhere to work that is
 neither your working copy nor your host.
 
 ## The problem
@@ -12,7 +12,7 @@ other's context, and the mixed diff has to be teased apart into separate PRs
 afterward. Forget about having one agent reconfigure the underlying stack.
 
 If you give each agent a real place to work, that whole class of problem goes
-away... but "a real place to work" is harder to assemble than it sounds.
+away, but a real place to work is harder to assemble than it sounds.
 
 A worktree separates the files but not the running stack. Port offsets
 deconflict the ports, but it gets confusing, runs on your host, and requires
@@ -26,7 +26,9 @@ pick one over `para`.
 
 ## The solution
 
-ParaSpace strikes a balanced approach to overcome all of these downsides.
+ParaSpace makes one choice that answers most of that. A workspace is an
+unprivileged system container on your own machine, and everything below follows
+from it.
 
 ### Reserve nothing
 
@@ -34,36 +36,38 @@ A workspace is a container, not a virtual machine. It shares your kernel and
 doesn't need to reserve large chunks of resources up front. At idle, it costs
 almost nothing. When busy, it borrows from the same pool as everything else.
 That is what makes a dozen ParaSpace workspaces running at once possible even
-on modest hardware. Note: on macOS the Linux VM underneath reserves once for
-the whole machine, not once per workspace. Read [How it
-works](./how-it-works.md#macos-one-extra-layer).)
+on modest hardware. On macOS the Linux VM underneath reserves once for the
+whole machine, not once per workspace, which
+[How it works](./how-it-works.md#macos-adds-one-layer) covers.
 
-It is a *system* container, so it holds containers of its own: your Compose
+It is a *system* container, so it holds containers of its own. Your Compose
 stack boots inside it on its own Docker daemon, with no host socket and no
-`--privileged`. The isolation holds at every layer, and one kernel serves all of
-them. [Prior art](./prior-art.md#on-nested-containers) has the mechanics.
+`--privileged`, and one kernel serves every layer.
+[Prior art](./prior-art.md#on-nested-containers) has the mechanics.
 
-Parallel spaces, each one full of spaces: that's the name.
+Parallel spaces, each one full of spaces. That is where the name comes from.
 
 ### It runs on your machine, in a real terminal
 
-The common shape for "agents in a sandbox" is a browser tab: the agent's TUI in
-an iframe, your app in another tab, a web terminal in a third, a proxy chain
-behind all of it. That shape is part of what you pay for the isolation: TUIs
-misbehave outside a real terminal, and live reload rarely survives the proxies.
+Most "agents in a sandbox" products put the agent's TUI in an iframe, your app
+in a second tab and a web terminal in a third, with a proxy chain behind all of
+them. You pay for that isolation in the browser, where TUIs misbehave outside a
+real terminal and live reload rarely survives the proxies.
 
-ParaSpace inverts it. The workspace is a container on your own box:
+A ParaSpace workspace is a container on your own box, so you reach it the
+ordinary way:
 
 ```sh
 para sh my-feature   # a real pty in the clone
 ```
 
 It comes with a `$TERM` the container has terminfo for, so tmux, Neovim and
-Claude Code behave the way they do in any terminal — because they are in one.
+Claude Code behave the way they do in any terminal, because they are in one.
 Your dotfiles get there through a `skel/` directory your own hooks copy in.
 
 So parallel work becomes a window-manager problem rather than a tab-management
-one: one workspace per desktop, navigated with the keybindings you already have.
+one. Put one workspace per desktop and switch between them with the keybindings
+you already have.
 
 ### An agent can't reach your host
 
@@ -72,29 +76,30 @@ workspace. Inside one:
 
 - it is an **unprivileged** container,
 - **nothing of your host is mounted.** para pushes your `.paraspace/` directory
-  and, optionally, one `.env` — that's the whole surface. Your home directory,
-  SSH keys and cloud credentials aren't there to be read;
+  and, optionally, one `.env`, and that is the whole surface. Your home
+  directory, SSH keys and cloud credentials aren't there to be read;
 - it's disposable: `para rm my-feature` and the whole thing is gone.
 
-So [an agent uploading a home directory][hn] can't happen here — there is
-nothing mounted to upload.
+So [an agent uploading a home directory][hn] can't happen here, because there
+is nothing mounted to upload.
 
-> [NOTE] Workspaces have ordinary outbound network access. If you need network
-> egress rules, that can be achieved with Incus ACLs.
+> [!NOTE]
+> Workspaces have ordinary outbound network access. If you need network egress
+> rules, that can be achieved with Incus ACLs.
 
 ### Authenticate once per project
 
 Run `gh auth login` in any workspace and every workspace of that project is
 authenticated, including the one you create next week, and after a reboot.
 Credentials live on a [volume](./internals.md#the-shared-home-volume) shared by
-the project's workspaces — on the container side of the boundary, not a host
+the project's workspaces, on the container side of the boundary, not a host
 bind mount.
 
 ### Automatic subdomain routing
 
 Every workspace gets its own bridge IP, so your stack binds its **usual ports**
-on it. Port 3000 is port 3000 in every workspace — no offsets, no override
-files, no compose config that knows it's being sandboxed. Caddy runs on your
+on it. Port 3000 is port 3000 in every workspace, with no offsets, no override
+files, and no compose config that knows it's being sandboxed. Caddy runs on your
 host and its entire job is to map workspace subdomains to each port you want to
 access, e.g.:
 
@@ -104,7 +109,7 @@ https://db.my-feature.paraspace.dev  →  10.x.x.201:8081
 ```
 
 Nothing is remapped or path-rewritten, and there's no `X-Forwarded-Prefix` your
-app has to learn about — which is why WebSockets and hot reload work without
+app has to learn about, which is why WebSockets and hot reload work without
 anyone configuring them. Your Compose stack runs *inside* the workspace,
 unchanged, on the ports it already uses. Routes are one line of your
 [`Parafile`](./parafile.md).
@@ -123,7 +128,7 @@ hooks. It knows nothing about your stack. The extension points are all files in
 | how the stack boots, and when it's ready | `.paraspace/hooks/boot` |
 | **new `para` verbs** | `.paraspace/commands/<verb>` |
 
-`para claude ws1` is not a feature of para — it's a command you drop in
+`para claude ws1` is not a feature of para. It's a command you drop in
 `.paraspace/commands/`, and no bundled template ships one.
 
 ```sh
@@ -131,15 +136,16 @@ hooks. It knows nothing about your stack. The extension points are all files in
 exec "$PARA_BIN" sh "$1" -c "exec claude --name $1"
 ```
 
-So the answer to "can para do X for my project" is that your project can.
+So whatever you need para to do for your project, your project is where you add
+it.
 
 ## What it isn't
 
 - **A hosted service.** Workspaces run on your hardware, on Linux or macOS.
   There is no control plane and nothing to log into.
 - **A boundary against hostile code.** It's a strong boundary against an agent
-  doing something dumb or a dependency doing something rude — not a claim that
-  container escape is impossible.
+  doing something dumb or a dependency doing something rude, but not a claim
+  that container escape is impossible.
 - **A git workflow.** Each workspace gets its own clone; branching, review and
   merge stay exactly what they were.
 

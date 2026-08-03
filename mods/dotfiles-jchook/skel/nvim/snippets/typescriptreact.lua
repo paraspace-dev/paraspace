@@ -6,7 +6,7 @@ local fmt = require("luasnip.extras.fmt").fmt
 
 return {
   -- New functional component. Shares the same $1 for the component name and
-  -- its props interface — rep() mirrors node 1 into the second placeholder.
+  -- its props interface, so rep() mirrors node 1 into the second placeholder.
   s("fc", fmt([[
 export interface {}Props {{
 	{}

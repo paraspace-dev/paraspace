@@ -6,13 +6,13 @@
  * semicircle of radius 30.5 on a 78x100 body, stroked at 17: P is that arch
  * closed at the bar, A is the same arch with both legs run to the baseline, and
  * R is P with a leg. S and C are arcs of the same family, so every curve on the
- * page — including the two lenses behind this — comes off one circle.
+ * page, including the two lenses behind this, comes off one circle.
  *
  * Stroked, not filled: butt caps land the terminals flush on the baseline and
  * the right edge, and round joins give the E its corners for free.
  *
  * Two places that isn't enough. R's leg is a diagonal, and a butt cap on a
- * diagonal is cut square to the stroke — which leaves a stub hanging off the
+ * diagonal is cut square to the stroke, which leaves a stub hanging off the
  * end rather than a foot standing on the line. The leg runs at 45 degrees
  * straight through the baseline and the wordmark is clipped there instead, so
  * the ground does the cutting. And C's ellipse is as wide as every other body,

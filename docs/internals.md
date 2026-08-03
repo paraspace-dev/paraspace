@@ -1,12 +1,12 @@
 # Internals
 
 The finer mechanics behind [How it works](./how-it-works.md). None of this is
-required to use `para` — it explains behavior you'll observe.
+required to use `para`, but it explains behavior you'll observe.
 
 ## Incus is the database
 
 There is no para registry. Each `para-<name>` container records its own
-identity — owning project, routes, domain — in its Incus config at `up` time,
+identity (owning project, routes, domain) in its Incus config at `up` time,
 and its IP in its `eth0` device. One `incus list` returns all of it as columns,
 so para keeps no second copy and can't drift from one.
 
@@ -32,13 +32,13 @@ at one `PARA_VOLUME` to share auth across them. `para rm` never touches it.
 
 A name maps to one `para-<name>` container, so `sh`/`rm`/`down` address it by
 bare name from anywhere with no ambiguity. `para up <name>` refuses a name
-already owned by another project — and names the owner — rather than adopting
-its container.
+already owned by another project, and names the owner, rather than adopting its
+container.
 
 ## Project discovery
 
 [Finding the `.paraspace/` directory](./project-setup.md) is only a file
-lookup: a project's *identity* is `PARA_PROJECT`, so moving or renaming the
+lookup. A project's *identity* is `PARA_PROJECT`, so moving or renaming the
 checkout never orphans its workspaces.
 
 ## Where state lives

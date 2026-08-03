@@ -13,11 +13,11 @@ map("x", "//", [[y/\V<C-r>=escape(@", '/\')<cr><cr>]])
 -- Full config reload = real restart (Neovim 0.12+ `:restart`). Stops this
 -- instance with `:qall` and relaunches the server with the same args/files,
 -- re-attaching the UI. Unlike an in-process `package.loaded` reload, this
--- re-runs init.lua, re-bootstraps lazy.nvim, and re-fires LspAttach — so
+-- re-runs init.lua, re-bootstraps lazy.nvim, and re-fires LspAttach, so
 -- changes to lua/plugins/* are picked up too.
 --
 -- `:qall` aborts if any buffer is unsaved; `:wall` writes the named ones
--- first. (Unnamed/no-file buffers will still block — save or :bd them, or
+-- first. (Unnamed/no-file buffers will still block, so save or :bd them, or
 -- run `:restart +qall!` manually to discard everything.)
 map("n", "<leader><F12>", "<cmd>wall <bar> restart<cr>", { desc = "Restart nvim (reload all config)" })
 

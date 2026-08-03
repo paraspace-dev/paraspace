@@ -2,20 +2,20 @@
 set -euo pipefail
 
 # Guest provisioning for the e2e fixture's base image. Runs as root inside a
-# fresh $PARA_IMAGE_BASE container — `images:alpine/edge` per the Parafile,
+# fresh $PARA_IMAGE_BASE container (`images:alpine/edge` per the Parafile,
 # bootstrapped with `apk add --no-cache bash` (Alpine ships no bash, and para
-# runs this hook with bash) — invoked by `para image build`.
+# runs this hook with bash), invoked by `para image build`.
 #
 # Deliberately NOT Void and NOT Docker: this is the second consumer that proves
-# `para image build` is generic. It's also what keeps the e2e tier cheap — the
+# `para image build` is generic. It's also what keeps the e2e tier cheap, since the
 # published image is ~5.5 MB and boots in a second, where a Docker-capable box
 # is minutes and gigabytes.
 #
 # What it installs is only what para's contract needs, plus the one thing the
 # fixture's app needs:
-#   bash            — para runs hooks and `para sh` via `su -s /bin/bash`
-#   sudo            — the contract's passwordless-sudo-for-$PARA_USER
-#   busybox-extras  — /usr/sbin/httpd, the "app" hooks/boot starts on :8080
+#   bash            para runs hooks and `para sh` via `su -s /bin/bash`
+#   sudo            the contract's passwordless-sudo-for-$PARA_USER
+#   busybox-extras  /usr/sbin/httpd, the "app" hooks/boot starts on :8080
 #
 # Idempotent (guarded user create, `apk add` is a no-op when present), so
 # `para image build -i` works here too.

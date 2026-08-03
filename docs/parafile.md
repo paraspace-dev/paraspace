@@ -1,12 +1,12 @@
 # The Parafile
 
-`.paraspace/Parafile` is your project's config: the few `PARA_*` variables
+`.paraspace/Parafile` is your project's config, the few `PARA_*` variables
 `para` itself reads. It is **sourced as bash** and follows the
 [precedence](#precedence) rules. Most vars default sensibly and can be left out
-for a lean & simple config.
+for a lean and simple config.
 
-Every value is a **scalar**. Arrays aren't forwarded to your hooks — they
-arrive as their first element — so a list is a delimited string. See
+Every value is a **scalar**. An array is not forwarded to your hooks (it
+arrives as its first element), so write a list as a delimited string. See
 [Hooks](./hooks.md#the-environment-para-injects).
 
 ## Required vars
@@ -24,19 +24,19 @@ typically three vars are required:
 
 | Var | Default | What it does |
 |---|---|---|
-| `PARA_CONTRACT` | — | the [contract](./versioning.md) your `.paraspace/` targets. para refuses on a mismatch |
+| `PARA_CONTRACT` | none | the [contract](./versioning.md) your `.paraspace/` targets. para refuses on a mismatch |
 | `PARA_PROJECT` | the directory name, slugified (`My.App` → `my-app`) | project identity: workspace ownership, `para ls` scoping, the shared-volume name |
 | `PARA_IMAGE` | `$PARA_PROJECT` | the image `para up` launches and `para image build` publishes |
-| `PARA_IMAGE_BASE` | — | the Incus image `para image build` builds *from* |
-| `PARA_IMAGE_BOOTSTRAP` | — | one `sh -c` line run in the builder before your `image-build` hook |
+| `PARA_IMAGE_BASE` | none | the Incus image `para image build` builds *from* |
+| `PARA_IMAGE_BOOTSTRAP` | none | one `sh -c` line run in the builder before your `image-build` hook |
 | `PARA_ROUTES` | empty | `[sub:]port` entries, one Caddy site each |
 | `PARA_DOMAIN` | `paraspace.dev` | wildcard domain workspaces are served under |
 | `PARA_VOLUME` | `para-home-$PARA_PROJECT` | the shared home volume's name |
 | `PARA_CLONE_DIR` | `app` | directory under `~` to clone into; also where `para sh` starts |
 | `PARA_HOST_ENV` | `$PARA_PROJECT_DIR/.env` | a base `.env` pushed to `~/.paraspace/host.env` **if the file exists** |
-| `PARA_READY_HOST` | — | a hostname the guest must resolve before hooks run |
+| `PARA_READY_HOST` | none | a hostname the guest must resolve before hooks run |
 | `PARA_USER` / `PARA_UID` / `PARA_GID` | `app` / `1000` / `1000` | the workspace user para runs everything as |
-| `PARA_WORKCOPY_PORT` | — | proxy `https://localhost` to a stack you run on the **host** |
+| `PARA_WORKCOPY_PORT` | none | proxy `https://localhost` to a stack you run on the **host** |
 | `PARA_WORKCOPY_HOST` | `localhost` | matters only if that host stack terminates TLS with SNI |
 
 Anything else you set is [forwarded to your hooks](#your-own-vars) untouched.
@@ -45,7 +45,7 @@ Anything else you set is [forwarded to your hooks](#your-own-vars) untouched.
 
 ### `PARA_ROUTES`
 
-A list of `[sub:]port` entries — one TLS Caddy site each. A bare port is the
+A list of `[sub:]port` entries, one TLS Caddy site each. A bare port is the
 workspace apex:
 
 ```sh
@@ -54,8 +54,8 @@ PARA_ROUTES="3000,api:3001"
 # https://api.<name>.$PARA_DOMAIN  -> :3001
 ```
 
-The order is **`sub:port`** — left is where you arrive, right is where it goes,
-the same direction as `docker -p` and `ssh -L`.
+The order is **`sub:port`**, so left is where you arrive and right is where it
+goes, the same direction as `docker -p` and `ssh -L`.
 
 Commas, spaces, tabs and newlines all separate entries, so a long list can go
 one route per line. [Hooks](./hooks.md#the-environment-para-injects) see one
@@ -64,7 +64,7 @@ normalized space-separated list.
 `caddy validate` runs before every reload, so any configuration issues
 fail loudly.
 
-Empty means "this workspace serves no HTTP" — a worker, a bare box. `para ls`
+Empty means this workspace serves no HTTP, a worker or a bare box. `para ls`
 shows no URL, `$PARA_URL` is empty in your hooks, and `para doctor` mentions it
 in case you didn't mean it. Note that only a **bare port** creates
 `https://<name>.$PARA_DOMAIN`; a subdomain-only list has no apex site.
@@ -73,31 +73,31 @@ in case you didn't mean it. Note that only a **bare port** creates
 
 Set it only to point several projects at one image, or to name an image built
 elsewhere. Aliases are Incus-daemon-global, so two projects naming the same
-image share it: `para image build` in either republishes it for both.
+image share it, and `para image build` in either republishes it for both.
 
 ### `PARA_IMAGE_BASE` and `PARA_IMAGE_BOOTSTRAP`
 
 The base is **required to build**, and any Incus image works
-(`images:debian/13`, `images:voidlinux`, `images:alpine/edge`, …): para pins no
+(`images:debian/13`, `images:voidlinux`, `images:alpine/edge`, …). para pins no
 default, so your distro can't change under you when para updates.
 
 The bootstrap is one `sh -c` line run in the builder before your
 `.paraspace/hooks/image-build`. Its job is to leave **bash** in the image (para
-runs it with `bash`) and refresh the package index if the base
-needs it — `xbps-install -Syu xbps bash` on Void, `apk add --no-cache bash` on
-Alpine, `apt-get update` on Debian. Leave it unset if your base needs nothing.
+runs it with `bash`) and refresh the package index if the base needs it, so
+`xbps-install -Syu xbps bash` on Void, `apk add --no-cache bash` on Alpine,
+`apt-get update` on Debian. Leave it unset if your base needs nothing.
 
 ### `PARA_USER` / `PARA_UID` / `PARA_GID`
 
 The workspace user para runs hooks and `para sh` as, and chowns every pushed
-file to. Your `hooks/image-build` creates that user — it gets all three in its
-environment — so if you change them, **rebuild the image**, or the chowns land
-on a uid with no passwd entry and the shared volume becomes unwritable.
+file to. Your `hooks/image-build` creates that user, and gets all three in its
+environment. If you change them, **rebuild the image**, or the chowns land on a
+uid with no passwd entry and the shared volume becomes unwritable.
 
 ## Your own vars
 
 Any `PARA_FOO` you set reaches your hooks, project commands and image build
-untouched — that's how a project declares its own knobs (`PARA_GH_AUTH` in the
+untouched, which is how a project declares its own knobs (`PARA_GH_AUTH` in the
 default template, the `PARA_PREPULL_IMAGES` the templates' `hooks/image-build`
 reads). See
 [Hooks](./hooks.md#the-environment-para-injects), and
@@ -120,7 +120,7 @@ Write your vars with these idioms and the environment can still win:
 ```sh
 : "${PARA_DOMAIN:=myapp.dev}"      # a value, unless the environment has one
 PARA_ROUTES="${PARA_ROUTES-3000}"  # same, but the environment can set it empty
-PARA_CLONE_DIR=src                 # "I insist" — legitimate for a project to say
+PARA_CLONE_DIR=src                 # "I insist", legitimate for a project to say
 ```
 
 So `PARA_ROUTES="3000" para up ws` works for a one-off.
@@ -134,7 +134,7 @@ idioms.
 
 | Var | Default | What it does |
 |---|---|---|
-| `PARA_HTTPS_PORT` | `8443` | the port para's Caddy binds — `443` for port-less URLs ([Workspace URLs](./urls.md)) |
+| `PARA_HTTPS_PORT` | `8443` | the port para's Caddy binds, `443` for port-less URLs ([Workspace URLs](./urls.md)) |
 | `PARA_POOL` | `default` | the Incus storage pool |
 | `PARA_BRIDGE` | `incusbr0` | the Incus bridge workspaces attach to |
 | `PARA_IP_LO` / `PARA_IP_HI` | `200` / `249` | the band static IPs are allocated from |
@@ -143,4 +143,3 @@ idioms.
 Nothing stops you putting a project var here, but a box-wide `PARA_PROJECT` or
 `PARA_ROUTES` applies to *every* project on the machine, which is rarely what
 you want. `para doctor` says so when it sees one.
-

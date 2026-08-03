@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
-# CLI-tier tests for the bundled mods/dotfiles-jchook hook — content rather than
+# CLI-tier tests for the bundled mods/dotfiles-jchook hook, content rather than
 # engine, and here for one reason: this hook once deleted a user's Claude Code
 # login and history, their editor config and their own scripts, on the migration
 # it exists to serve. Nothing in the suite caught it, because `para mod add`
 # tests only assert the files land.
 #
 # The hook is ordinary shell over $PARA_SKEL and $PARA_SHARED, so it runs on the
-# host with no incus — the same trick test_run_hook.sh uses. $HOME is redirected
+# host with no incus, the same trick test_run_hook.sh uses. $HOME is redirected
 # at a throwaway, because the hook symlinks into it and deletes what it finds.
 
-# a_used_shared_volume — a $PARA_SHARED shaped like one somebody has been living
+# a_used_shared_volume: a $PARA_SHARED shaped like one somebody has been living
 # in for months, which is what the old void-jchook template left behind. Echoes it.
 a_used_shared_volume() {
   local v; v="$(scratch)/shared"
@@ -22,7 +22,7 @@ a_used_shared_volume() {
   printf '%s\n' "$v"
 }
 
-# run_mod_provision <shared> — the bundled mod's provision hook, run the way the
+# run_mod_provision <shared>: the bundled mod's provision hook, run the way the
 # runner would: $PARA_HOOKS and $PARA_SKEL pointed at the mod's own directories.
 run_mod_provision() {
   local repo home; repo="$(cd "$(dirname "$PARA")/.." && pwd)"
@@ -65,7 +65,7 @@ test_the_dotfiles_mod_seeds_a_volume_that_has_nothing() {
 
 test_the_dotfiles_mod_provision_is_idempotent() {
   # para re-runs provision on every `para up`, so runs 2 and 3 must change
-  # nothing — including after you edit what it seeded, which is the point of
+  # nothing, including after you edit what it seeded, which is the point of
   # seeding once.
   local v; v="$(a_used_shared_volume)"
   run_mod_provision "$v" >/dev/null || return 1
@@ -78,7 +78,7 @@ test_the_dotfiles_mod_provision_is_idempotent() {
 
 test_the_dotfiles_mod_reseeds_what_you_delete() {
   # The documented recovery: delete a seed, converge, get it back. It works
-  # because seeding guards on the destination — there is no mark to get out of
+  # because seeding guards on the destination, so there is no mark to get out of
   # step with the file, which is what makes "rm and re-up" a reliable gesture.
   local v; v="$(a_used_shared_volume)"
   run_mod_provision "$v" >/dev/null || return 1

@@ -1,6 +1,6 @@
 return {
   -- Filetype icons used by fzf-lua, oil, and anything else that can render
-  -- them. Shared dep — keep it in one place.
+  -- them. Shared dep, so keep it in one place.
   { "nvim-tree/nvim-web-devicons", lazy = true },
 
   {
@@ -25,7 +25,7 @@ return {
       --   * `_fzf_nth_devicons=false` disables fzf-lua's default `--nth=-1..`,
       --     which scopes scoring to the basename (after the icon delimiter)
       --     and varies scores across files enough to defeat the tiebreak.
-      --     Icons still render — this only affects what fzf scores against.
+      --     Icons still render; this only affects what fzf scores against.
       {
         "<C-p>",
         function()
@@ -35,7 +35,7 @@ return {
           -- still works (just without proximity ordering).
           local has_prox = vim.fn.executable("proximity-sort") == 1
           -- An explicit `cmd` bypasses `fd_opts` entirely, and fzf-lua still
-          -- appends `--hidden` for its <A-h> toggle — so the excludes have to
+          -- appends `--hidden` for its <A-h> toggle, so the excludes have to
           -- be repeated here or <C-p> lists the whole .git tree.
           local base = "fd -t f --exclude .git --exclude .jj --strip-cwd-prefix"
           local cmd = (cur == "" or cur == nil or not has_prox)

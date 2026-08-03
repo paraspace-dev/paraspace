@@ -21,7 +21,7 @@ require("lazy").setup({
     rtp = {
       disabled_plugins = {
         "gzip", "tarPlugin", "tohtml", "tutor", "zipPlugin",
-        -- keep matchit/matchparen — replaced by vim-matchup
+        -- keep matchit/matchparen, replaced by vim-matchup
       },
     },
   },

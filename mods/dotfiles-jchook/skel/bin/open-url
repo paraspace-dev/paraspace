@@ -3,4 +3,4 @@
 # container, so instead of failing with "xdg-open … not found in $PATH", print
 # the URL with guidance and exit 0. Invoked as `$BROWSER <url>` by gh's
 # device-auth flow, gh's `--web` commands, and many other CLIs that "open" URLs.
-printf '\n\033[36m==>\033[0m Cannot open a browser in this virtualized workspace — open this URL on your workstation:\n    %s\n\n' "$*" >&2
+printf '\n\033[36m==>\033[0m Cannot open a browser in this virtualized workspace. Open this URL on your workstation:\n    %s\n\n' "$*" >&2

@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # ============================================================================
-# para — parallel dev workspaces on Incus.
+# para - parallel dev workspaces on Incus.
 #
 # Each workspace is an unprivileged Incus container with its own clone, its own
 # stack, a static bridge IP, and an https:// URL served by a para-owned Caddy.
@@ -11,8 +11,8 @@ set -euo pipefail
 # needs done lives in that project's .paraspace/ dir (Parafile, hooks/,
 # commands/), which para runs but never contains.
 #
-# The prose lives in docs/ — parafile.md, hooks.md, commands.md, image.md,
-# urls.md, how-it-works.md, versioning.md. It is not restated here.
+# The prose lives in docs/ (parafile.md, hooks.md, commands.md, image.md,
+# urls.md, how-it-works.md, versioning.md). It is not restated here.
 # ============================================================================
 
 CT_PREFIX=para-
@@ -21,7 +21,7 @@ CT_PREFIX=para-
 # names and semantics, the ~/.paraspace layout in the guest, the Parafile keys,
 # and the project-command mechanism. A breaking change to any of them bumps it;
 # additive changes don't. A project declares the one it targets as PARA_CONTRACT
-# and para refuses on a mismatch — see docs/versioning.md.
+# and para refuses on a mismatch. See docs/versioning.md.
 CONTRACT=1
 
 # The oldest incus para is known to work with. It reads every workspace out of
@@ -33,7 +33,7 @@ MIN_INCUS=6.22
 # The columns every workspace reader below expects, in order. Routes go LAST:
 # they are space-separated by construction, but a stamp left by an older para
 # may hold commas, and `read` puts whatever remains of the line in the final
-# field — so a legacy value arrives intact instead of shifting the others.
+# field, so a legacy value arrives intact instead of shifting the others.
 WS_COLS='n,s,user.para.project,user.para.domain,devices:eth0.ipv4.address,user.para.routes'
 
 # Prefixed to every command para runs inside a workspace. Everything the guest
@@ -75,7 +75,7 @@ load_config() {
   PARA_BIN="$(cd "$(dirname "$0")" && pwd)/${0##*/}"
 
   # The project para operates on: the nearest .paraspace/ from $PWD upward,
-  # like git and compose find theirs. Only a file locator — a project's
+  # like git and compose find theirs. Only a file locator, because a project's
   # identity is PARA_PROJECT, so moving the checkout never orphans a workspace.
   PARA_PROJECT_DIR="${PARA_PROJECT_DIR:-$(find_project_root || true)}"
   # shellcheck source=/dev/null  # a per-user and a per-project file, both runtime
@@ -99,7 +99,7 @@ load_config() {
   : "${PARA_IMAGE_BOOTSTRAP:=}"
   : "${PARA_READY_HOST:=}"
   # Caddy's admin endpoint. Empty means Caddy's own default (localhost:2019),
-  # which every Caddy on the box shares — set this to give para's Caddy an
+  # which every Caddy on the box shares. Set this to give para's Caddy an
   # address of its own when something else is already using it.
   : "${PARA_CADDY_ADMIN:=}"
   : "${PARA_WORKCOPY_HOST:=localhost}"
@@ -132,7 +132,7 @@ find_project_root() {
 slug() { printf '%s' "$1" | tr '[:upper:]' '[:lower:]' | tr -c 'a-z0-9-' '-'; }
 
 # Routes may be written with commas, spaces, tabs or newlines. The canonical
-# form is lowercase and space-separated — what para stamps on the container,
+# form is lowercase and space-separated, what para stamps on the container,
 # injects as $PARA_ROUTES, and reads back with plain word splitting. Also used
 # on the way back out of incus, where a stamp made by an older para may still
 # be comma-separated and therefore CSV-quoted.
@@ -146,9 +146,9 @@ normalize_routes() {
 # Commands that clone, boot or build need a project; the rest work anywhere.
 require_project() {
   [ -n "$PARA_PROJECT_DIR" ] \
-    || die "not inside a para project — no .paraspace/ directory from \$PWD upward. cd into one, or set PARA_PROJECT_DIR."
+    || die "not inside a para project. No .paraspace/ directory from \$PWD upward. cd into one, or set PARA_PROJECT_DIR."
   if [ -n "$PARA_CONTRACT" ] && [ "$PARA_CONTRACT" != "$CONTRACT" ]; then
-    die "this project targets para contract $PARA_CONTRACT, but this para provides $CONTRACT — see docs/versioning.md."
+    die "this project targets para contract $PARA_CONTRACT, but this para provides $CONTRACT. See docs/versioning.md."
   fi
 }
 
@@ -162,11 +162,11 @@ para_env() {
 
 validate_name() {
   [[ "$1" =~ ^[a-z][a-z0-9-]{0,30}$ ]] \
-    || die "invalid workspace name '$1' — lowercase letters, digits and hyphens, starting with a letter (max 31)."
+    || die "invalid workspace name '$1'. Use lowercase letters, digits and hyphens, starting with a letter (max 31)."
 }
 
 # ---- URLs ------------------------------------------------------------------
-# The ":port" para URLs carry — empty on :443.
+# The ":port" para URLs carry, empty on :443.
 url_port() { [ "$PARA_HTTPS_PORT" = 443 ] || printf ':%s' "$PARA_HTTPS_PORT"; }
 
 # "[sub:]port" -> the Caddy site host for <workspace> on <domain>.
@@ -177,7 +177,7 @@ route_host() { # route_host <route> <name> <domain>
   esac
 }
 
-# The apex URL — empty unless a bare port routes it. A subdomain-only project
+# The apex URL, empty unless a bare port routes it. A subdomain-only project
 # has no site at https://<name>.<domain>, so there is nothing to print.
 ws_url() { # ws_url <name> <domain> <routes>
   local route
@@ -202,7 +202,7 @@ ws_urls() { # ws_urls <name> <domain> <routes>
 # A workspace records its own project, routes and domain in its container's
 # user config, and its IP in its eth0 device. incus can return all of it in one
 # query, so para keeps no registry of its own and can't drift from one.
-ws_list() { # ws_list [<project>] — CSV: name,state,project,domain,ip,routes
+ws_list() { # ws_list [<project>] -> CSV: name,state,project,domain,ip,routes
   if [ -n "${1:-}" ]; then
     incus list "^$CT_PREFIX" "user.para.project=$1" -f csv -c "$WS_COLS"
   else
@@ -214,7 +214,7 @@ ws_list() { # ws_list [<project>] — CSV: name,state,project,domain,ip,routes
 # Non-zero if there is no such workspace.
 ws_load() {
   local rows row
-  rows="$(ws_list)" || die "cannot read the workspace list from incus — refusing to guess whether '$1' exists."
+  rows="$(ws_list)" || die "cannot read the workspace list from incus, so refusing to guess whether '$1' exists."
   row="$(awk -F, -v ct="$CT_PREFIX$1" '$1 == ct' <<<"$rows")"
   [ -n "$row" ] || return 1
   # shellcheck disable=SC2034  # a row reader exposes the whole row, used or not
@@ -230,7 +230,7 @@ incus_q() { if [ -t 2 ]; then incus "$@"; else incus --quiet "$@"; fi; }
 require_incus() {
   need incus
   incus info >/dev/null 2>&1 \
-    || die "incus is not reachable — start it (macOS: colima start --runtime incus), then try 'para doctor'."
+    || die "incus is not reachable. Start it (on macOS, colima start --runtime incus), then try 'para doctor'."
 }
 
 # Mirror this workspace's identity onto its container, refreshed on every up.
@@ -244,7 +244,7 @@ stamp_ct() { # stamp_ct <ct>
 # NOTE, and it applies to every helper reached from inside a $( ): bash strips
 # `set -e` there, so a `die` in one of them kills only the substitution and the
 # caller sails on with an empty value. Such helpers RETURN non-zero and the
-# caller checks — see alloc_ip.
+# caller checks. See alloc_ip.
 bridge_prefix() { # "192.168.100.1/24" -> "192.168.100"
   local addr
   addr="$(incus network get "$PARA_BRIDGE" ipv4.address 2>/dev/null)" || return 1
@@ -254,27 +254,27 @@ bridge_prefix() { # "192.168.100.1/24" -> "192.168.100"
 }
 
 # A free static IP in the bridge's <prefix>.$PARA_IP_LO-$PARA_IP_HI band. Reads
-# the addresses incus has actually pinned, across all incus projects — the
+# the addresses incus has actually pinned, across all incus projects, since the
 # bridge is machine-global, so anything else fails open onto a live container.
 alloc_ip() {
   local prefix used n
   prefix="$(bridge_prefix)" \
-    || die "cannot read $PARA_BRIDGE ipv4.address — is the bridge up? ('para doctor')"
+    || die "cannot read $PARA_BRIDGE ipv4.address. Is the bridge up? ('para doctor')"
   # Two sources, because neither is complete: the runtime address (empty while an
   # instance is stopped) and the pinned device address (absent on instances para
-  # did not create). Reduced to bare addresses — incus annotates the runtime
+  # did not create). Reduced to bare addresses, because incus annotates the runtime
   # column as "10.0.0.5 (eth0)", and a whole-line match would miss every one.
   used="$(incus list --all-projects -f csv -c '4,devices:eth0.ipv4.address' \
     | grep -oE '([0-9]{1,3}\.){3}[0-9]{1,3}')"
   for n in $(seq "$PARA_IP_LO" "$PARA_IP_HI"); do
     if ! grep -qxF "$prefix.$n" <<<"$used"; then printf '%s' "$prefix.$n"; return; fi
   done
-  return 1   # the caller dies; a die here is inside a $( ) — see bridge_prefix
+  return 1   # the caller dies; a die here is inside a $( ). See bridge_prefix
 }
 
 # The shared home volume: one authenticated home per project, attached to every
 # workspace of it. security.shifted is what lets a single volume attach to many
-# unprivileged containers with correctly shifted ownership — do not drop it.
+# unprivileged containers with correctly shifted ownership. Do not drop it.
 ensure_volume() {
   if incus storage volume show "$PARA_POOL" "$PARA_VOLUME" >/dev/null 2>&1; then return; fi
   log "Creating shared volume '$PARA_VOLUME' on pool '$PARA_POOL'…"
@@ -289,7 +289,7 @@ attach_volume() { # attach_volume <ct>
 }
 
 # Block until the guest can actually be provisioned: the incus agent answers,
-# and — if the project named a host it depends on — DNS resolves it.
+# and, if the project named a host it depends on, DNS resolves it.
 wait_ready() { # wait_ready <ct>
   log "Waiting for $1…"
   for _ in $(seq 1 60); do
@@ -326,7 +326,7 @@ caddy_run() { # caddy_run <args>…
 caddy_globals() {
 cat <<EOF
 {
-	# Internal CA only — no ACME, so nothing needs to bind :80.
+	# Internal CA only, so no ACME and nothing needs to bind :80.
 	auto_https disable_redirects
 ${PARA_CADDY_ADMIN:+	admin $PARA_CADDY_ADMIN
 }}
@@ -353,7 +353,7 @@ https://localhost$(url_port), https://local.$PARA_DOMAIN$(url_port) {
 EOF
 }
 
-# One site per route, for every para workspace on this machine — each served by
+# One site per route, for every para workspace on this machine, each served by
 # ITS OWN recorded domain and routes, so one Caddy is correct across projects.
 caddy_sites() {
   local rows name state project domain ip routes route ws
@@ -361,7 +361,7 @@ caddy_sites() {
   # indistinguishable from "no workspaces", and the config that gets written is
   # a valid one with every route on the machine missing.
   rows="$(ws_list)" \
-    || die "cannot read the workspace list from incus — refusing to write a Caddyfile that would drop every route."
+    || die "cannot read the workspace list from incus, so refusing to write a Caddyfile that would drop every route."
   while IFS=, read -r name state project domain ip routes; do
     ws="${name#"$CT_PREFIX"}"
     routes="$(normalize_routes "$routes")"
@@ -375,7 +375,7 @@ caddy_sites() {
   done <<<"$rows"
 }
 
-# Regenerate the Caddyfile from incus and make Caddy adopt it — starting Caddy
+# Regenerate the Caddyfile from incus and make Caddy adopt it, starting Caddy
 # if it isn't running, which is what a bare `para up` relies on. `caddy
 # validate` is the route validator: it catches a bad port or two workspaces
 # claiming one hostname, and says which, before anything is live.
@@ -386,7 +386,7 @@ caddy_sync() {
   # straight into $CADDYFILE would leave a gutted one behind on any failure.
   { caddy_globals; caddy_workcopy; caddy_sites; } > "$CADDYFILE.new"
   caddy_run validate --config "$CADDYFILE.new" --adapter caddyfile \
-    || die "the generated Caddyfile is invalid (above) — check PARA_ROUTES and PARA_DOMAIN. It is at $CADDYFILE.new."
+    || die "the generated Caddyfile is invalid (above). Check PARA_ROUTES and PARA_DOMAIN. It is at $CADDYFILE.new."
   mv "$CADDYFILE.new" "$CADDYFILE"
   if caddy_running; then
     caddy_run reload --config "$CADDYFILE" --adapter caddyfile \
@@ -396,20 +396,20 @@ caddy_sync() {
   log "Starting para Caddy on :${PARA_HTTPS_PORT}…"
   rm -f "$CADDY_PID"
   caddy_run start --config "$CADDYFILE" --adapter caddyfile --pidfile "$CADDY_PID" \
-    || die "caddy could not start on :$PARA_HTTPS_PORT (above) — 'para doctor' checks the usual causes, and the full log is $CADDY_LOG."
+    || die "caddy could not start on :$PARA_HTTPS_PORT (above). 'para doctor' checks the usual causes, and the full log is $CADDY_LOG."
   warn "If browsers distrust the certificates, run once:  caddy trust"
 }
 
 # ---- the one door into a workspace -----------------------------------------
-# Every guest execution goes through here — `para sh`, hooks, and (via `para
-# sh`) project commands — so the terminal handling is stated once:
+# Every guest execution goes through here (`para sh`, hooks, and, via `para
+# sh`, project commands), so the terminal handling is stated once:
 #
 #   su -       runs initgroups, so the user's supplementary groups load. That
 #              is why this is not `incus exec --user`: without the docker group
 #              the stack hits permission denied on the socket.
 #   su --pty   with -c, plain su stays the terminal's foreground process and
 #              drops SIGWINCH, so a TUI never repaints on resize. --pty proxies
-#              the tty and forwards resizes to the child. (util-linux su —
+#              the tty and forwards resizes to the child. (util-linux su only;
 #              busybox has no --pty, so an interactive shell needs a real one.)
 #   -t / -T    a pty only when BOTH our ends are terminals. A pty echoes NULs
 #              and turns \n into \r\n, so forcing one on stdin alone dirties
@@ -431,9 +431,9 @@ ws_exec() { # ws_exec <name> [<command>]
 # ---- hooks -----------------------------------------------------------------
 # para_env as the guest sees it: the three path keys renamed to where <dest>
 # actually put them, and the ones that must not cross unset rather than left
-# pointing at host files — or, for PARA_HOOK_STACK, at a lie.
+# pointing at host files, or, for PARA_HOOK_STACK, at a lie.
 guest_env() { # guest_env <dest>
-  # Local, because the host keeps its own PARA_HOST_ENV — push_project reads it.
+  # Local, because the host keeps its own PARA_HOST_ENV, which push_project reads.
   # shellcheck disable=SC2034  # all three are read by para_env's ${!PARA_@}
   local PARA_HOOKS="$1/.paraspace/hooks" \
         PARA_SKEL="$1/.paraspace/skel" \
@@ -474,21 +474,21 @@ push_project() { # push_project <name>
   incus exec "$ct" -- chown -R "$PARA_UID:$PARA_GID" "$home/.paraspace"
 }
 
-# Run <hook> everywhere it is defined — the project, then each mod. The runner
-# announces what it finds, because only it knows how many that is.
+# Run <hook> everywhere it is defined, the project first and then each mod. The
+# runner announces what it finds, because only it knows how many that is.
 # Hooks own all provisioning; para only decides when they run. docs/hooks.md.
 run_hook() { # run_hook <hook> <name>
   ws_exec "$2" "exec ~/.paraspace/run-hook '$1'" || die "the '$1' hook failed (above)."
 }
 
-# Every directory shaped like a .paraspace — the project's own, then each mod it
-# vendored, most specific first. Each holds its own hooks/, skel/ and commands/,
-# so every name para resolves runs down this list; libexec/run-hook walks
-# the same one on the guest side.
+# Every directory shaped like a .paraspace, starting with the project's own and
+# then each mod it vendored, most specific first. Each holds its own hooks/,
+# skel/ and commands/, so every name para resolves runs down this list;
+# libexec/run-hook walks the same one on the guest side.
 #
-# The glob is `mods/*`, never `mods/*/hooks/x` — bash sorts a multi-component
-# glob with strcoll, which ignores `/` under en_US and orders mods/m2 before
-# mods/m. One component keeps the order the same in every locale.
+# The glob is `mods/*`, never `mods/*/hooks/x`, since bash sorts a
+# multi-component glob with strcoll, which ignores `/` under en_US and orders
+# mods/m2 before mods/m. One component keeps the order the same in every locale.
 paraspace_dirs() {
   printf '%s\n' "$PARA_PROJECT_DIR/.paraspace"
   local pdir
@@ -531,9 +531,9 @@ cmd_up() {
   require_incus
   # Container names are machine-global, so refuse to adopt another project's.
   # An unstamped container has no owner (a launch that failed before stamp_ct,
-  # or one made by hand), so it is adoptable — only a DIFFERENT owner refuses.
+  # or one made by hand), so it is adoptable. Only a DIFFERENT owner refuses.
   if ws_load "$name" && [ -n "$ws_project" ] && [ "$ws_project" != "$PARA_PROJECT" ]; then
-    die "workspace '$name' belongs to project '$ws_project' — names are unique per machine, pick another."
+    die "workspace '$name' belongs to project '$ws_project'. Names are unique per machine, so pick another."
   fi
   trap 'up_hint $?' EXIT
 
@@ -543,16 +543,16 @@ cmd_up() {
     # swallow the real reason a stopped workspace refuses to come up, and the
     # next thing the user sees is a 120s wait_ready timeout blaming guest DNS.
     if [ "${ws_state:-}" = RUNNING ]; then
-      log "Workspace '$name' is running — reconverging…"
+      log "Workspace '$name' is running, reconverging…"
     else
-      log "Workspace '$name' exists — starting it…"
+      log "Workspace '$name' exists, starting it…"
       incus start "$ct"
     fi
   else
     incus image info "$PARA_IMAGE" >/dev/null 2>&1 \
-      || die "no image '$PARA_IMAGE' — build it first with 'para image build'."
+      || die "no image '$PARA_IMAGE'. Build it first with 'para image build'."
     ip="$(alloc_ip)" \
-      || die "no free IP in the .$PARA_IP_LO-.$PARA_IP_HI band on $PARA_BRIDGE — remove a workspace, or widen PARA_IP_LO/HI."
+      || die "no free IP in the .$PARA_IP_LO-.$PARA_IP_HI band on $PARA_BRIDGE. Remove a workspace, or widen PARA_IP_LO/HI."
     log "Launching $ct at ${ip}…"
     incus launch "$PARA_IMAGE" "$ct" --storage "$PARA_POOL" \
       -c security.nesting=true -d eth0,ipv4.address="$ip"
@@ -572,7 +572,7 @@ cmd_up() {
   workspace_context "$name"
   push_project "$name"
   run_hook provision "$name"
-  log "Booting the stack — the first run pulls images, so be patient…"
+  log "Booting the stack. The first run pulls images, so be patient…"
   run_hook boot "$name"
   caddy_sync
   trap - EXIT
@@ -581,7 +581,7 @@ cmd_up() {
   if [ -n "$urls" ]; then
     log "Workspace '$name' ready → $urls"
   else
-    log "Workspace '$name' ready — no HTTP routes declared, so 'para sh $name' for a shell."
+    log "Workspace '$name' ready. No HTTP routes declared, so 'para sh $name' for a shell."
   fi
 }
 
@@ -591,14 +591,14 @@ cmd_down() {
   require_incus
   ws_load "$name" || die "no such workspace '$name' (see: para ls)"
   if [ -n "$ws_project" ] && [ "$ws_project" != "$PARA_PROJECT" ]; then
-    die "workspace '$name' belongs to project '$ws_project' — stop it from there, or: PARA_PROJECT=$ws_project para down $name"
+    die "workspace '$name' belongs to project '$ws_project'. Stop it from there, or run: PARA_PROJECT=$ws_project para down $name"
   fi
   if [ "$ws_state" != RUNNING ]; then
     warn "workspace '$name' is already stopped"
     return
   fi
   incus stop "$CT_PREFIX$name"
-  log "Workspace '$name' stopped — data is kept, 'para up $name' resumes it."
+  log "Workspace '$name' stopped. Data is kept, and 'para up $name' resumes it."
 }
 
 cmd_rm() {
@@ -614,9 +614,9 @@ cmd_rm() {
   # stay removable, or a workspace whose launch died before stamp_ct could never
   # be cleaned up with para at all.
   if ws_load "$name" && [ -n "$ws_project" ] && [ "$ws_project" != "$PARA_PROJECT" ]; then
-    die "workspace '$name' belongs to project '$ws_project' — remove it from there, or: PARA_PROJECT=$ws_project para rm $name"
+    die "workspace '$name' belongs to project '$ws_project'. Remove it from there, or run: PARA_PROJECT=$ws_project para rm $name"
   fi
-  # Converging on "gone", so an already-absent workspace is a no-op — teardown
+  # Converging on "gone", so an already-absent workspace is a no-op. Teardown
   # scripts rely on that, and it is still said out loud in case of a typo.
   if ! instance_exists "$ct"; then
     warn "no workspace '$name' to remove (see: para ls)"
@@ -640,7 +640,7 @@ cmd_ls() {
     esac
   done
   require_incus
-  # Scoped to this project by default — and to everything when asked, or when
+  # Scoped to this project by default, and to everything when asked, or when
   # there is no project to scope to.
   local scope="$PARA_PROJECT"
   [ "$all" -eq 0 ] || scope=""
@@ -661,7 +661,7 @@ cmd_ls() {
 }
 
 cmd_sh() {
-  local usage="usage: para sh <name> [-c <command>] — the command as ONE quoted string"
+  local usage="usage: para sh <name> [-c <command>]  (the command as ONE quoted string)"
   local name="" cmd="" have_cmd=0
   while [ "$#" -gt 0 ]; do
     case "$1" in
@@ -675,7 +675,7 @@ cmd_sh() {
   [ -n "$name" ] || die "$usage"
   require_incus
   ws_load "$name" || die "no such workspace '$name' (see: para ls)"
-  [ "$ws_state" = RUNNING ] || die "workspace '$name' is $ws_state — 'para up $name' first."
+  [ "$ws_state" = RUNNING ] || die "workspace '$name' is $ws_state. Run 'para up $name' first."
   if [ "$have_cmd" -eq 1 ]; then ws_exec "$name" "$cmd"; else ws_exec "$name"; fi
 }
 
@@ -702,7 +702,7 @@ cmd_caddy() {
         log "  config $CADDYFILE"
         log "  log    $CADDY_LOG"
       else
-        log "para Caddy is not running — 'para caddy start'."
+        log "para Caddy is not running. Start it with 'para caddy start'."
       fi
       ;;
     *) die "usage: para caddy <start|stop|status>" ;;
@@ -725,11 +725,11 @@ cmd_config() {
       ;;
     init)
       if [ -f "$PARA_CONFIG" ] && [ "${2:-}" != --force ]; then
-        die "$PARA_CONFIG already exists — edit it, or 'para config init --force' to replace it."
+        die "$PARA_CONFIG already exists. Edit it, or 'para config init --force' to replace it."
       fi
       mkdir -p "$PARA_CONFIG_DIR"
       config_template > "$PARA_CONFIG"
-      log "Wrote $PARA_CONFIG — every line is commented out; uncomment what you want to change."
+      log "Wrote $PARA_CONFIG. Every line is commented out; uncomment what you want to change."
       ;;
     *) die "usage: para config <edit|init [--force]|path>" ;;
   esac
@@ -740,7 +740,7 @@ cmd_config() {
 config_template() {
   local key
   cat <<-'EOF'
-	# para user config — sourced as bash, like a project's Parafile.
+	# para user config, sourced as bash like a project's Parafile.
 	#
 	#   : "${PARA_X:=value}"   yields to the environment
 	#   PARA_X=value           insists
@@ -777,19 +777,20 @@ cmd_image_build() {
       *) die "usage: para image build [-i|--from-current]" ;;
     esac
   done
-  # Everything the project itself has to get right, checked before the daemon —
-  # an incomplete Parafile is more useful to hear about than an absent incus.
+  # Everything the project itself has to get right, checked before the daemon,
+  # because an incomplete Parafile is more useful to hear about than an absent
+  # incus.
   have_hook image-build \
-    || die "no 'image-build' hook — .paraspace/hooks/image-build (renamed from image-build.sh). See docs/image.md."
+    || die "no 'image-build' hook. Add .paraspace/hooks/image-build (renamed from image-build.sh). See docs/image.md."
   local base="$PARA_IMAGE_BASE"
   [ "$from_current" -eq 0 ] || base="$PARA_IMAGE"
   [ -n "$base" ] \
-    || die "PARA_IMAGE_BASE is not set — name the incus image to build from in .paraspace/Parafile, e.g. : \"\${PARA_IMAGE_BASE:=images:debian/13}\". See docs/image.md."
+    || die "PARA_IMAGE_BASE is not set. Name the incus image to build from in .paraspace/Parafile, e.g. : \"\${PARA_IMAGE_BASE:=images:debian/13}\". See docs/image.md."
 
   require_incus
   if [ "$from_current" -eq 1 ]; then
     incus image info "$base" >/dev/null 2>&1 \
-      || die "no existing '$base' image to build from — run a plain 'para image build' first."
+      || die "no existing '$base' image to build from. Run a plain 'para image build' first."
   fi
 
   # Script scope, not local: the EXIT trap fires after this function unwinds.
@@ -797,7 +798,7 @@ cmd_image_build() {
   tmp_alias="para-image-tmp-$PARA_PROJECT"
   published=0
   trap image_cleanup EXIT
-  trap 'echo >&2; warn "interrupted — removing the builder…"; exit 130' INT TERM
+  trap 'echo >&2; warn "interrupted, removing the builder…"; exit 130' INT TERM
 
   if instance_exists "$builder"; then incus delete -f "$builder"; fi
   log "Launching the builder from '$base'…"
@@ -815,7 +816,7 @@ cmd_image_build() {
   # be able to read $PARA_SKEL through it.
   incus exec "$builder" -- mkdir -p /opt
   push_paraspace "$builder" /opt
-  log "Provisioning the image — this takes a few minutes…"
+  log "Provisioning the image. This takes a few minutes…"
   # Backgrounded so Ctrl-C works: incus relays SIGINT only into a process it
   # gave a pty, and this one has none. `wait` can be interrupted, which runs the
   # INT trap, which tears the builder down. Prompting is an `up`-only promise.
@@ -844,7 +845,7 @@ image_publish() { # image_publish <base>
   published=1
   incus image delete "$PARA_IMAGE" >/dev/null 2>&1 || true
   incus image alias rename "$tmp_alias" "$PARA_IMAGE" \
-    || die "the new image is published as '$tmp_alias' but could not be renamed — recover with: incus image alias rename $tmp_alias $PARA_IMAGE"
+    || die "the new image is published as '$tmp_alias' but could not be renamed. Recover with: incus image alias rename $tmp_alias $PARA_IMAGE"
   # What this image was built from, as opposed to what the Parafile names today,
   # which is what the *next* build would use. `-i` stamps $PARA_IMAGE itself.
   incus image set-property "$PARA_IMAGE" user.para.base "$1"
@@ -861,7 +862,7 @@ cmd_image_status() {
   require_incus
   local info
   info="$(incus image info "$PARA_IMAGE" 2>/dev/null)" \
-    || die "no '$PARA_IMAGE' image yet — build it with: para image build"
+    || die "no '$PARA_IMAGE' image yet. Build it with: para image build"
   local built base
   built="$(awk -F'Uploaded: *' '/Uploaded:/{print $2; exit}' <<<"$info")"
   base="$(incus image get-property "$PARA_IMAGE" user.para.base 2>/dev/null || true)"
@@ -878,7 +879,7 @@ cmd_image_rm() {
 }
 
 # ---- scaffolding -----------------------------------------------------------
-# This script's package root, through any symlink chain — npm global installs,
+# This script's package root, through any symlink chain. npm global installs,
 # npx, and a source checkout all land here. Plain readlink, not readlink -f,
 # which macOS doesn't have.
 pkg_root() {
@@ -931,7 +932,7 @@ cmd_init() {
     printf '  add: %s\n' "$rel" >&2
     added=$((added + 1))
   done < <(find "$root" -type f)
-  log "Done — $added added, $skipped skipped."
+  log "Done. $added added, $skipped skipped."
   [ "$added" -eq 0 ] \
     || log "Next: edit .paraspace/Parafile (PARA_ORIGIN, PARA_ROUTES), then 'para image build' and 'para up <name>'."
 }
@@ -944,7 +945,7 @@ bundled_names() { # bundled_names <templates|mods>
   done
 }
 
-# A mod is a directory shaped like a .paraspace/ — hooks/, skel/ — that a project
+# A mod is a directory shaped like a .paraspace/ (hooks/, skel/) that a project
 # vendors instead of forking a template to get it. Copied from what this para
 # ships, never fetched, so it lands in the project's own git history and `para
 # up` stays offline. docs/mods.md.
@@ -956,7 +957,7 @@ cmd_mod() {
     --list) bundled_names mods; return ;;
     "")     die "$usage" ;;
     # Same reason as a template's: without it, `para mod add ../..` copies an
-    # arbitrary tree in — and the destination is one your project commits.
+    # arbitrary tree in, and the destination is one your project commits.
     */*|.|..) die "a mod is a plain directory name (see: para mod add --list); got '$name'." ;;
   esac
   require_project
@@ -969,7 +970,7 @@ cmd_mod() {
   rm -rf "$dest"
   mkdir -p "$dest"
   cp -R "$src/." "$dest"
-  log "Vendored '$name' into .paraspace/mods/$name — read it, commit it, then: para up <name>"
+  log "Vendored '$name' into .paraspace/mods/$name. Read it, commit it, then: para up <name>"
   # A command honours its shebang, so unlike a hook it needs the exec bit, and a
   # checkout with core.fileMode=false has none to copy. Same repair cmd_init makes.
   local f verbs=""
@@ -977,7 +978,7 @@ cmd_mod() {
     if [ -f "$f" ]; then chmod +x "$f"; verbs="${verbs:+$verbs, }${f##*/}"; fi
   done
   [ -z "$verbs" ] \
-    || warn "it adds para verbs that run on YOUR machine with your privileges ($verbs) — read .paraspace/mods/$name/commands/ before you run them."
+    || warn "it adds para verbs that run on YOUR machine with your privileges ($verbs). Read .paraspace/mods/$name/commands/ before you run them."
 }
 
 # ---- project commands ------------------------------------------------------
@@ -1012,7 +1013,7 @@ command_path() { # command_path <verb>
 }
 
 # Does more than one mod define <verb>? Nothing promises an order between them,
-# so dispatch refuses rather than pick — see run_project_command. Your own
+# so dispatch refuses rather than pick. See run_project_command. Your own
 # commands/ settles it, which is why finding one here means "no conflict", and
 # why everything command_files then returns belongs to a mod.
 command_conflict() { # command_conflict <verb>
@@ -1037,13 +1038,13 @@ run_project_command() {
   local verb="$1" script pdir
   shift
   # A verb names a file in commands/, never a path out of it.
-  case "$verb" in */*|.|..) die "unknown command '$verb' — see 'para --help'." ;; esac
-  script="$(command_path "$verb")" || die "unknown command '$verb' — see 'para --help'."
+  case "$verb" in */*|.|..) die "unknown command '$verb'. See 'para --help'." ;; esac
+  script="$(command_path "$verb")" || die "unknown command '$verb'. See 'para --help'."
   require_project   # commands are part of the contract, so honour the pin
   # Refuse rather than pick: para promises no order between mods, so running one
   # of them would be a coin toss the reader cannot see the result of.
   if command_conflict "$verb"; then
-    die "more than one mod defines '$verb' — rm one of these, or shadow it with your own .paraspace/commands/$verb:
+    die "more than one mod defines '$verb'. rm one of these, or shadow it with your own .paraspace/commands/$verb:
 $(command_files "$verb")"
   fi
   # PARA_HOOKS and PARA_SKEL name paths inside a workspace, so an inherited pair
@@ -1066,8 +1067,8 @@ d_warn() { printf '  \033[33m!\033[0m %s\n' "$*"; }
 d_bad()  { printf '  \033[31m✗\033[0m %s\n' "$*"; DOCTOR_FAILED=1; }
 
 cmd_doctor() {
-  # Every check below reads something that may be absent or broken — that IS the
-  # job — so this one command does not inherit `set -e`. Without it a diagnostic
+  # Every check below reads something that may be absent or broken, which IS the
+  # job, so this one command does not inherit `set -e`. Without it a diagnostic
   # stops at the first thing it cannot read, which is the moment you most need
   # the rest of the report.
   set +e
@@ -1080,7 +1081,7 @@ cmd_doctor() {
   printf '\nproject\n'
   doctor_project
   printf '\n'
-  [ "$DOCTOR_FAILED" -eq 0 ] || die "some checks failed — see above."
+  [ "$DOCTOR_FAILED" -eq 0 ] || die "some checks failed. See above."
 }
 
 doctor_config() {
@@ -1095,17 +1096,17 @@ doctor_config() {
   printf '    PARA_VOLUME   %s\n' "${PARA_PROJECT:+$PARA_VOLUME}"
   printf '    Caddy port    %s\n' "$PARA_HTTPS_PORT"
   # Caddy site addresses are whitespace-separated, so a domain with a space in
-  # it becomes TWO addresses and `caddy validate` accepts the result happily —
+  # it becomes TWO addresses and `caddy validate` accepts the result happily,
   # the one bad value the generated Caddyfile cannot catch for itself.
   case "$PARA_DOMAIN" in
-    *[[:space:]]*) d_bad "PARA_DOMAIN contains whitespace — Caddy reads '<workspace>.$PARA_DOMAIN' as two site addresses, and none of your URLs will resolve" ;;
+    *[[:space:]]*) d_bad "PARA_DOMAIN contains whitespace, so Caddy reads '<workspace>.$PARA_DOMAIN' as two site addresses and none of your URLs will resolve" ;;
   esac
   # The user config describes your box, so a project-shaped key there applies
   # to every project on it. Nothing refuses that; this says it out loud.
   local key
   for key in PARA_PROJECT PARA_IMAGE PARA_ORIGIN PARA_ROUTES PARA_IMAGE_BASE PARA_VOLUME; do
     if [ -f "$PARA_CONFIG" ] && grep -q "^[^#]*$key" "$PARA_CONFIG"; then
-      d_warn "$key is set in the user config, so it applies to EVERY project on this box — it probably belongs in a Parafile."
+      d_warn "$key is set in the user config, so it applies to EVERY project on this box. It probably belongs in a Parafile."
     fi
   done
 }
@@ -1121,43 +1122,43 @@ doctor_host() {
     if getcap "$bin" 2>/dev/null | grep -q cap_net_bind_service; then
       d_ok "caddy may bind :$PARA_HTTPS_PORT"
     else
-      d_bad "caddy cannot bind :$PARA_HTTPS_PORT unprivileged — sudo setcap cap_net_bind_service=+ep $bin (re-apply after a caddy upgrade), or use the default :8443"
+      d_bad "caddy cannot bind :$PARA_HTTPS_PORT unprivileged. Run sudo setcap cap_net_bind_service=+ep $bin (re-apply after a caddy upgrade), or use the default :8443"
     fi
   fi
   # The wildcard must resolve to this machine or no workspace URL will load.
   if ! command -v getent >/dev/null 2>&1; then
-    d_warn "no getent here — check by hand that *.$PARA_DOMAIN resolves to 127.0.0.1"
+    d_warn "no getent here, so check by hand that *.$PARA_DOMAIN resolves to 127.0.0.1"
   elif getent hosts "doctor.$PARA_DOMAIN" | grep -q '^127\.'; then
     d_ok "*.$PARA_DOMAIN resolves to 127.0.0.1"
   else
-    d_bad "*.$PARA_DOMAIN does not resolve to 127.0.0.1 — workspace URLs will not load (docs/urls.md)"
+    d_bad "*.$PARA_DOMAIN does not resolve to 127.0.0.1, so workspace URLs will not load (docs/urls.md)"
   fi
   # A named cgroup-v1 hierarchy under /sys/fs/cgroup makes LXC fail every
   # container start with a cryptic "Failed to create cgroup at_mnt".
   local v1
   v1="$(awk '$3 == "cgroup" && $2 ~ /^\/sys\/fs\/cgroup\//{print $2}' /proc/mounts 2>/dev/null | tr '\n' ' ')"
-  [ -z "$v1" ] || d_bad "cgroup-v1 mounted inside /sys/fs/cgroup (${v1% }) — containers will not start until: sudo umount -l ${v1% }"
+  [ -z "$v1" ] || d_bad "cgroup-v1 mounted inside /sys/fs/cgroup (${v1% }), so containers will not start until: sudo umount -l ${v1% }"
 }
 
 doctor_incus() {
   if ! command -v incus >/dev/null 2>&1; then d_bad "incus not on PATH"; return; fi
-  if ! incus info >/dev/null 2>&1; then d_bad "incus daemon unreachable — 'incus admin init', or start colima on macOS"; return; fi
+  if ! incus info >/dev/null 2>&1; then d_bad "incus daemon unreachable. Try 'incus admin init', or start colima on macOS"; return; fi
   # The probe decides, not the version: a distro may backport, and an incus that
-  # cannot do this rejects the column rather than returning it empty — which
+  # cannot do this rejects the column rather than returning it empty, which
   # would be far worse, since para would read every workspace as address-less.
   local v
   v="$(incus version | awk '/Client version/{print $3}')"
   if ! incus list -f csv -c 'devices:eth0.ipv4.address' >/dev/null 2>&1; then
-    d_bad "incus ${v:-?} cannot select device columns, which is how para reads workspace state — upgrade to $MIN_INCUS or newer (Ubuntu's repos ship 6.2)"
+    d_bad "incus ${v:-?} cannot select device columns, which is how para reads workspace state. Upgrade to $MIN_INCUS or newer (Ubuntu's repos ship 6.2)"
   elif [ -n "$v" ] && ! version_ge "$v" "$MIN_INCUS"; then
-    d_warn "incus $v is older than the $MIN_INCUS para is tested against — it can do what para needs, but expect surprises"
+    d_warn "incus $v is older than the $MIN_INCUS para is tested against. It can do what para needs, but expect surprises"
   else
     d_ok "incus $v"
   fi
   local driver
   driver="$(incus storage list -f csv 2>/dev/null | awk -F, -v p="$PARA_POOL" '$1 == p {print $2}')"
   if [ -z "$driver" ]; then
-    d_bad "storage pool '$PARA_POOL' does not exist — incus storage create $PARA_POOL dir"
+    d_bad "storage pool '$PARA_POOL' does not exist. Create one with: incus storage create $PARA_POOL dir"
   else
     d_ok "pool '$PARA_POOL' ($driver)"
     doctor_storage "$driver"
@@ -1170,22 +1171,22 @@ doctor_incus() {
 }
 
 # Nested Docker on btrfs, or on ZFS before 2.2, silently falls back to the vfs
-# storage driver — the slowest failure para has. And the shared volume needs
+# storage driver, the slowest failure para has. And the shared volume needs
 # idmapped mounts, without which a workspace dies mid-boot with "Required
 # idmapping abilities not available".
 doctor_storage() {
   local driver="$1" zv
   case "$(uname -s)/$driver" in
     Linux/btrfs|Linux/zfs)
-      d_warn "pool '$PARA_POOL' is $driver-backed — nested Docker falls back to vfs. Put para on a dir pool over ext4/xfs: incus storage create para-dir dir source=/path/on/ext4" ;;
+      d_warn "pool '$PARA_POOL' is $driver-backed, so nested Docker falls back to vfs. Put para on a dir pool over ext4/xfs: incus storage create para-dir dir source=/path/on/ext4" ;;
   esac
   if ! grep -qw shiftfs /proc/filesystems 2>/dev/null; then
     if [ "$(incus info | awk -F'"' '/^[[:space:]]*idmapped_mounts:/{print $2; exit}')" = false ]; then
-      d_bad "this kernel cannot do idmapped mounts, which the shared volume needs — upgrade to >= 5.12 (>= 5.15 for btrfs)"
+      d_bad "this kernel cannot do idmapped mounts, which the shared volume needs. Upgrade to >= 5.12 (>= 5.15 for btrfs)"
     fi
     zv="$(zfs_version)"
     if [ -n "$zv" ] && ! version_ge "$zv" 2.2; then
-      d_warn "OpenZFS $zv is older than 2.2 — if the pool lives on ZFS, the shared volume will fail to attach at boot"
+      d_warn "OpenZFS $zv is older than 2.2, so if the pool lives on ZFS the shared volume will fail to attach at boot"
     fi
   fi
 }
@@ -1196,15 +1197,15 @@ version_ge() { [ "$1" = "$2" ] || [ "$(printf '%s\n%s\n' "$1" "$2" | sort -V | t
 doctor_project() {
   if [ -z "$PARA_PROJECT_DIR" ]; then d_warn "not inside a para project"; return; fi
   if [ -z "$PARA_CONTRACT" ]; then
-    d_warn "the Parafile declares no PARA_CONTRACT — add : \"\${PARA_CONTRACT:=$CONTRACT}\" so a breaking para change fails loudly"
+    d_warn "the Parafile declares no PARA_CONTRACT. Add : \"\${PARA_CONTRACT:=$CONTRACT}\" so a breaking para change fails loudly"
   elif [ "$PARA_CONTRACT" = "$CONTRACT" ]; then
     d_ok "Parafile targets contract $PARA_CONTRACT"
   else
-    d_bad "this project targets contract $PARA_CONTRACT, but this para provides $CONTRACT — see docs/versioning.md"
+    d_bad "this project targets contract $PARA_CONTRACT, but this para provides $CONTRACT. See docs/versioning.md"
   fi
-  if [ -n "$PARA_ROUTES" ]; then d_ok "routes: $PARA_ROUTES"; else d_warn "no PARA_ROUTES — this project publishes no HTTP"; fi
+  if [ -n "$PARA_ROUTES" ]; then d_ok "routes: $PARA_ROUTES"; else d_warn "no PARA_ROUTES, so this project publishes no HTTP"; fi
   if incus image info "$PARA_IMAGE" >/dev/null 2>&1; then d_ok "image '$PARA_IMAGE' exists"
-  else d_bad "no image '$PARA_IMAGE' — para image build"; fi
+  else d_bad "no image '$PARA_IMAGE'. Build it with: para image build"; fi
   # A command that shadows an engine verb never runs, and a verb more than one
   # mod defines refuses at dispatch until you break the tie. An engine verb wins
   # over both, so it is reported instead of the tie, not as well as it.
@@ -1213,7 +1214,7 @@ doctor_project() {
     if is_engine_verb "$verb"; then
       doctor_shadowed "$verb"
     elif command_conflict "$verb"; then
-      d_bad "more than one mod defines '$verb' — 'para $verb' refuses until one is removed"
+      d_bad "more than one mod defines '$verb', so 'para $verb' refuses until one is removed"
     fi
   done < <(project_commands)
 }
@@ -1243,7 +1244,7 @@ is_engine_verb() {
 
 usage() {
   cat <<-EOF
-	para — parallel dev workspaces on Incus
+	para - parallel dev workspaces on Incus
 
 	WORKSPACES
 	  up <name>                 create or reconverge a workspace, then boot it
@@ -1273,7 +1274,7 @@ usage() {
 	EOF
 }
 
-# A project's own verbs, listed so nothing it added runs invisibly — including
+# A project's own verbs, listed so nothing it added runs invisibly, including
 # the ones a mod brought, which is why each row names the mod it came from.
 usage_project_commands() {
   local list verb path pdir
@@ -1287,9 +1288,9 @@ usage_project_commands() {
     # the engine owns the name, or more than one mod claims it. Either way there
     # is nothing worth crediting and no summary worth advertising.
     if is_engine_verb "$verb"; then
-      printf '  %-25s %s\n' "$verb" "never runs — the engine verb wins (para doctor)"
+      printf '  %-25s %s\n' "$verb" "never runs, the engine verb wins (para doctor)"
     elif command_conflict "$verb"; then
-      printf '  %-25s %s\n' "$verb" "never runs — more than one mod defines it (para doctor)"
+      printf '  %-25s %s\n' "$verb" "never runs, more than one mod defines it (para doctor)"
     else
       printf '  %-25s %s%s\n' "$verb" "$(command_summary "$path")" "${pdir:+ [${pdir##*/}]}"
     fi
@@ -1304,7 +1305,7 @@ cmd_completions() {
 	autoload -U +X bashcompinit && bashcompinit
 	EOF
       ;;
-    *) die "usage: para completions <bash|zsh>  — then: source <(para completions bash)" ;;
+    *) die "usage: para completions <bash|zsh>  (then: source <(para completions bash))" ;;
   esac
   cat <<-'EOF'
 	_para() {
@@ -1328,7 +1329,7 @@ cmd_completions() {
 	                   COMPREPLY=( $(compgen -W "--list $(para mod add --list 2>/dev/null)" -- "$cur") )
 	                 fi ;;
 	    ls)          COMPREPLY=( $(compgen -W "--all --names" -- "$cur") ) ;;
-	    # Everything else — including every project command — takes a workspace.
+	    # Everything else, including every project command, takes a workspace.
 	    *)           [ "$COMP_CWORD" -eq 2 ] \
 	                   && COMPREPLY=( $(compgen -W "$(para ls --names 2>/dev/null)" -- "$cur") ) ;;
 	  esac
@@ -1363,7 +1364,7 @@ main() {
     ""|-h|--help|help) usage ;;
     --version)   cmd_version ;;
     # para wraps `incus exec`, so container muscle memory reaches for this.
-    exec)        die "no 'exec' command — run one command in a workspace with: para sh <name> -c '<command>'" ;;
+    exec)        die "no 'exec' command. Run one command in a workspace with: para sh <name> -c '<command>'" ;;
     *)           run_project_command "$cmd" "$@" ;;
   esac
 }

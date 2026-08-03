@@ -1,4 +1,4 @@
-# para shared zshrc — seeded once into the shared volume from .paraspace/skel/, then
+# para shared zshrc, seeded once into the shared volume from .paraspace/skel/, then
 # yours (para never overwrites it after the first seed). Shared by every workspace
 # of this project via ~/.zshrc, so edits apply everywhere. Keep it small; grow it.
 
@@ -14,7 +14,7 @@ autoload -Uz compinit && compinit -u
 
 # --- prompt ------------------------------------------------------------------
 # %m is the container hostname (para-<workspace>), so every shell announces which
-# workspace you're in — the whole point of running several at once.
+# workspace you're in, the whole point of running several at once.
 autoload -Uz vcs_info
 zstyle ':vcs_info:git:*' formats ' (%b)'
 precmd() { vcs_info }

@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# sandbox.sh — isolate an e2e run from the developer's real para state.
+# sandbox.sh - isolate an e2e run from the developer's real para state.
 #
 # Sourced by test/run. para keeps its Caddyfile, pidfile and user config under
-# XDG dirs, so pointing those at throwaway temp dirs — plus its own Caddy port
-# and admin endpoint — gives a run that starts its OWN Caddy and never touches,
+# XDG dirs, so pointing those at throwaway temp dirs, plus its own Caddy port
+# and admin endpoint, gives a run that starts its OWN Caddy and never touches,
 # or is touched by, a real one.
 #
 # Two things are machine-global and cannot be sandboxed, both fine:
@@ -12,7 +12,7 @@
 #     address a real workspace holds.
 #   * the workspace list. para reads it from incus rather than a registry of its
 #     own, so this run's Caddyfile also carries the developer's real workspaces.
-#     Harmless — it is served on this run's own port — but do not write a test
+#     Harmless, since it is served on this run's own port, but do not write a test
 #     that asserts the Caddyfile has nothing else in it.
 
 # Absolute path to the para under test and the hello fixture. Set by test/run.
@@ -39,7 +39,7 @@ sandbox_base() {
   #     and get their real volume deleted by a `--cli` run;
   #   - the image keys are just as destructive one step over. The fixture's
   #     Parafile declares them with `: "${X:=…}"`, which yields to the
-  #     environment — so an exported PARA_IMAGE (say, a real project's alias)
+  #     environment, so an exported PARA_IMAGE (say, a real project's alias)
   #     means a PARA_TEST_REBUILD=1 run PUBLISHES the Alpine fixture payload over
   #     that real alias. Without the rebuild it's merely confusing: workspaces
   #     launch from the wrong image and fail with no /usr/sbin/httpd.
@@ -50,16 +50,16 @@ sandbox_base() {
   # That is safe because isolation here is by NAME: everything the run creates is
   # run-unique, teardown is guarded to those names, and para has no pool-level
   # destructive operation. (para no longer switches or creates pools on your
-  # behalf — `para doctor` reports a pool that would hurt, and leaves it to you.)
+  # behalf. `para doctor` reports a pool that would hurt, and leaves it to you.)
   # A non-default port so the run's Caddy can't collide with a real para Caddy on
   # :8443, and its own pidfile (under the temp XDG_STATE_HOME) governs only it.
   export PARA_HTTPS_PORT="${PARA_TEST_PORT:-9443}"
   # And its own Caddy admin endpoint. Caddy's default (localhost:2019) is shared
   # by every Caddy on the box via SO_REUSEPORT, so a `caddy reload` from this run
-  # could otherwise land on the developer's real para Caddy — or theirs on ours.
+  # could otherwise land on the developer's real para Caddy, or theirs on ours.
   # This is why the e2e tier no longer has to refuse to start while one is up.
   export PARA_CADDY_ADMIN="localhost:$((PARA_HTTPS_PORT + 10000))"
-  # No prompts, no pty — scripted.
+  # No prompts, no pty, fully scripted.
   export PARA_NONINTERACTIVE=1
   # Pin the workspace user rather than inherit it. These are project keys with a
   # documented default, but a real user config (~/.config/para/config) could set
@@ -76,10 +76,10 @@ sandbox_e2e() {
   export PARA_PROJECT_DIR="$FIXTURE_DIR"
   export PARA_PROJECT="paratest-$$"
   export PARA_VOLUME="para-home-$PARA_PROJECT"
-  # The fixture's base image, built through para itself — `para image build`
+  # The fixture's base image, built through para itself, so `para image build`
   # reads the fixture's Parafile (PARA_PROJECT_DIR above) for the Alpine base,
   # the bash bootstrap, and the payload. Doing it this way means an e2e run also
-  # exercises image build against a non-Void, Docker-free consumer — but only on
+  # exercises image build against a non-Void, Docker-free consumer, but only on
   # the run that actually builds. An existing alias is REUSED, because the
   # rebuild is by far the slow part, so in steady state most runs skip
   # image build entirely. Nothing detects that you edited the fixture's payload:
@@ -137,7 +137,7 @@ sandbox_teardown() {
       ;;
   esac
   # Kill the run's own Caddy by its sandboxed pidfile, which targets exactly
-  # ours. (`para caddy stop` does the same thing — it stops by pidfile too — but
+  # ours. (`para caddy stop` does the same thing, stopping by pidfile too, but
   # going direct keeps teardown independent of the CLI under test.)
   local pidf="${XDG_STATE_HOME:-}/para/caddy.pid" pid
   if [ -f "$pidf" ]; then

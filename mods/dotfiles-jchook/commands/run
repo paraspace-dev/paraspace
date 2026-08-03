@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# summary: attach a tmux session — claude in one window, a shell in another
+# summary: attach a tmux session, claude in one window and a shell in another
 set -euo pipefail
 [ "$#" -eq 1 ] || { echo "usage: para run <workspace>" >&2; exit 1; }
 

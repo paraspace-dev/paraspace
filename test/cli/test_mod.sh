@@ -1,16 +1,16 @@
 #!/usr/bin/env bash
-# CLI-tier tests for `para mod add` — the verb that vendors a bundled mod into a
+# CLI-tier tests for `para mod add`, the verb that vendors a bundled mod into a
 # project's .paraspace/mods/. No incus: it is a directory copy and a name check.
 #
 # Every test installs into a THROWAWAY project (a_project), never into
-# test/fixtures/hello. The fixture is tracked, and teardown doesn't cover it — a
+# test/fixtures/hello. The fixture is tracked, and teardown doesn't cover it, so a
 # test that added a mod there would dirty the working tree, hand bin/lint the
 # installed copy to lint, and fail the second time it ran.
 # shellcheck disable=SC2016  # command bodies expand when the command runs, not here
 
-# a_para_pkg <entry>... — a package root of our own: a copy of para under bin/,
+# a_para_pkg <entry>...: a package root of our own, a copy of para under bin/,
 # and the given entries created under mods/ (a trailing / makes a directory).
-# pkg_root resolves from $0, so `$d/bin/para` reads `$d/mods` — which is how a
+# pkg_root resolves from $0, so `$d/bin/para` reads `$d/mods`, which is how a
 # test can put things in mods/ that the real package must never ship.
 a_para_pkg() {
   local d entry; d="$(scratch)"
@@ -45,7 +45,7 @@ test_mod_add_vendors_a_bundled_mod() {
 }
 
 test_mod_add_says_which_verbs_a_mod_brought() {
-  # The reader is told, because these run on the HOST with their privileges —
+  # The reader is told, because these run on the HOST with their privileges,
   # the one thing about a mod that isn't confined to a throwaway container.
   local p; p="$(a_project)"
   para_in "$p" mod add dotfiles-jchook
@@ -109,7 +109,7 @@ test_mod_add_list_skips_a_stray_file() {
 
 test_mod_add_list_says_nothing_when_this_para_ships_none() {
   # What the `[ -d ]` in bundled_names is actually for. The stray-file test
-  # above passes without it — a trailing-slash glob never matches a plain file —
+  # above passes without it (a trailing-slash glob never matches a plain file),
   # but an EMPTY mods/ leaves the glob unmatched, and para would print a bare
   # `*` as though it were a mod you could install.
   local pkg out; pkg="$(a_para_pkg)"
@@ -130,7 +130,7 @@ test_mod_add_outside_a_project_fails_with_paras_own_error() {
 
 test_mod_add_refuses_a_path_as_a_mod_name() {
   # Same containment as `para init`, and it matters more here: the destination
-  # is a directory this deletes before it writes. Asserted on the MESSAGE — each
+  # is a directory this deletes before it writes. Asserted on the MESSAGE, since each
   # of these would fail anyway once the source path missed, so an
   # exit-status-only check would still pass with the name check removed.
   local p out rc name; p="$(a_project)"
@@ -179,7 +179,7 @@ echo SHADOWED-THE-ENGINE'
   assert_contains "$PARA_OUT" "shadowed" "doctor warns about the shadowed command"
 }
 
-# _completions_after <word>... — what bash would offer after those words. Always
+# _completions_after <word>...: what bash would offer after those words. Always
 # called in a subshell, so sourcing the script and putting para on $PATH (which
 # the generated script calls by name) stays in here.
 _completions_after() {
@@ -192,7 +192,7 @@ _completions_after() {
 }
 
 test_mod_completes_one_level_at_a_time() {
-  # `para mod` takes a subcommand, `para mod add` takes a mod name — one flat
+  # `para mod` takes a subcommand, `para mod add` takes a mod name, so one flat
   # word list offers both at both positions, so it answers `para mod add <TAB>`
   # with "add". Drive the function: the assert above greps the script's text and
   # passes either way.
@@ -260,7 +260,7 @@ echo BETA'
   assert_contains "$PARA_OUT" "mods/beta/commands/deploy"  "and the other"        || return 1
 
   # --help must survive it, and must not advertise it. A conflict is a project
-  # you have to go fix, and help is what you run when you're lost — killing it
+  # you have to go fix, and help is what you run when you're lost, so killing it
   # there would be hostile, but crediting one mod for a verb that refuses is
   # worse than saying nothing.
   para_in "$p" --help
@@ -272,7 +272,7 @@ echo BETA'
 }
 
 test_a_third_mod_does_not_make_it_two() {
-  # The message counts, so it must not say "two" when three collide — an error
+  # The message counts, so it must not say "two" when three collide, since an error
   # that misdescribes the world sends you looking for the wrong thing.
   local p m; p="$(a_project)"
   for m in alpha beta gamma; do
@@ -288,7 +288,7 @@ echo RAN'
 
 test_an_engine_verb_beats_a_mods_command() {
   # An engine verb wins over every owner, so a mod claiming one must be reported
-  # as shadowed — NOT as a mod-vs-mod tie, which would be a false claim that
+  # as shadowed, NOT as a mod-vs-mod tie, which would be a false claim that
   # `para ls` refuses, and would make `para doctor` fail over nothing.
   local p; p="$(a_project)"
   a_mod_command "$p" rogue  ls '#!/bin/sh
@@ -299,7 +299,7 @@ echo HIJACKED-TOO'
   assert_not_contains "$PARA_OUT" "HIJACKED" "the engine verb ran" || return 1
   para_in "$p" doctor
   # BOTH of them. Naming only the one that "would have run" picks a file by glob
-  # order — which is locale-dependent — to report about a verb where neither runs.
+  # order, which is locale-dependent, to report about a verb where neither runs.
   assert_contains     "$PARA_OUT" "mod rogue's command 'ls' is shadowed"  "doctor names one loser" || return 1
   assert_contains     "$PARA_OUT" "mod rogue2's command 'ls' is shadowed" "and the other"          || return 1
   assert_not_contains "$PARA_OUT" "more than one mod defines 'ls'" "and does not claim a refusal that never happens" || return 1
@@ -310,7 +310,7 @@ echo HIJACKED-TOO'
 test_a_shadowed_command_is_reported_to_its_own_owner() {
   # Both owners lose to the engine verb, and each has a different file to go fix,
   # so each is named as itself. Crediting a mod for the file you wrote sends you
-  # looking under mods/ for it — and an anonymous mod is nowhere at all.
+  # looking under mods/ for it, and an anonymous mod is nowhere at all.
   local p; p="$(a_project)"
   a_project_command "$p"       ls '#!/bin/sh
 echo MINE'
@@ -333,7 +333,7 @@ echo "at:$PARA_MOD_DIR"'
   para_in "$p" whereami
   assert_contains "$PARA_OUT" "at:$p/.paraspace/mods/tools" "it points at the mod's own directory" || return 1
 
-  # And a project's own command must not see one — including a stale value from
+  # And a project's own command must not see one, including a stale value from
   # the environment, which is exactly what a mod command calling back would leave.
   a_project_command "$p" whoami '#!/bin/sh
 echo "at:${PARA_MOD_DIR-<unset>}"'
@@ -344,7 +344,7 @@ echo "at:${PARA_MOD_DIR-<unset>}"'
 test_a_command_never_sees_guest_paths() {
   # PARA_HOOKS and PARA_SKEL name directories inside a WORKSPACE. On the host
   # they name nothing, so an inherited pair would point a command at paths that
-  # don't exist — and docs/hooks.md promises they are unset here.
+  # don't exist, and docs/hooks.md promises they are unset here.
   local p; p="$(a_project)"
   a_project_command "$p" probe '#!/bin/sh
 echo "hooks=[${PARA_HOOKS-unset}] skel=[${PARA_SKEL-unset}]"'

@@ -30,35 +30,35 @@ For the argument about *why* this shape, see [Why ParaSpace](./why.md).
 ```
 
 Each workspace is an unprivileged Incus **system** container with a static IP on
-the Incus bridge. Whatever the project runs inside — bare processes or nested
-containers — binds its usual ports on that IP, so workspaces never collide with
+the Incus bridge. Whatever the project runs inside (bare processes or nested
+containers) binds its usual ports on that IP, so workspaces never collide with
 each other or with the host, and nothing gets remapped.
 
-There are two doors into a workspace: its URL, and `para sh`.
+A workspace has two doors, its URL and `para sh`.
 
 ## The pieces
 
 - **Host-level Caddy** terminates TLS for the `*.<domain>` wildcard and
   reverse-proxies each workspace's routes to its container IP. It is generated
-  from Incus, so a single Caddy is correct across every project on the machine
-  — see [Workspace URLs](./urls.md).
+  from Incus, so a single Caddy is correct across every project on the machine.
+  See [Workspace URLs](./urls.md).
 - **One Incus container per workspace** (`para-<name>`), holding the clone and
   running the project's whole stack inside, nested containers included.
 - **One shared home volume per project**, attached to every workspace of that
   project at `/para/shared`. Authenticate once (git, `gh`, dotfiles) and every
   workspace of the project inherits it.
 - **The project's hooks do all the provisioning.** Everything project-specific
-  lives in the project's `.paraspace/` directory, never in `para` — see the
+  lives in the project's `.paraspace/` directory, never in `para`. See the
   [hook contract](./hooks.md).
 
-There is no ParaSpace daemon or database: a workspace records its own
-identity on its container, so `incus` is the only thing that has to remember
-anything. `para up` starts what it needs, including Caddy — which, besides the
-Incus daemon, is the only para-related process on your host.
+There is no ParaSpace daemon or database. A workspace records its own identity
+on its container, so `incus` is the only thing that has to remember anything.
+`para up` starts what it needs, including Caddy, which besides the Incus daemon
+is the only para-related process on your host.
 
-## macOS: one extra layer
+## macOS adds one layer
 
-The same stack, one layer down. Incus runs inside a
+The same stack runs one layer down. Incus runs inside a
 [Colima](https://github.com/abiosoft/colima) Linux VM, so the containers and
 the shared volume live in the VM. Caddy still runs on the Mac and reaches
 container IPs through the VM's network (Colima's `--network-address`). The
@@ -66,9 +66,9 @@ container IPs through the VM's network (Colima's `--network-address`). The
 
 ## Going deeper
 
-- [Internals](./internals.md) — self-describing workspaces, the shared volume,
-  machine-global names, where state lives.
-- [Commands](./commands.md) — the full surface, and how a project adds verbs
+- [Internals](./internals.md) covers self-describing workspaces, the shared
+  volume, machine-global names, and where state lives.
+- [Commands](./commands.md) is the full surface, and how a project adds verbs
   of its own.
 
 [Incus]: https://linuxcontainers.org/incus/

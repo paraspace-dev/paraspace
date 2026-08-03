@@ -1,7 +1,7 @@
 # Shared authentication
 
 Every workspace of a project mounts the same volume at `/para/shared`. Whatever
-your provision hook links out of it, every workspace inherits — so you sign in
+your provision hook links out of it, every workspace inherits, so you sign in
 once per project instead of once per workspace, and workspaces you create next
 month are already signed in.
 
@@ -24,8 +24,8 @@ ln -sfn "$PARA_SHARED/ssh/id_ed25519" ~/.ssh/id_ed25519
 
 Link the directory a tool keeps its state in, and that tool is authenticated in
 every workspace of the project. The volume is
-[per project](./internals.md#the-shared-home-volume) by default — point several
-projects at one `PARA_VOLUME` to share across them.
+[per project](./internals.md#the-shared-home-volume) by default, and you point
+several projects at one `PARA_VOLUME` to share across them.
 
 Recipes for the common ones are in the [Cookbook](./cookbook.md).
 
@@ -33,7 +33,7 @@ Recipes for the common ones are in the [Cookbook](./cookbook.md).
 
 Workspaces clone and push over the network, so your host has to trust a key.
 The bundled templates' provision hook generates **one key per project**, on
-that project's shared volume and labelled `para-<hostname>` — individually
+that project's shared volume and labelled `para-<hostname>`. It is individually
 revocable, and never your host keys.
 
 Nothing about this is git-specific. A Mercurial, Fossil or Subversion project
@@ -53,8 +53,8 @@ the key, prints it, and **pauses** so you can authorize it:
 `Permission denied (publickey)`, authorize the key and re-run.
 
 `void-docker-gh` also ships a
-[project command](./commands.md#project-commands) that re-prints it — a file in
-its `.paraspace/commands/`, not a `para` built-in:
+[project command](./commands.md#project-commands) that re-prints it, a file in
+its `.paraspace/commands/` rather than a `para` built-in:
 
 ```sh
 para key
@@ -63,14 +63,14 @@ para key
 ### Letting `gh` do it
 
 Set `PARA_GH_AUTH=1` in that template's `Parafile` and the hook takes a
-`gh auth login` path instead, uploading the key for you — useful for private
-repos. The [Cookbook](./cookbook.md#authenticate-gh-during-provisioning) shows
-how that hook is written.
+`gh auth login` path instead, uploading the key for you, which is useful for
+private repos. The [Cookbook](./cookbook.md#authenticate-gh-during-provisioning)
+shows how that hook is written.
 
 ## What sharing costs
 
 One credential store reachable by every workspace means anything running in
-one — [an agent included](./agents.md#let-the-agent-off-the-leash) — can use
+one, [an agent included](./agents.md#let-the-agent-off-the-leash), can use
 every credential you put there. It can push wherever that key is authorized,
 and call whatever API those tokens allow.
 

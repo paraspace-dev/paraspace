@@ -1,8 +1,8 @@
 /**
  * ParaSpace theme: gruvbox brand colors, softened, in two physics.
  *
- * The landing page is a teaser one-sheet — two lenses overlapping like a Venn
- * (see Poster.vue) — and it prints twice. Dark is a CRT: the lenses combine
+ * The landing page is a teaser one-sheet, two lenses overlapping like a Venn
+ * (see Poster.vue), and it prints twice. Dark is a CRT: the lenses combine
  * additively and the wordmark carries RGB fringing. Light is a faded photo
  * print: the same two plates overprint like ink and the fringe becomes
  * misregistration. The palettes below are those two passes, not one recolored.
@@ -13,12 +13,12 @@
 /*
  * Body and code: IBM Plex Sans and Plex Mono, self-hosted from public/fonts/
  * (SIL OFL, license alongside the files), so the page makes no third-party
- * request and works offline. They're siblings by design, which is the point —
+ * request and works offline. They're siblings by design, which is the point:
  * the prose and the commands inside it are the same voice at two widths. The
  * theme entry pulls vitepress/theme-without-fonts so the default Inter isn't
  * shipped underneath them. Sans is the variable file: one download covers 400
  * through 700, which is every weight the theme asks for. There is no display
- * face to load — the wordmark is drawn (see Wordmark.vue). Latin subset only;
+ * face to load, since the wordmark is drawn (see Wordmark.vue). Latin subset only;
  * the unicode-range hands anything outside it back to the stack.
  */
 @font-face {
@@ -43,8 +43,8 @@
     U+2212, U+2215, U+FEFF, U+FFFD;
 }
 
-/* Mono has no variable cut, so the one bold the page actually uses — the `$`
-   prompt in the hero terminal — gets its own file rather than a fake bold. */
+/* Mono has no variable cut, so the one bold the page actually uses (the `$`
+   prompt in the hero terminal) gets its own file rather than a fake bold. */
 @font-face {
   font-family: 'IBM Plex Mono';
   font-style: normal;
@@ -68,7 +68,7 @@
    * with. That is the whole argument for it: the page carries two lens hues and
    * one warm, and every warm thing on it is the same warm. Brand-1 is the
    * faded cut of the gold, deep enough to carry small text on a white docs
-   * page — and it is the same value as --vp-code-color below, deliberately.
+   * page, and it is the same value as --vp-code-color below, deliberately.
    */
   --vp-c-brand-1: #94600e;
   --vp-c-brand-2: #a4620f;
@@ -93,7 +93,7 @@
   /* Prose links are blue, not the brand gold: against a page this warm, a warm
      link blurs into the inline code and the headings, while the blue reads as
      the one interactive thing on the line. The exact value is the identifier
-     blue the code blocks use for shell arguments (see ../shiki-gruvbox.ts) — a
+     blue the code blocks use for shell arguments (see ../shiki-gruvbox.ts), so a
      workspace name in a snippet and a link in a sentence are the same blue, so
      the page has one blue, not two. */
   --para-link: #076678;
@@ -103,7 +103,7 @@
 
   /* ---- Poster: the print pass ------------------------------------------ */
 
-  /* One shade off white — enough to read as stock under the plates, not enough
+  /* One shade off white, enough to read as stock under the plates, not enough
      to become a band across the page. The warm cream it used to be now belongs
      to the terminal, so the poster has one warm object rather than two. */
   --pv-paper: #faf8f2;
@@ -111,10 +111,10 @@
   --pv-lens-b: #4f9256;
   --pv-d: 1.5;
   --pv-under: #dfae4a;
-  /* Ink on paper is subtractive, so the plates darken where they cross —
-     which is also what makes the intersection the densest thing on the page. */
+  /* Ink on paper is subtractive, so the plates darken where they cross, which
+     is also what makes the intersection the densest thing on the page. */
   --pv-blend: multiply;
-  /* The two plates crossed — what the intersection reads as. It tints anything
+  /* The two plates crossed, what the intersection reads as. It tints anything
      that belongs to the poster but isn't a lens: the outlined button, the ring
      around the closing block. --pv-halo is the wordmark's own glow. */
   --pv-mix: #6a927c;
@@ -160,7 +160,7 @@
 }
 
 .dark {
-  /* On the CRT the gold can run at full strength — nothing has to survive a
+  /* On the CRT the gold can run at full strength, since nothing has to survive a
      white background, so brand and inline code land on the same value. */
   --vp-c-brand-1: #fabd2f;
   --vp-c-brand-2: #f0b429;
@@ -200,7 +200,7 @@
 }
 
 /*
- * Links in prose only. Nav, sidebar, and buttons keep the brand gold — the
+ * Links in prose only. Nav, sidebar, and buttons keep the brand gold, and the
  * blue is for things inside a paragraph that you can click.
  */
 .vp-doc a {
@@ -214,7 +214,7 @@
 /*
  * The lenses are wider than the page at small widths and the terminal's stack
  * spills past its box; clip both at the page edge so neither opens a phantom
- * right gutter. `clip` on one axis only — `hidden` would create a scroll
+ * right gutter. `clip` on one axis only, because `hidden` would create a scroll
  * container and cut the poster's own vertical bleed.
  */
 @media (max-width: 767px) {
@@ -233,7 +233,7 @@
 /*
  * Above 960px the default theme already drops the navbar's background on
  * `home.top`; below it the bar stays opaque and cuts a band across the poster.
- * Let it go transparent there too — the paper is pale and the CRT is dark, so
+ * Let it go transparent there too, since the paper is pale and the CRT is dark, so
  * the nav controls keep their contrast either way. `screen-open` keeps its
  * background: the mobile menu needs it.
  */
@@ -278,7 +278,7 @@
   /*
    * `closest-side` matters: the default `farthest-corner` puts the gradient's
    * end past the corner of the box, so the circular clip cuts the ramp while it
-   * is still around 7% — a hard edge exactly where the glow was supposed to
+   * is still around 7%, a hard edge exactly where the glow was supposed to
    * stop existing. Sized to the side instead, it reaches zero at the clip.
    *
    * The stops trace a bell rather than a straight ramp. A linear falloff has a
@@ -321,7 +321,7 @@
 
 /*
  * One button, used by the poster and by the call to action that closes the
- * page. The brand gold is the page's one warm interactive thing — against the
+ * page. The brand gold is the page's one warm interactive thing, and against the
  * blue-green lenses it's the complement, which is why it's the only fill.
  */
 .para-btn {
@@ -342,7 +342,7 @@
 /*
  * A call to action is not prose. The one at the foot of the page is authored in
  * index.md, so it lands inside `.vp-doc` and picks up the theme's prose-anchor
- * treatment — underline and weight 500 — which `.para-btn` alone can't outrank.
+ * treatment (underline and weight 500) which `.para-btn` alone can't outrank.
  * Colour is handled where each state is declared, below.
  */
 .vp-doc a.para-btn {

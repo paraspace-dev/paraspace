@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 # ============================================================================
-# release — cut a version and hand it to CI.
+# release - cut a version and hand it to CI.
 #
 # Bumps package.json, commits, tags and pushes. From there
 # .github/workflows/publish.yml publishes the tag to npm; README's Development
@@ -40,10 +40,10 @@ branch="$(git rev-parse --abbrev-ref HEAD)"
 # remote would tag the wrong tree.
 git fetch --quiet origin main
 if ! git merge-base --is-ancestor origin/main HEAD; then
-  die "main is behind origin/main — 'git pull' first."
+  die "main is behind origin/main. Run 'git pull' first."
 fi
 
 npm version "$1"
 git push --follow-tags
 
-echo "Released $(git describe --tags --abbrev=0) — 'gh run watch' follows the publish." >&2
+echo "Released $(git describe --tags --abbrev=0). 'gh run watch' follows the publish." >&2

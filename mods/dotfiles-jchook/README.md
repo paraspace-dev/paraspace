@@ -1,7 +1,7 @@
 # dotfiles-jchook
 
-A full personal dev environment in every workspace of a project — zsh, tmux,
-Neovim and Claude Code — without forking a template to get it.
+A full personal dev environment (zsh, tmux, Neovim and Claude Code) in every
+workspace of a project, without forking a template to get it.
 
 ```sh
 para mod add dotfiles-jchook
@@ -23,23 +23,23 @@ It opens no [hook point](https://paraspace.dev/docs/hook-points) of its own.
 | Verb | What it does |
 |---|---|
 | `para claude <ws> [args…]` | Claude Code in that workspace's clone, arguments passed through intact |
-| `para run <ws>` | a tmux session — Claude in one window, a shell in another; re-running attaches instead of stacking |
+| `para run <ws>` | a tmux session with Claude in one window and a shell in another; re-running attaches instead of stacking |
 
 Both run on your machine with your privileges, like any
-[para verb](https://paraspace.dev/docs/commands#project-commands) — read them
+[para verb](https://paraspace.dev/docs/commands#project-commands), so read them
 before you run them. Your own `.paraspace/commands/<verb>` overrides either.
 
 **Targets [`void-docker-gh`](https://github.com/paraspace-dev/paraspace/tree/main/templates/void-docker-gh).** Two couplings:
 the build hook is `xbps`, so another distro means rewriting the package list;
 and it installs Claude Code as `$PARA_USER`, so the base's `image-build` has to
-have created that user already — which [the image
+have created that user already, which [the image
 contract](https://paraspace.dev/docs/image) requires of every base anyway.
 
 ## What it claims
 
 On the **shared volume**, written only if nothing is there already and yours from
 then on: `tmux/`, `nvim/`, `nvim-data/`, `claude/`, `claude.json`,
-`bin/open-url`, and `dotfiles-jchook/zshrc`. Nothing here is ever replaced — if
+`bin/open-url`, and `dotfiles-jchook/zshrc`. Nothing here is ever replaced, so if
 you have used this volume before, everything you had survives untouched,
 including your Claude Code login and history under `claude/`. To take a seed
 again, delete it and run `para up`.
@@ -51,7 +51,7 @@ template owns that name. Yours stays exactly where it is; this mod just points
 In **`$HOME`**, as symlinks onto the above: `~/.zshrc`, `~/.config/tmux`,
 `~/.config/nvim`, `~/.local/share/nvim`, `~/.claude`, `~/.claude.json`. Anything
 real already sitting at one of those paths is **deleted**, because `ln -sfn` onto
-a real directory would otherwise nest the link inside it — so a workspace that
+a real directory would otherwise nest the link inside it, so a workspace that
 predates this mod loses its local `~/.claude` in favour of the shared one.
 
 In the **image**: `/etc/gitconfig`, `/etc/claude-code/managed-settings.json`
@@ -60,8 +60,8 @@ In the **image**: `/etc/gitconfig`, `/etc/claude-code/managed-settings.json`
 
 ## Neovim: config shared, plugins installed once
 
-The image carries the toolchain — Neovim, Node, `tree-sitter`, `fd`/`rg`/`bat`/
-`fzf` — but not the plugins. The config is seeded from `skel/nvim/` onto the
+The image carries the toolchain (Neovim, Node, `tree-sitter`, `fd`/`rg`/`bat`/
+`fzf`) but not the plugins. The config is seeded from `skel/nvim/` onto the
 shared volume and linked in at `~/.config/nvim`; plugin, parser and LSP state
 lives beside it (`~/.local/share/nvim` → `nvim-data`). So a config edit is live
 everywhere at once, and plugins install **once** on first `nvim` launch.
@@ -69,12 +69,12 @@ everywhere at once, and plugins install **once** on first `nvim` launch.
 > [!WARNING]
 > `nvim-data` is read-mostly at runtime and many workspaces reading it is fine,
 > but don't run installs (`:Lazy sync`, a first-launch `:TSInstall`, Mason) in
-> two workspaces *simultaneously* — they write the same tree and can corrupt a
+> two workspaces *simultaneously*, because they write the same tree and can corrupt a
 > parser or clobber `lazy-lock.json`. Set it up once, then it's just reads.
 
 ## Making it yours
 
-It's vendored — the copy under your `.paraspace/mods/` is in your git history,
+It's vendored, so the copy under your `.paraspace/mods/` is in your git history,
 so edit `skel/` freely and `para up` pushes the change with no image rebuild.
 Adding packages or another runtime means editing `hooks/image-build` and
 rebuilding.

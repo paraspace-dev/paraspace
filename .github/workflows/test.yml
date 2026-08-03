@@ -1,7 +1,7 @@
 name: test
 
 # The CLI tier of the para suite (test/run --cli): argument handling, help text,
-# and `para init`. It needs only bash + the checkout — no incus — so it runs on
+# and `para init`. It needs only bash + the checkout, with no incus, so it runs on
 # GitHub-hosted runners. The e2e tier (test/run --e2e) drives real Incus
 # workspaces and is run locally / on a self-hosted incus runner, not here.
 on:

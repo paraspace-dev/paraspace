@@ -36,28 +36,29 @@ project
   ✓ image 'myapp' exists
 ```
 
-`✓` passed, `!` is advice, `✗` is a failure — and any `✗` exits non-zero. The
-`config` block is also the answer to "what did para actually resolve" — check it
-whenever a setting doesn't seem to be taking effect.
+`✓` passed, `!` is advice, and `✗` is a failure that exits non-zero. The
+`config` block is also the answer to "what did para actually resolve", so check
+it whenever a setting doesn't seem to be taking effect.
 
 ## The host
 
 ### Your Incus is too old
 
 > ✗ incus 6.2 cannot select device columns, which is how para reads workspace
-> state — upgrade to 6.22 or newer (Ubuntu's repos ship 6.2)
+> state. Upgrade to 6.22 or newer (Ubuntu's repos ship 6.2)
 
-para has no registry: it asks Incus for each workspace's project, routes and IP
+para has no registry. It asks Incus for each workspace's project, routes and IP
 as query columns, which needs **Incus ≥ 6.22**. Distro repos lag, so install
 from [the Incus package
 repositories](https://linuxcontainers.org/incus/docs/main/installing/).
 
 ### Containers won't start at all
 
-> ✗ cgroup-v1 mounted inside /sys/fs/cgroup (…)
+> ✗ cgroup-v1 mounted inside /sys/fs/cgroup (…), so containers will not start
+> until: sudo umount -l …
 
 A named cgroup-v1 hierarchy mounted under `/sys/fs/cgroup` makes LXC fail every
-container start with a cryptic `Failed to create cgroup at_mnt`. Unmount it —
+container start with a cryptic `Failed to create cgroup at_mnt`. Unmount it, and
 doctor prints the exact path:
 
 ```sh
@@ -76,11 +77,11 @@ and OpenZFS ≥ 2.2 if the pool is on ZFS.
 
 ### Everything inside the workspace is slow
 
-> ! pool 'default' is btrfs-backed — nested Docker falls back to vfs
+> ! pool 'default' is btrfs-backed, so nested Docker falls back to vfs
 
-The slowest failure para has, and it's silent: nested Docker can't use overlayfs
-on a btrfs or ZFS-backed Incus pool, so it falls back to the `vfs` driver, which
-copies the whole filesystem per layer. Put para on a `dir` pool over ext4/xfs:
+Nested Docker can't use overlayfs on a btrfs or ZFS-backed Incus pool, so it
+falls back to the `vfs` driver, which copies the whole filesystem per layer.
+Put para on a `dir` pool over ext4/xfs:
 
 ```sh
 incus storage create para-dir dir source=/path/on/ext4
@@ -90,20 +91,20 @@ Then set `PARA_POOL` in your [user config](./parafile.md#user-config-not-parafil
 
 ### The workspace is up but the URL doesn't load
 
-> ✗ *.paraspace.dev does not resolve to 127.0.0.1 — workspace URLs will not
+> ✗ *.paraspace.dev does not resolve to 127.0.0.1, so workspace URLs will not
 > load (docs/urls.md)
 
 The wildcard has to point at your machine. The default `paraspace.dev` already
-does; a custom `PARA_DOMAIN` needs a wildcard record of your own — see
+does; a custom `PARA_DOMAIN` needs a wildcard record of your own. See
 [Workspace URLs](./urls.md#using-your-own-domain).
 
 If DNS is fine, check Caddy is actually up (`para caddy status`) and that the
-browser trusts its CA — a first-run `caddy trust` covers most browsers, and
+browser trusts its CA. A first-run `caddy trust` covers most browsers, and
 [Workspace URLs](./urls.md#trusting-the-certificate) covers the rest.
 
 ### Caddy can't bind `:443`
 
-> ✗ caddy cannot bind :443 unprivileged — sudo setcap …
+> ✗ caddy cannot bind :443 unprivileged. Run sudo setcap …
 
 Non-root can't bind below 1024 on Linux. Grant the capability (re-apply after
 every `caddy` upgrade), or stay on the default `:8443`:
@@ -119,24 +120,24 @@ re-run.
 
 ## The project
 
-### `no image 'myapp' — para image build`
+### `no image 'myapp'. Build it with: para image build`
 
 The base image is per-project and per-arch, and it isn't built for you. Run
-`para image build` — several minutes the first time. See
+`para image build`, which takes several minutes the first time. See
 [The image contract](./image.md).
 
 ### `Permission denied (publickey)` during the first `up`
 
 The machine's para key isn't authorized at your git host yet. `para up` is
-idempotent, so authorize it and re-run — [Shared
+idempotent, so authorize it and re-run. See [Shared
 authentication](./shared-auth.md).
 
 ### `up` succeeds but the URL returns 502
 
 Caddy is proxying to a port nothing is listening on. Almost always a `boot` hook
-that returned zero before its services were actually up: the
-[readiness contract](./hooks.md#boot) is that it returns only once every routed
-service is listening (`docker compose up -d --wait`). Check from inside:
+that returned zero before its services were actually up. The
+[readiness contract](./hooks.md#boot) requires that it return only once every
+routed service is listening (`docker compose up -d --wait`). Check from inside:
 
 ```sh
 para sh <name> -c 'ss -ltnp'

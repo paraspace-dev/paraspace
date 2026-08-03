@@ -14,7 +14,7 @@ return {
   { "tpope/vim-obsession", lazy = false },
   { "editorconfig/editorconfig-vim", event = { "BufReadPre", "BufNewFile" } },
 
-  -- mini.* — small, focused, well-maintained
+  -- mini.*, small and focused and well-maintained
   {
     "echasnovski/mini.surround",
     version = "*",
@@ -22,12 +22,12 @@ return {
     -- Remapped from mini.surround's native `sa`/`sd`/`sr`/`sf`/`sh` to
     -- vim-surround's `ys`/`ds`/`cs` for muscle-memory continuity.
     --
-    -- The native scheme is genuinely cleaner — one `s` prefix, mnemonic
+    -- The native scheme is genuinely cleaner, with one `s` prefix, mnemonic
     -- second letter, plus `sf`/`sh` (find / highlight) and `<char>l`/`<char>n`
     -- suffixes for last/next match. We give that up because adopting it
     -- means clobbering `s` (substitute char), and the alternative for `s`
     -- alone (`vc`) is one extra keystroke. (For single-char replace, `r<char>`
-    -- is already shorter than `s<char><esc>` — no loss there.)
+    -- is already shorter than `s<char><esc>`, so no loss there.)
     --
     -- Aspirational: migrate to defaults eventually. When ready, set the
     -- mappings table to `{}`, add `vim.keymap.set({'n','x'}, 's', '<Nop>')`
@@ -105,7 +105,7 @@ return {
     },
   },
 
-  -- Image paste in markdown — replaces clipboard-image.nvim
+  -- Image paste in markdown, replaces clipboard-image.nvim
   {
     "HakonHarnes/img-clip.nvim",
     event = "VeryLazy",

@@ -1,12 +1,12 @@
-# para shared zshrc — seeded once into the shared volume from .paraspace/skel/, then
+# para shared zshrc, seeded once into the shared volume from .paraspace/skel/, then
 # yours (para never overwrites it after the first seed). Shared by every workspace
 # of this project via ~/.zshrc, so edits apply everywhere.
 #
 # NOTE: the void-minimal base image installs NOTHING, so it logs you into bash and
-# this file sits unused until you add `zsh` to .paraspace/hooks/image-build — at which
+# this file sits unused until you add `zsh` to .paraspace/hooks/image-build, at which
 # point the provision hook switches your login shell and this applies. It's the
 # seed of your shell config; grow it as you add tools. (The dotfiles-jchook mod
-# is a fully fleshed-out one — aliases, a git-aware prompt, editor/browser setup.)
+# is a fully fleshed-out one, with aliases, a git-aware prompt, and editor setup.)
 
 # --- history (per-workspace: home is not shared) -----------------------------
 HISTFILE=~/.zsh_history
@@ -20,7 +20,7 @@ autoload -Uz compinit && compinit -u
 
 # --- prompt ------------------------------------------------------------------
 # %m is the container hostname (para-<workspace>), so every shell announces which
-# workspace you're in — the whole point of running several at once.
+# workspace you're in, the whole point of running several at once.
 setopt prompt_subst
 PROMPT='%F{cyan}%m%f %F{yellow}%1~%f %# '
 

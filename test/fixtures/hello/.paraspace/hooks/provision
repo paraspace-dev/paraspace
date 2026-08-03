@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
-# para provision hook — runs INSIDE the workspace before boot (in the clone if it
-# already exists, else $HOME — so use absolute paths), as the
+# para provision hook, run INSIDE the workspace before boot (in the clone if it
+# already exists, else $HOME, so use absolute paths), as the
 # $PARA_USER user (uid $PARA_UID). Idempotent: para re-runs it on every `para up`.
 #
 # The hello fixture has no repo to clone and no toolchain to install (that's baked
-# into the image). Provision does just enough to exercise the shared-volume seam:
+# into the image). Provision does just enough to exercise the shared volume:
 # it drops a one-time marker on the per-project shared volume and links it into
 # $HOME, so the e2e suite can prove the volume is mounted and shared across a
 # project's workspaces.
@@ -14,7 +14,7 @@ set -euo pipefail
 
 shared="$PARA_SHARED"
 
-# `para sh <ws> -c` (and the interactive shell) cd into ~/$PARA_CLONE_DIR — para's
+# `para sh <ws> -c` (and the interactive shell) cd into ~/$PARA_CLONE_DIR, and para's
 # working-copy convention. A real project's clone hook creates it by cloning; this
 # fixture has no repo, so make the dir exist or every `para sh -c` would `cd || exit`
 # into nothing and run as a silent no-op.
@@ -25,7 +25,7 @@ mkdir -p "$HOME/$PARA_CLONE_DIR"
 : > "$HOME/owners-seen"
 printf 'project-provision\n' >> "$HOME/owners-seen"
 
-# A hook point of the fixture's own — para has never heard the name. A real
+# A hook point of the fixture's own, a name para has never heard. A real
 # template opens one where it has an ordering constraint; this one exists so the
 # e2e tier covers a point a project opens, not just the three para invokes.
 "$PARA_RUN_HOOK" clone:before

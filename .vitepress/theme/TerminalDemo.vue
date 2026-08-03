@@ -63,7 +63,7 @@ onMounted(() => {
 
 <style scoped>
 /* Gruvbox dark-hard terminal under the CRT poster; gruvbox light under the
-   print one — see the light override below the palette. */
+   print one; see the light override below the palette. */
 .para-hero {
   --gb-bg: #1d2021;
   --gb-bg-soft: #282828;
@@ -87,7 +87,7 @@ onMounted(() => {
   margin: 0 auto;
   /* Headroom for the stack, on the two sides it actually travels: two layers
      up and to the right at 14px each. Keep this in step with .ghost's inset
-     and the translate below — the three together are what make the offsets
+     and the translate below, and the three together are what make the offsets
      land on one diagonal. */
   padding: 28px 28px 0 0;
 }
@@ -134,7 +134,7 @@ html:not(.dark) .para-hero {
  * ws2 and ws3, receding behind the front window. Three dimmed copies of the
  * same pane just read as a smudge, so the stack changes state as it goes back
  * instead of only changing opacity: the near one is a translucent pane, the far
- * one is a drawn outline with nothing inside it. Solid, glass, line — the way a
+ * one is a drawn outline with nothing inside it. Solid, glass, line, the way a
  * mission diagram renders the thing itself, the thing behind it, and the thing
  * that's only a plan. It also fixes the daylight problem the dimming had, since
  * a hairline can't smudge a bright sky the way a dark pane does.
@@ -150,7 +150,7 @@ html:not(.dark) .para-hero {
 }
 
 /* Sits exactly on the terminal to start with, so the only thing separating the
-   layers is the translate — an even 14px up and right, one step per layer, and
+   layers is the translate, an even 14px up and right, one step per layer, and
    --d is the line that puts it there: each pane arrives on its workspace's URL. */
 .ghost {
   position: absolute;
@@ -258,7 +258,7 @@ html:not(.dark) .term {
   color: var(--gb-yellow);
   /* 600, not 700: that's the bold cut of Plex Mono the page loads, and asking
      for a weight no loaded face has leaves the choice to each engine's font
-     matching — some pick the 600, some smear a synthetic bold over it. */
+     matching, since some pick the 600 and some smear a synthetic bold over it. */
   font-weight: 600;
 }
 
@@ -304,7 +304,7 @@ html:not(.dark) .term {
 /* ---- Reveal ------------------------------------------------------------- */
 
 /*
- * The terminal arrives the way the feature rows below it do — a rise and a
+ * The terminal arrives the way the feature rows below it do, with a rise and a
  * fade, one gesture, once.
  */
 .para-hero.js {
@@ -320,8 +320,8 @@ html:not(.dark) .term {
   transform: none;
 }
 
-/* And the session waits for it. One rule holds every clock in here — the typing,
-   the output lines, the two panes, the cursor — so there is no timeline that can
+/* And the session waits for it. One rule holds every clock in here (the typing,
+   the output lines, the two panes, the cursor), so there is no timeline that can
    start early. */
 .para-hero.js * {
   animation-play-state: paused;

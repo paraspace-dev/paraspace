@@ -2,13 +2,13 @@
 set -euo pipefail
 
 # Guest provisioning for the void-minimal base image. Runs as root inside a fresh
-# $PARA_IMAGE_BASE container — `images:voidlinux` (glibc) per the Parafile —
-# invoked by `para image build`. This is the BAREST image: it installs nothing.
-# It just stands up a workspace user on the Void base (which — with the
-# Parafile's PARA_IMAGE_BOOTSTRAP — already ships bash, sudo, ca-certificates,
-# coreutils, and a current xbps), enough for an interactive shell via `para sh`.
+# $PARA_IMAGE_BASE container (`images:voidlinux` (glibc) per the Parafile) and
+# invoked by `para image build`. This is the BAREST image, and it installs
+# nothing. It just stands up a workspace user on the Void base, which with the
+# Parafile's PARA_IMAGE_BOOTSTRAP already ships bash, sudo, ca-certificates,
+# coreutils, and a current xbps, enough for an interactive shell via `para sh`.
 #
-# This is yours — para owns no image. The `pkgs=""` block below is where your
+# This is yours, since para owns no image. The `pkgs=""` block below is where your
 # toolchain goes; a boot hook that runs an app is where hooks/boot goes. Grow this
 # into templates/void-docker-gh (docker + a clone + a real boot) as you go.
 
@@ -18,7 +18,7 @@ PARA_USER="${PARA_USER:-app}"
 PARA_UID="${PARA_UID:-1000}"
 PARA_GID="${PARA_GID:-1000}"
 
-# ---- packages (empty by default — this box installs nothing) ----------------
+# ---- packages (empty by default, this box installs nothing) -----------------
 # Add what your app needs here, space-separated, then rebuild with `para
 # image-build`. Leave it empty for a bare box. Common first additions:
 #   pkgs="zsh tmux neovim git curl"          # a richer interactive shell + editor
@@ -30,7 +30,7 @@ pkgs=""
 missing=()
 for p in $pkgs; do xbps-query "$p" >/dev/null 2>&1 || missing+=("$p"); done
 if [ "${#missing[@]}" -gt 0 ]; then
-  # Full-upgrade FIRST so the new packages match the rest of the base image —
+  # Full-upgrade FIRST so the new packages match the rest of the base image,
   # installing against freshly-synced repodata without a full -Syu is Void's
   # classic partial-upgrade footgun (a new package pulls a lib newer than a
   # held-back one and shlib resolution breaks). Skipped entirely while pkgs="".
@@ -38,7 +38,7 @@ if [ "${#missing[@]}" -gt 0 ]; then
   xbps-install -Syu -y >/dev/null
   xbps-install -Sy "${missing[@]}" >/dev/null
 else
-  echo "  (none — bare box)"
+  echo "  (none, bare box)"
 fi
 
 # Void incus ships /tmp as 0755 root:root; a normal install is sticky 1777. Without
@@ -59,4 +59,4 @@ id -u "$PARA_USER" >/dev/null 2>&1 \
 echo "$PARA_USER ALL=(ALL) NOPASSWD:ALL" > "/etc/sudoers.d/90-$PARA_USER-nopasswd"
 chmod 0440 "/etc/sudoers.d/90-$PARA_USER-nopasswd"
 
-echo "==> provisioning complete (bare box — add your toolchain above)"
+echo "==> provisioning complete (bare box, add your toolchain above)"

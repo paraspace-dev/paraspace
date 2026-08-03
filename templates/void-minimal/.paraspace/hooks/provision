@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
-# para provision hook — runs INSIDE the workspace before boot (in the clone if it
-# already exists, else $HOME — so use absolute paths).
+# para provision hook, run INSIDE the workspace before boot (in the clone if it
+# already exists, else $HOME, so use absolute paths).
 #
 # The barest useful provision: seed the shell rc onto the shared volume and link
-# it in. No clone, no .env, no app — this box runs nothing. The comments at the
+# it in. No clone, no .env, no app, because this box runs nothing. The comments at the
 # bottom mark where each of those grows in; templates/void-docker-gh is the same
 # hook fully fleshed out (shared-volume seeding, git-key auth, .env handling).
 #
@@ -39,7 +39,7 @@ fi
 # ---- where this grows ------------------------------------------------------
 # This box clones nothing and boots nothing. When you have an app:
 #   • add its toolchain to .paraspace/hooks/image-build (the empty `pkgs=""` block)
-#   • clone it here — copy the shared-volume seeding, git-key authorization, and
+#   • clone it here, copying the shared-volume seeding, git-key authorization, and
 #     .env handling from templates/void-docker-gh/.paraspace/hooks/provision
 #   • bring it up in .paraspace/hooks/boot, and point PARA_ROUTES at its port
-stage "Bare box provisioned — see the comments here + hooks/boot to add an app"
+stage "Bare box provisioned. See the comments here + hooks/boot to add an app"

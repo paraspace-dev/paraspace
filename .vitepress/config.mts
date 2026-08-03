@@ -7,13 +7,13 @@ import { gruvboxDark, gruvboxLight } from './shiki-gruvbox'
 export default defineConfig({
   title: 'ParaSpace',
   description:
-    'Parallel dev workspaces — every task gets a full, isolated copy of your project with its own stack and URL.',
+    'Parallel dev workspaces. Every task gets a full, isolated copy of your project with its own stack and URL.',
   cleanUrls: true,
   lastUpdated: true,
 
   // The two faces the first screen actually paints: the body sans and the mono
   // the poster's host list is set in. Preloaded so neither swaps under the
-  // reader — the rest of Plex Mono's weights can wait for the stylesheet. The
+  // reader, and the rest of Plex Mono's weights can wait for the stylesheet. The
   // wordmark needs no font at all; it's drawn (see theme/Wordmark.vue). Fonts
   // are fetched in CORS mode even same-origin, hence the crossorigin attribute.
   head: (

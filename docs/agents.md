@@ -27,15 +27,15 @@ the agent can install packages, rewrite the tree, and run whatever it likes;
 
 Two things are *not* isolated:
 
-- **the network** — workspaces have ordinary outbound access. para does no
+- **the network.** Workspaces have ordinary outbound access. para does no
   egress filtering; that's an Incus network ACL if you want it.
-- **the git key** — the [shared volume](./internals.md#the-shared-home-volume)
+- **the git key.** The [shared volume](./internals.md#the-shared-home-volume)
   holds the project's key, so an agent can push to whatever that key is
   authorized for. Scope it narrowly if that matters; see
   [Shared authentication](./shared-auth.md).
 
-Everything else — your home directory, your host SSH keys, your cloud
-credentials — isn't reachable from inside a workspace, because it was never
+Everything else (your home directory, your host SSH keys, your cloud
+credentials) isn't reachable from inside a workspace, because it was never
 mounted there.
 
 ## Driving one
@@ -54,12 +54,12 @@ ships them, so write them into your own `.paraspace/commands/` if you'd rather
 not take the [mod](./mods.md):
 
 ```sh
-# .paraspace/commands/claude — "para claude <ws>"
+# .paraspace/commands/claude ("para claude <ws>")
 exec "$PARA_BIN" sh "$1" -c "exec claude --name $1"
 ```
 
 ```sh
-# .paraspace/commands/run — "para run <ws>", tmux with claude in one window
+# .paraspace/commands/run ("para run <ws>"), tmux with claude in one window
 exec "$PARA_BIN" sh "$1" -c "
   tmux has-session -t $1 2>/dev/null && exec tmux attach -t $1
   tmux new-session -d -s $1 -n claude \"claude --name $1\"
@@ -68,13 +68,13 @@ exec "$PARA_BIN" sh "$1" -c "
 "
 ```
 
-They stay one-liners because `para sh` owns the terminal handling — see
+They stay one-liners because `para sh` owns the terminal handling. See
 [Commands](./commands.md#project-commands). The mod's copies are the same
 one-liners with the argument quoting filled in, so `para claude ws -p 'write a
 test'` reaches Claude Code as one argument instead of four.
 
 For the agent to feel like home, put your dotfiles in `.paraspace/skel/` and
-have your provision hook link them in — or vendor a mod that brings its own
+have your provision hook link them in, or vendor a mod that brings its own
 (`para mod add dotfiles-jchook` installs Claude Code, an editor and a shell in
 one step). The agent's own config (`CLAUDE.md`, `AGENTS.md`) travels with the
 repo, so it's already in the clone.
@@ -113,9 +113,9 @@ shared one. When the branch has landed:
 para rm fix-login
 ```
 
-The shared volume — and with it your authentication — survives.
+The shared volume survives, and with it your authentication.
 
 ## When something's wrong
 
 When an `up` fails for reasons that don't look like your project's, run
-`para doctor` — see [Troubleshooting](./troubleshooting.md).
+`para doctor`. See [Troubleshooting](./troubleshooting.md).

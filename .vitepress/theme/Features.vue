@@ -2,8 +2,8 @@
 /**
  * The five things para gives you, alternating down the page.
  *
- * Each one sits in a lens — the same primitive the hero is built from (see
- * .pv-lens in custom.css) — and takes the hue of the hero circle on its side:
+ * Each one sits in a lens, the same primitive the hero is built from (see
+ * .pv-lens in custom.css), and takes the hue of the hero circle on its side:
  * blue on the left, green on the right. The two circles separate on load and
  * then walk down the page, which is the whole reason the section reads as part
  * of the poster rather than a list underneath it.
@@ -17,7 +17,7 @@ const ROWS = [
   {
     key: 'planet',
     title: 'Sandboxed',
-    body: 'Set your agent harness to <code>--yolo</code> mode and enjoy peace of mind. Each workspace runs in an unprivileged system container — fast boot up, minimal resource usage, and you can run containerized stacks inside it. Run many at once and none of them can see another\'s branch, database, or half-finished edits.',
+    body: 'Set your agent harness to <code>--yolo</code> mode and enjoy peace of mind. Each workspace runs in an unprivileged system container, so it boots fast, costs little to keep around, and runs containerized stacks inside it. Run many at once and none of them can see another\'s branch, database, or half-finished edits.',
   },
   {
     key: 'key',
@@ -27,7 +27,7 @@ const ROWS = [
   {
     key: 'sputnik',
     title: 'Workspace subdomains',
-    body: 'Access <code>https://fix-login.paraspace.dev</code> the moment it\'s up — no DNS to set up; local TLS &amp; CA trust is automatic. Your stack keeps its usual ports, so hot reload and WebSockets need no configuration.',
+    body: 'Access <code>https://fix-login.paraspace.dev</code> the moment it\'s up, with no DNS to set up and local TLS &amp; CA trust handled for you. Your stack keeps its usual ports, so hot reload and WebSockets need no configuration.',
   },
   {
     key: 'rocket',
@@ -45,8 +45,8 @@ const root = ref(null)
 
 /*
  * The reveal is added by script and only ever by script: without it every row
- * is already in its finished state, so a reader with no JS — or one who asked
- * for less motion — gets the page rather than five empty gaps.
+ * is already in its finished state, so a reader with no JS, or one who asked
+ * for less motion, gets the page rather than five empty gaps.
  */
 onMounted(() => {
   if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
@@ -217,7 +217,7 @@ onMounted(() => {
   order: 2;
 }
 
-/* Blue on the left, green on the right — whichever hero circle that side came
+/* Blue on the left, green on the right, whichever hero circle that side came
    from. The small lens turns the poster's dials down; at 150px the poster's
    bloom would swallow the icon. */
 .row {
@@ -243,7 +243,7 @@ onMounted(() => {
 
 /*
  * The warm core: the underglow from the hero, pooled behind each icon so the
- * glyph is lit rather than painted. It wants to be barely there — enough to
+ * glyph is lit rather than painted. It wants to be barely there, enough to
  * warm the ink and no more. Sized to the side and taken to zero at the clip,
  * like the halo, and front-loaded so it is gone well before the glass.
  */
@@ -262,7 +262,7 @@ onMounted(() => {
 
 /*
  * Optical sizing. Drawn at their natural proportions the glyphs range 21% in
- * height — a rocket is a tall thing and a monitor is a wide one — and the tall
+ * height (a rocket is a tall thing and a monitor is a wide one), and the tall
  * ones read as crowding the heading below even though every gap here is
  * identical to the pixel. Each is scaled to one optical height, with the stroke
  * divided back out so they all keep the same weight. The numbers come from
@@ -302,7 +302,7 @@ onMounted(() => {
   stop-color: var(--pv-lens-b);
 }
 
-/* Secondary detail — a terminator, a highlight, a far signal arc — reads as
+/* Secondary detail (a terminator, a highlight, a far signal arc) reads as
    depth at full strength and as clutter. */
 .ico :deep(.soft) {
   opacity: 0.55;

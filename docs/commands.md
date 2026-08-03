@@ -1,25 +1,25 @@
 # Commands
 
 `para --help` is always current for the build you're running; this page is the
-same surface with room to explain. It comes in two halves: the **engine verbs**
-below, which are fixed, and the **project commands** your repo adds — its own,
-and any a [mod](./mods.md) brought with it.
+same surface with room to explain. It comes in two halves. The **engine verbs**
+below are fixed, and the **project commands** your repo adds are its own, plus
+any a [mod](./mods.md) brought with it.
 
 Only `para up`, `para image …` and `para mod add` must run inside a project (a
-`.paraspace/` directory, found from `$PWD` upward). Everything else — including
-`para init`, which is how you *create* one — works from anywhere.
+`.paraspace/` directory, found from `$PWD` upward). Everything else works from
+anywhere, including `para init`, which is how you *create* one.
 
 ## Workspaces
 
 | Command | What it does |
 |---|---|
-| `para up <name>` | create or reconverge a workspace, then boot it: launch, attach the shared volume, push `.paraspace/`, run the hooks, publish the routes. Idempotent |
+| `para up <name>` | create or reconverge a workspace, then boot it by launching it, attaching the shared volume, pushing `.paraspace/`, running the hooks and publishing the routes. Idempotent |
 | `para down <name>` | stop the container. Data is kept; `para up` resumes it |
 | `para rm <name>` | delete the workspace. The shared volume is untouched |
 | `para ls [-a\|--all] [--names]` | list this project's workspaces; `--all` spans every project, `--names` prints bare names (this is what completion reads) |
 | `para sh <name> [-c <command>]` | a shell in the clone, or [one command in it](#running-one-command) |
 
-`up`, `down` and `rm` converge: they warn and succeed when the world is already
+`up`, `down` and `rm` converge. They warn and succeed when the world is already
 in the state you asked for, so teardown scripts and retries stay simple.
 
 ```
@@ -41,25 +41,25 @@ diff <(para sh ws1 -c 'cat package.json') package.json
 ```
 
 The command is handed to bash as a single string, so pipes, redirects and `&&`
-work as written — quote the whole thing or your host shell eats them first. Two
-caveats:
+work as written, but quote the whole thing or your host shell eats them first.
+Two caveats:
 
-- It's a **non-interactive login bash**: `/etc/profile` and `~/.bash_profile`
-  are read, but the interactive rc your `skel/` installs is not, so `PATH`
-  entries added there are missing. Ask for that shell explicitly if you need it:
-  `para sh ws1 -c 'zsh -ic "npm test"'`.
+- It's a **non-interactive login bash**, so `/etc/profile` and `~/.bash_profile`
+  are read but the interactive rc your `skel/` installs is not, and `PATH`
+  entries added there are missing. Ask for that shell explicitly if you need it,
+  with `para sh ws1 -c 'zsh -ic "npm test"'`.
 - A pty is allocated only when para's own stdin *and* stdout are terminals, so
   `-c 'vim …'` works from a terminal while `| tee`, `> file` and `$(…)` stay
   byte-clean. `PARA_NONINTERACTIVE=1` forces the no-pty path.
 
-There is no `para exec` — this is it.
+There is no `para exec`; this is it.
 
 ## Host
 
 | Command | What it does |
 |---|---|
 | `para caddy <start\|stop\|status>` | the para Caddy that serves `*.$PARA_DOMAIN`. `para up` starts it for you; `stop` leaves workspaces running |
-| `para doctor` | check this machine and print the resolved config — see [Troubleshooting](./troubleshooting.md) |
+| `para doctor` | check this machine and print the resolved config (see [Troubleshooting](./troubleshooting.md)) |
 | `para config <edit\|init\|path>` | open, seed, or locate the [user config](./parafile.md#user-config-not-parafile) |
 
 The user config is hand-edited, so `config` just gets you to it:
@@ -69,7 +69,7 @@ para config edit    # opens it in $VISUAL/$EDITOR, creating it first if needed
 ```
 
 That's the only one you need day to day. `init` seeds the file without opening
-it (`--force` overwrites); `path` prints its location — both for scripting.
+it (`--force` overwrites); `path` prints its location. Both are for scripting.
 
 ## Project
 
@@ -77,7 +77,7 @@ it (`--force` overwrites); `path` prints its location — both for scripting.
 |---|---|
 | `para init [<template>] [--list] [-f\|--force] [--full]` | scaffold `.paraspace/` from a bundled template (default `void-docker-gh`), skipping files that already exist; `--full` copies the whole template tree, not just `.paraspace/` |
 | `para mod add <name>` | vendor a bundled [mod](./mods.md) into `.paraspace/mods/<name>/`, replacing it if it's already there. `--list` in place of a name prints what this `para` ships |
-| `para image build [-i\|--from-current]` | build and publish the project's base image; `-i` layers onto the current one for fast iteration — see [The image contract](./image.md) |
+| `para image build [-i\|--from-current]` | build and publish the project's base image; `-i` layers onto the current one for fast iteration (see [The image contract](./image.md)) |
 | `para image status` | when `$PARA_IMAGE` was built, and from what base |
 | `para image rm` | delete `$PARA_IMAGE`. Running workspaces are clones and keep running |
 | `para commands` | list the verbs this project adds, its mods' included, one per line |
@@ -105,10 +105,11 @@ xdg-open "$url"
 ```
 
 Save that as `.paraspace/commands/web`, make it executable, and `para web ws1`
-works. Three variables exist for exactly this: **`PARA_BIN`** (the path to this
-`para`, so a command can call back without relying on `$PATH`),
-**`PARA_PROJECT_DIR`**, and — only when the command came from a
-[mod](./mods.md) — **`PARA_MOD_DIR`**, the directory that mod was vendored into.
+works. Three variables exist for exactly this. **`PARA_BIN`** is the path to
+this `para`, so a command can call back without relying on `$PATH`.
+**`PARA_PROJECT_DIR`** is the project directory. **`PARA_MOD_DIR`** is the
+directory a mod was vendored into, and para sets it only when the command came
+from a [mod](./mods.md).
 
 Because [`para sh`](#running-one-command) owns all the terminal handling,
 commands that drive something inside a workspace stay one-liners:
@@ -129,8 +130,8 @@ A few rules keep this safe to have in a repo you cloned:
 - They run with **your** privileges, on the host, like any other script in the
   repo. Read them before you run them.
 
-The bundled templates ship a few as examples, not as features — delete the ones
-you don't want:
+The bundled templates ship a few as examples, not as features, so delete the
+ones you don't want:
 
 | Template | Commands |
 |---|---|
@@ -138,5 +139,5 @@ you don't want:
 | `void-minimal` | none |
 
 A [mod](./mods.md) you vendored can add verbs too, listed the same way with the
-mod named beside them — [the precedence rules are
+mod named beside them. [The precedence rules are
 there](./mods.md#verbs-a-mod-brings).

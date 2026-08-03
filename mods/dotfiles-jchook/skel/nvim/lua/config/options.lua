@@ -76,7 +76,7 @@ opt.statusline = " %f %m %a%=%l, %c %y %P "
 -- POSIX shell highlighting
 vim.g.is_posix = 1
 
--- Disable some unused providers — speeds startup, hides install warnings
+-- Disable some unused providers, which speeds startup and hides install warnings
 vim.g.loaded_perl_provider = 0
 vim.g.loaded_ruby_provider = 0
 vim.g.loaded_node_provider = 0

@@ -1,19 +1,18 @@
 #!/usr/bin/env bash
 set -u
-# para-probe — one read-only report on this machine and this project, so a
+# para-probe writes one read-only report on this machine and this project, so a
 # ParaSpace setup starts from what is installed rather than from a guess.
 #
 # Neither -e nor pipefail: every section is allowed to fail (a missing tool IS
-# the finding), and a probe that reports failure is as useless as one that stops
-# at the first one — the agent running it would read a non-zero exit as "the
-# survey broke" and start debugging the probe.
+# the finding), and a non-zero exit would read as "the survey broke", sending
+# the agent off to debug the probe instead of the machine.
 
 have()    { command -v "$1" >/dev/null 2>&1; }
 section() { printf '\n== %s\n' "$*"; }
 kv()      { printf '  %-14s %s\n' "$1" "$2"; }
 
 # para's package root, through any symlink chain, the way bin/para's pkg_root
-# does it — plain readlink, because macOS has no readlink -f. The docs and
+# does it with plain readlink, because macOS has no readlink -f. The docs and
 # templates the setup skill must read live in there.
 para_pkg() {
   local self dir link
@@ -27,7 +26,7 @@ para_pkg() {
 }
 
 # para finds a project by walking up from $PWD for a .paraspace/, so git's
-# toplevel is only a fallback — in a monorepo the two are different directories.
+# toplevel is only a fallback. In a monorepo the two are different directories.
 project_root() {
   local dir="$PWD"
   while [ "$dir" != / ]; do
@@ -41,7 +40,7 @@ vcs_kind() {
   if   [ -d "$1/.git" ]; then echo git
   elif [ -d "$1/.hg"  ]; then echo mercurial
   elif [ -d "$1/.svn" ]; then echo svn
-  else echo "none found — the code has to be pushed in, not cloned"
+  else echo "none found, the code has to be pushed in rather than cloned"
   fi
 }
 
@@ -49,8 +48,8 @@ section machine
 kv os "$(uname -s) $(uname -r) $(uname -m)"
 case "$(uname -s)" in
   Darwin)
-    kv incus-runs-in "a Colima VM — containers, images and the storage pool live in there"
-    if have colima; then colima list 2>&1 | sed 's/^/  /'; else kv colima "MISSING — brew install colima"; fi
+    kv incus-runs-in "a Colima VM, which holds the containers, images and storage pool"
+    if have colima; then colima list 2>&1 | sed 's/^/  /'; else kv colima "MISSING, run: brew install colima"; fi
     ;;
   Linux)
     [ -r /etc/os-release ] && kv distro "$(sed -n 's/^PRETTY_NAME=//p' /etc/os-release | tr -d '"')"
@@ -69,12 +68,12 @@ have para  && kv para-version  "$(para --version 2>&1 | head -1)"
 have incus && kv incus-version "$(incus version 2>&1 | tr '\n' ' ')"
 have caddy && kv caddy-version "$(caddy version 2>&1 | head -1)"
 if pkg="$(para_pkg 2>/dev/null)"; then
-  kv docs      "$pkg/docs"        # the authoritative spec for THIS para — read it
+  kv docs      "$pkg/docs"        # the authoritative spec for THIS para
   kv templates "$pkg/templates"
 fi
 
-# Storage driver is the one thing doctor can only warn about and the one that
-# silently costs the most: nested Docker on btrfs/zfs falls back to vfs.
+# Storage driver is the one thing doctor can only warn about, and the one that
+# costs the most silently, since nested Docker on btrfs/zfs falls back to vfs.
 section incus
 if have incus && incus info >/dev/null 2>&1; then
   printf '  storage pools (name,driver):\n'
@@ -82,29 +81,29 @@ if have incus && incus info >/dev/null 2>&1; then
   printf '  managed bridges (name,ipv4):\n'
   incus network list -f csv -c nm4 | grep ',YES,' | cut -d, -f1,3 | sed 's/^/    /'
 else
-  kv daemon "unreachable — on macOS: colima start --runtime incus"
+  kv daemon "unreachable; on macOS run: colima start --runtime incus"
 fi
 
 section "para doctor"
 if have para; then
   report="$(para doctor 2>&1)"; rc=$?
   printf '%s\n' "$report" | sed 's/^/  /'
-  kv exit "$rc — host ✗ are the human's to fix; 'no image' is expected before adoption"
+  kv exit "$rc; host ✗ are the human's to fix, and 'no image' is expected before adoption"
 else
   kv skipped "para is not installed"
 fi
 
 # What this repo already says about how it comes up. Every hit is a source for
-# the .paraspace/ you are about to write — see references/evidence.md.
+# the .paraspace/ you are about to write; see references/evidence.md.
 section "project evidence"
 root="$(project_root)"
 kv root "$root"
 kv vcs "$(vcs_kind "$root")"
 if [ -d "$root/.paraspace" ]; then
-  kv paraspace "present — this project is already adopted; you are AMENDING it"
+  kv paraspace "present, so this project is already adopted and you are AMENDING it"
   find "$root/.paraspace" -mindepth 1 -maxdepth 1 -exec basename {} \; | sed 's/^/    /'
 else
-  kv paraspace "absent — nothing adopted yet"
+  kv paraspace "absent, nothing adopted yet"
 fi
 printf '  files that describe provisioning:\n'
 find "$root" -maxdepth 3 \

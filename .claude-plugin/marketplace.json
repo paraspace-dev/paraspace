@@ -1,6 +1,6 @@
 {
   "name": "paraspace",
-  "description": "ParaSpace — parallel dev workspaces on Incus",
+  "description": "ParaSpace, parallel dev workspaces on Incus",
   "owner": {
     "name": "Wes Roberts"
   },

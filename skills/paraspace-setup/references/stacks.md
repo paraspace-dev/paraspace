@@ -1,15 +1,15 @@
 # Bringing the stack up, and knowing when it's up
 
-`boot` has one contract: **return zero only once every routed port is actually
-listening.** para gates on the container agent, runs your hooks, and then trusts
-your exit code — so a `boot` that backgrounds a dev server and returns
-immediately produces a workspace that reports ready and serves 502s. Every
-pattern below is really a pattern for satisfying that one sentence.
+`boot` has exactly one contract. **Return zero only once every routed port is
+actually listening.** para gates on the container agent, runs your hooks, and
+then trusts your exit code, so a `boot` that backgrounds a dev server and
+returns immediately produces a workspace that reports ready and serves 502s.
+Every pattern below exists to satisfy that one sentence.
 
 Contents: [readiness helpers](#readiness-helpers) ·
 [docker compose](#1-docker-compose) · [system services](#2-system-services-plus-an-app-process)
 · [bare processes](#3-bare-processes-no-init-involved) · [k3s](#4-k3s-inside-the-workspace)
-· [hybrid](#5-hybrid-services-in-containers-app-bare) · [seed data](#seed-data-and-migrations)
+· [hybrid](#5-hybrid-services-in-containers-and-the-app-bare) · [seed data](#seed-data-and-migrations)
 
 ## Readiness helpers
 
@@ -21,7 +21,7 @@ first compile).
 ```sh
 # Wait until something is listening on a TCP port. $1 port, $2 seconds (60).
 wait_port() {
-  command -v ss >/dev/null || die "ss is missing — add iproute2 in image-build"
+  command -v ss >/dev/null || die "ss is missing, add iproute2 in image-build"
   local i=0
   while [ "$i" -lt "${2:-60}" ]; do
     ss -ltn "sport = :$1" 2>/dev/null | grep -q LISTEN && return 0
@@ -30,7 +30,7 @@ wait_port() {
   return 1
 }
 
-# Wait until a URL answers at all — any status, including 404 and 500. $1 url,
+# Wait until a URL answers at all, any status, including 404 and 500. $1 url,
 # $2 seconds (120). No `curl -f`: it exits non-zero on >=400, so an app whose /
 # is a 404 would look dead for the whole timeout.
 wait_http() {
@@ -44,16 +44,16 @@ wait_http() {
 ```
 
 **They return rather than `die`, and that matters.** `die` exits the hook, so a
-caller written as `wait_port 3000 || { tail log; }` would never reach the `tail`
-— the process is already gone, and the log you most wanted is the one nobody
-sees. Returning leaves the decision with the call site:
+caller written as `wait_port 3000 || { tail log; }` would never reach the
+`tail`. The process is already gone, and the log you most wanted is the one
+nobody sees. Returning leaves the decision with the call site:
 
 ```sh
 wait_port 3000 120 || die "nothing on :3000 after 120s"
 wait_port 3000 120 || { tail -50 ~/log/dev.log >&2; die "the dev server never came up"; }
 ```
 
-`ss` is in `iproute2` on every base in `references/bases.md` — install it there,
+`ss` is in `iproute2` on every base in `references/bases.md`. Install it there,
 and the guard above blames the missing package instead of blaming your app.
 
 A boot hook that starts several things should wait for each of them, and the
@@ -65,8 +65,8 @@ for r in $PARA_ROUTES; do
 done
 ```
 
-That loop is worth writing verbatim in most projects: it reads the routes para
-actually published, so it can't drift from the `Parafile`.
+That loop is worth writing verbatim in most projects, because it reads the
+routes para actually published and so can't drift from the `Parafile`.
 
 ## 1. Docker Compose
 
@@ -78,29 +78,30 @@ docker compose up -d --wait --wait-timeout 300
 ```
 
 `--wait` blocks until healthchecked services are healthy and plain ones are
-running, which satisfies the contract for free — provided your compose file
+running, which satisfies the contract for free, provided your compose file
 actually defines healthchecks for the services that matter. If it doesn't, add
 `wait_port` calls after it rather than trusting "running".
 
-What this costs in the image is in `image.md` under the docker requirements;
+What this costs in the image is in `image.md` under the docker requirements, and
 `references/bases.md` has the per-distro spelling, including the Debian/Ubuntu
-equivalent of the Void template's docker block. The one thing worth repeating
-because it is silent: on a btrfs- or ZFS-backed pool nested Docker falls back to
-the `vfs` driver instead of overlayfs, so refuse to publish the image in that
-state the way the templates' `image-build` does.
+equivalent of the Void template's docker block. One thing is worth repeating
+because it happens silently. On a btrfs- or ZFS-backed pool, nested Docker falls
+back to the `vfs` driver instead of overlayfs, so refuse to publish the image in
+that state the way the templates' `image-build` does.
 
 Bind mounts and `network_mode: host` inside a workspace behave normally; ports
 bind on the container's own IP, so nothing collides with the host or with other
-workspaces. **Don't remap ports** to avoid collisions — that's the problem para
-already solved.
+workspaces. **Don't remap ports** to avoid collisions, since that's the problem
+para already solved.
 
 ## 2. System services plus an app process
 
-The best fit for "our stack just runs locally" — PHP + MySQL, Rails + Postgres,
-Django + Redis, a Python service with a queue. **An Incus system container boots
-the distro's init**, so on Debian/Ubuntu bases `systemctl` genuinely works, and
-the packaged services behave the way they do on a dev laptop. This is usually
-simpler *and* faster than adding Docker to the picture.
+The best fit for "our stack just runs locally", covering PHP with MySQL, Rails
+with Postgres, Django with Redis, or a Python service and a queue. **An Incus
+system container boots the distro's init**, so on Debian/Ubuntu bases
+`systemctl` genuinely works, and the packaged services behave the way they do on
+a dev laptop. This is usually simpler *and* faster than adding Docker to the
+picture.
 
 In `image-build` (as root, no tty):
 
@@ -118,12 +119,13 @@ sudo systemctl is-active --quiet postgresql || sudo systemctl start postgresql
 wait_port 5432 30 || die "postgres never came up"
 npm ci && npm run build
 sudo systemctl restart myapp        # a unit your image-build installed
-wait_port 3000 120 || die "myapp is not listening — journalctl -u myapp"
+wait_port 3000 120 || die "myapp is not listening, see journalctl -u myapp"
 ```
 
-`boot` runs as `$PARA_USER`, so anything touching systemd needs `sudo` — the
+`boot` runs as `$PARA_USER`, so anything touching systemd needs `sudo`. The
 bundled templates grant that user passwordless sudo, which is a template's
-choice and not something para provides. Check it's there before relying on it.
+choice rather than something para provides. Check it's there before relying on
+it.
 
 On Void the equivalent is runit (`ln -sf /etc/sv/postgresql /var/service/`), on
 Alpine it's OpenRC (`rc-update add postgresql default`). Neither is worse; they
@@ -132,8 +134,8 @@ just aren't systemd.
 ## 3. Bare processes, no init involved
 
 When there is no service manager and you don't want one, supervise it yourself.
-The trap is that para runs `boot` to completion — anything still attached to the
-hook's stdout dies with it:
+The trap is that para runs `boot` to completion, so anything still attached to
+the hook's stdout dies with it:
 
 ```sh
 cd "$HOME/$PARA_CLONE_DIR"
@@ -144,11 +146,11 @@ wait_port 3000 120 || { tail -50 ~/log/dev.log >&2; die "the dev server never ca
 
 Three things make this survivable:
 
-- **`setsid` + redirecting all three streams** detaches the process from the
+- **`setsid` plus redirecting all three streams** detaches the process from the
   hook. Leave it attached and you get one of two bad outcomes: it dies with the
   hook, or it holds the hook's stdout open and `para up` never returns.
-- **A log file you can point at.** `tail` it in the failure path — a boot hook
-  that dies without showing why is the worst thing to hand a teammate.
+- **A log file you can point at.** `tail` it in the failure path, because a boot
+  hook that dies without showing why is the worst thing to hand a teammate.
 - **Idempotence.** `boot` re-runs on every `up`, so either kill the old process
   first (`pkill -f 'npm run dev' || true`) or check the port before starting.
 
@@ -158,27 +160,27 @@ process manager inside a boot hook is a sign the work belongs in the image.
 
 ## 4. k3s inside the workspace
 
-Workable — the container already runs nested — but it is the slowest option to
-converge and the fiddliest to keep healthy. Take it only when the project's dev
-loop genuinely is Kubernetes.
+It works, since the container already runs nested, but it is the slowest option
+to converge and the fiddliest to keep healthy. Take it only when the project's
+dev loop genuinely is Kubernetes.
 
 - Install in `image-build`, don't start it there: `curl -sfL https://get.k3s.io |
   INSTALL_K3S_SKIP_START=true sh -`.
 - On any pool that isn't overlayfs-capable, k3s needs `--snapshotter=native`,
   and it will be slow.
-- Readiness is a rollout, not a port: `kubectl wait --for=condition=Ready
-  node --all --timeout=180s`, then `kubectl rollout status deploy/<app>
-  --timeout=300s` for each deployment, and only then `wait_port` on the
-  NodePort or ingress you routed.
-- Point `PARA_ROUTES` at the ingress controller's NodePort (or a
-  `kubectl port-forward` you start in `boot` — but a NodePort is far more
-  stable across reconverges).
+- Readiness is a rollout rather than a port. Run `kubectl wait
+  --for=condition=Ready node --all --timeout=180s`, then `kubectl rollout status
+  deploy/<app> --timeout=300s` for each deployment, and only then `wait_port` on
+  the NodePort or ingress you routed.
+- Point `PARA_ROUTES` at the ingress controller's NodePort. A `kubectl
+  port-forward` started in `boot` also works, but a NodePort is far more stable
+  across reconverges.
 - Budget several minutes for the first boot and pre-pull images into the base
   image the way `PARA_PREPULL_IMAGES` does for Docker.
 
-## 5. Hybrid: services in containers, app bare
+## 5. Hybrid, services in containers and the app bare
 
-Very common, and para handles it without ceremony: run the databases in Docker
+Very common, and para handles it without ceremony. Run the databases in Docker
 (or as system services) and the app as a plain process, exactly as people do on
 their laptops.
 
@@ -188,26 +190,26 @@ docker compose up -d --wait db redis          # only the infra services
 mise install                                   # or nvm/pyenv, per the repo's pin
 npm ci
 setsid nohup npm run dev >~/log/dev.log 2>&1 </dev/null &
-wait_http "http://127.0.0.1:3000" 180 || die "the app never answered — see ~/log/dev.log"
+wait_http "http://127.0.0.1:3000" 180 || die "the app never answered, see ~/log/dev.log"
 ```
 
-The rule of thumb: put in a container whatever you'd otherwise have to install
-system-wide at a pinned version; run bare whatever you want to edit and restart
-constantly.
+As a rule of thumb, put in a container whatever you'd otherwise have to install
+system-wide at a pinned version, and run bare whatever you want to edit and
+restart constantly.
 
 ## Seed data and migrations
 
-Migrations belong in `boot` (they're part of coming up, and they must be
-idempotent — every framework's migrator already is). Seeding belongs wherever
-it's cheapest:
+Migrations belong in `boot`, since they're part of coming up, and they must be
+idempotent, which every framework's migrator already is. Seeding belongs
+wherever it's cheapest:
 
-- **small** — run the seed command in `boot` behind a sentinel.
-- **large dump** — put the dump on `$PARA_SHARED` once, restore per workspace at
+- **A small seed** runs in `boot` behind a sentinel.
+- **A large dump** goes on `$PARA_SHARED` once and is restored per workspace at
   boot. A multi-GB download per workspace is the thing to avoid; a multi-GB
   restore per workspace is usually fine and keeps each workspace's database its
   own.
 
-para's own `cookbook.md` has the concrete recipe — read it rather than
+para's own `cookbook.md` has the concrete recipe, so read that rather than
 re-deriving one.
 
 ## Routes
@@ -215,4 +217,4 @@ re-deriving one.
 Route only what a human would open. An unrouted port is still reachable from
 inside the workspace, and every route is one more Caddy site to keep valid. The
 syntax and what an empty list means are in `parafile.md`, in the docs the probe
-located — read it there rather than from a copy that can drift.
+located. Read it there rather than from a copy that can drift.

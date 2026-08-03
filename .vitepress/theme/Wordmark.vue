@@ -3,41 +3,34 @@
  * PARASPACE, drawn rather than typeset.
  *
  * One arch and one stem width build the whole alphabet. The arch is a
- * semicircle of radius 30.5 on a 78x100 body, stroked at 17: P is that arch
- * closed at the bar, A is the same arch with both legs run to the baseline, and
- * R is P with a leg. S and C are arcs of the same family, so every curve on the
- * page, including the two lenses behind this, comes off one circle.
+ * semicircle of radius 30.5 on a 78x100 body, stroked at 17. P is that arch
+ * closed at the bar, A is the same arch with both legs run to the baseline, R
+ * is P with a leg, and C is the arch twice, over the top and under the bottom,
+ * with 22 units of stem down the spine between them. S turns on the same 30.5
+ * half-width, so every curve on the page, including the two lenses behind this,
+ * is struck from the same radius.
  *
- * Stroked, not filled: butt caps land the terminals flush on the baseline and
+ * Stroked, not filled. Butt caps land the terminals flush on the baseline and
  * the right edge, and round joins give the E its corners for free.
  *
- * Two places that isn't enough. R's leg is a diagonal, and a butt cap on a
+ * One place that isn't enough. R's leg is a diagonal, and a butt cap on a
  * diagonal is cut square to the stroke, which leaves a stub hanging off the
  * end rather than a foot standing on the line. The leg runs at 45 degrees
  * straight through the baseline and the wordmark is clipped there instead, so
- * the ground does the cutting. And C's ellipse is as wide as every other body,
- * but its gap sat over the widest point, so the letter read narrow beside its
- * neighbours; the terminals come round far enough to put ink where the width
- * actually is.
+ * the ground does the cutting.
  */
 const GLYPHS = {
   p: 'M8.5 100V39a30.5 30.5 0 0 1 61 0v29H8.5',
   a: 'M8.5 100V39a30.5 30.5 0 0 1 61 0v61M8.5 68h61',
   r: 'M8.5 100V39a30.5 30.5 0 0 1 61 0v29H8.5M34 68l36 36',
   s: 'M69.5 29.25a30.5 20.75 0 1 0-30.5 20.75 30.5 20.75 0 1 1-30.5 20.75',
-  c: 'M65 28a30.5 41.5 0 1 0 0 44',
+  c: 'M69.5 39a30.5 30.5 0 0 0-61 0v22a30.5 30.5 0 0 0 61 0',
   e: 'M78 8.5H8.5V91.5H78M8.5 50H56',
 }
 
 /* Every body is 78 wide on a 100 advance, so the wordmark sets solid and the
-   tracking is one number rather than a per-pair judgement. C is the exception:
-   even closed up it stops short of the right edge, so it gives back 6 units. */
-const LETTERS = []
-let pen = 0
-for (const ch of 'paraspace') {
-  LETTERS.push({ d: GLYPHS[ch], x: pen })
-  pen += ch === 'c' ? 94 : 100
-}
+   tracking is one number rather than a per-pair judgement. */
+const LETTERS = [...'paraspace'].map((ch, i) => ({ d: GLYPHS[ch], x: i * 100 }))
 
 const WIDTH = LETTERS[LETTERS.length - 1].x + 78
 </script>

@@ -1,158 +1,177 @@
 # Why ParaSpace
 
-Running `n` coding agents on your project in parallel and not having to babysit
-them turn out to be the same problem. An agent needs somewhere to work that is
-neither your working copy nor your host.
+Running `n` coding agents on a project in parallel and not having to babysit
+them are the same problem: each agent needs somewhere to work that is neither
+your working copy nor your host.
 
 ## The problem
 
-You can naively point two agents at one project directory, but they will trip
-over each other. Branches change underneath, changes conflict or pollute the
-other's context, and the mixed diff has to be teased apart into separate PRs
-afterward. Forget about having one agent reconfigure the underlying stack.
+Point two agents at the same project directory and they will interfere with
+each other. Branches change underneath them, edits conflict or contaminate
+context, and the resulting mixed diff must be separated into individual PRs
+afterward. Letting one agent reconfigure the underlying stack is even riskier.
 
-If you give each agent a real place to work, that whole class of problem goes
-away, but a real place to work is harder to assemble than it sounds.
+Giving each agent a real place to work eliminates that entire class of
+problems. Assembling that place is harder than it sounds.
 
-A worktree separates the files but not the running stack. Port offsets
-deconflict the ports, but it gets confusing, runs on your host, and requires
-parameterizing your stack's configuration. Devcontainers can work, but lack the
-surrounding lifecycle management, and tie you to the Docker runtime /
-configuration language. A VM per task reserves its RAM whether it's busy or
-not. Cloud sandboxes bill by the second while your own machine idles. Coder has
-you using a clunky web-based agent harness and complicates routing.
-[Prior art](./prior-art.md) covers each properly, including when you should
-pick one over `para`.
+A worktree separates files, but not the running stack. Port offsets avoid
+collisions, but quickly become confusing, still run on your host, and require
+parameterizing the stack. Devcontainers can work, but lack the surrounding
+lifecycle management and tie you to Docker's runtime and configuration model. A
+VM per task reserves RAM whether it is busy or not. Cloud sandboxes bill by the
+second while your own machine sits idle. Coder complicates routing and pushes
+you toward a web-based agent harness.
+
+[Prior art](./prior-art.md) covers each option in detail, including when you
+should choose one instead of `para`.
 
 ## The solution
 
-ParaSpace answers all of it with one choice. A workspace is an unprivileged
-system container on your own machine, and everything below follows from that.
+ParaSpace starts from one choice, that a workspace is an unprivileged system
+container on your own machine.
+
+Everything else follows from that.
 
 ### Reserve nothing
 
 A workspace is a container, not a virtual machine. It shares your kernel and
-doesn't need to reserve large chunks of resources up front. At idle, it costs
-almost nothing. When busy, it borrows from the same pool as everything else.
-That is what makes a dozen ParaSpace workspaces running at once possible even
-on modest hardware. On macOS the Linux VM underneath reserves once for the
-whole machine, not once per workspace.
-[How it works](./how-it-works.md#macos-adds-one-layer) covers that layer.
+does not reserve a large block of resources up front. At idle, it costs almost
+nothing. Under load, it draws from the same resource pool as everything else.
 
-It is a *system* container, so it can hold containers of its own. A Docker
-stack can boot inside it on its own Docker daemon, with no host socket and no
-`--privileged`. Your one kernel serves every layer.
-[Prior art](./prior-art.md#on-nested-containers) has the mechanics.
+That is what makes it practical to run a dozen ParaSpace workspaces at once,
+even on modest hardware. On macOS, the underlying Linux VM is reserved once for
+the machine, not once per workspace. [How it
+works](./how-it-works.md#macos-adds-one-layer) explains that layer.
+
+Because it is a _system_ container, a workspace can also run containers of its
+own. A Docker stack boots inside it on an independent Docker daemon, without
+mounting the host socket or using `--privileged`. One kernel serves every
+layer.
+
+[Prior art](./prior-art.md#on-nested-containers) covers the mechanics.
 
 ### It runs on your machine, in a real terminal
 
-Most "agents in a sandbox" products put the agent's TUI in an iframe, your app
-in a second tab and a web terminal in a third, with a proxy chain behind all of
-them. You pay for that isolation in the browser, where TUIs misbehave outside a
-real terminal and live reload rarely survives the proxies.
+Many "agent in a sandbox" products put the agent TUI in an iframe, the
+application in another tab, and a web terminal in a third, with a proxy chain
+behind all of them. You pay for the isolation in browser friction. TUIs
+misbehave outside a real terminal, and live reload often breaks across the
+proxies.
 
-A ParaSpace workspace is a container on your own box, so you reach it the
-ordinary way:
+A ParaSpace workspace is a container on your own machine, so you enter it
+normally:
 
 ```sh
-para sh my-feature   # a real pty in the clone
+para sh my-feature   # a real PTY in the clone
 ```
 
-It comes with a `$TERM` the container has terminfo for, so tmux, Neovim and
-Claude Code behave the way they do in any terminal, because they are in one.
-Your dotfiles get there through a `skel/` directory your own hooks copy in.
+The workspace has a `$TERM` with matching terminfo, so tmux, Neovim, and Claude
+Code behave as they do in any other terminal, because they are in one. Your
+dotfiles arrive through a `skel/` directory copied by your own hooks.
 
-So parallel work becomes a window-manager problem rather than a tab-management
-one. Put one workspace per desktop and switch between them with the keybindings
-you already have.
+Parallel work becomes a window-manager problem instead of a tab-management
+problem. Put one workspace on each desktop and switch between them with the
+keybindings you already use.
 
-### An agent can't reach your host
+### An agent cannot reach your host
 
-You can turn off permission prompts because the blast radius stops at the
-workspace. Inside one:
+You can disable permission prompts because the blast radius ends at the
+workspace.
 
-- it is an **unprivileged** container,
-- **nothing of your host is mounted.** para pushes your `.paraspace/` directory
-  and, optionally, one `.env`. That is the whole surface, and your home
-  directory, SSH keys and cloud credentials aren't there to be read;
-- it's disposable: `para rm my-feature` and the whole thing is gone.
+Inside each workspace:
 
-So [an agent uploading a home directory][hn] can't happen here, because there
-is nothing mounted to upload.
+- it runs as an **unprivileged** container;
+- **nothing from your host is mounted**. `para` pushes only your `.paraspace/`
+  directory and, optionally, one `.env` file;
+- your home directory, SSH keys, and cloud credentials are not available to
+  read;
+- the workspace is disposable: `para rm my-feature` removes the whole
+  environment.
+
+That means [an agent uploading a home directory][hn] cannot happen here. There
+is no mounted home directory to upload.
 
 > [!NOTE]
-> Workspaces have ordinary outbound network access. If you need network egress
-> rules, that can be achieved with Incus ACLs.
+> Workspaces have ordinary outbound network access. Incus ACLs can be used
+> when you need egress restrictions.
 
 ### Authenticate once per project
 
-Run `gh auth login` in any workspace and every workspace of that project is
-authenticated, including the one you create next week, and after a reboot.
-Credentials live on a [volume](./internals.md#the-shared-home-volume) shared by
-the project's workspaces, on the container side of the boundary, not a host
-bind mount.
+Run `gh auth login` in any workspace and every workspace for that project
+becomes authenticated, including workspaces created later and workspaces
+restarted after a reboot.
+
+Credentials live on a [shared volume](./internals.md#the-shared-home-volume)
+attached to the project's workspaces. They remain on the container side of the
+boundary rather than entering through a host bind mount.
 
 ### Automatic subdomain routing
 
-Every workspace gets its own bridge IP, so your stack binds its **usual ports**
-on it. Port 3000 is port 3000 in every workspace, with no offsets, no override
-files, and nothing in your stack's config that knows it's being sandboxed.
-Caddy runs on your host and its entire job is to map workspace subdomains to
-each port you want to access, e.g.:
+Every workspace receives its own bridge IP, so each stack can bind its **usual
+ports**.
 
-```
+Port 3000 remains port 3000 in every workspace. There are no offsets, override
+files, or sandbox-specific settings in your application configuration.
+
+Caddy runs on the host and maps workspace subdomains to the ports you expose:
+
+```text
 https://my-feature.paraspace.dev     →  10.x.x.201:3000
 https://db.my-feature.paraspace.dev  →  10.x.x.201:8081
 ```
 
-Nothing is remapped or path-rewritten, and there's no `X-Forwarded-Prefix` your
-app has to learn about, which is why WebSockets and hot reload work without
-anyone configuring them. Your stack runs *inside* the workspace, unchanged, on
-the ports it already uses, whether that's a single process or a dozen
-containers. Routes are one line of your [`Parafile`](./parafile.md).
+Nothing is port-remapped or path-rewritten. There is no `X-Forwarded-Prefix`
+for the application to understand. WebSockets and hot reload work without
+application-specific proxy configuration.
+
+Your stack runs unchanged inside the workspace, on the ports it already uses,
+whether it consists of one process or a dozen containers. Each route is one
+line in your [`Parafile`](./parafile.md).
 
 ### A thin engine your project takes over
 
-`para` is simply a thin wrapper over `incus` and `caddy`. It makes a
-container, gives it an IP, attaches a volume, points Caddy at it, and runs your
-hooks. It knows nothing about your stack. The extension points are all files in
-*your* repo:
+`para` is a thin wrapper around `incus` and `caddy`. It creates a container,
+assigns an IP, attaches a volume, configures Caddy, and runs your hooks.
 
-| What | Where it lives |
-|---|---|
-| how the base image is built | `.paraspace/hooks/image-build` |
-| how a workspace is provisioned | `.paraspace/hooks/provision` |
-| how the stack boots, and when it's ready | `.paraspace/hooks/boot` |
-| **new `para` verbs** | `.paraspace/commands/<verb>` |
+It knows nothing about your stack.
 
-`para claude ws1` is not a feature of para. It's a command you drop in
-`.paraspace/commands/`, and no bundled template ships one.
+Every extension point lives in _your_ repository:
+
+| What                                       | Where it lives                 |
+| ------------------------------------------ | ------------------------------ |
+| How the base image is built                | `.paraspace/hooks/image-build` |
+| How a workspace is provisioned             | `.paraspace/hooks/provision`   |
+| How the stack starts and reports readiness | `.paraspace/hooks/boot`        |
+| **New `para` verbs**                       | `.paraspace/commands/<verb>`   |
+
+`para claude ws1` is not a built-in ParaSpace feature. It is a project command
+you add under `.paraspace/commands/`. For example:
 
 ```sh
 #!/usr/bin/env bash
 exec "$PARA_BIN" sh "$1" -c "exec claude --name $1"
 ```
 
-So whatever you need para to do for your project, your project is where you add
-it.
+When your project needs `para` to do something new, you add that behavior to
+the project itself.
 
-## What it isn't
+## What it is not
 
 - **A hosted service.** Workspaces run on your hardware, on Linux or macOS.
   There is no control plane and nothing to log into.
-- **A boundary against hostile code.** It's a strong boundary against an agent
-  doing something dumb or a dependency doing something rude, but not a claim
+- **A security boundary for hostile code.** It is a strong boundary against an
+  agent making a mistake or a dependency behaving badly, but it does not claim
   that container escape is impossible.
-- **A git workflow.** Each workspace gets its own clone; branching, review and
-  merge stay exactly what they were.
+- **A Git workflow.** Each workspace receives its own clone. Branching, review,
+  and merge remain unchanged.
 
-See [Prior art](./prior-art.md) for a comparison of alternatives.
+See [Prior art](./prior-art.md) for a comparison with the alternatives.
 
 ## Next
 
-[Getting started](./getting-started.md) to launch one ·
-[How it works](./how-it-works.md) for the architecture ·
-[Running coding agents](./agents.md) for the practice ·
-[Prior art](./prior-art.md) for the alternatives.
+[Install ParaSpace](./install.md) to set up your machine · [How it
+works](./how-it-works.md) for the architecture · [Running coding
+agents](./agents.md) for the workflow · [Prior art](./prior-art.md) for the
+alternatives
 
 [hn]: https://news.ycombinator.com/item?id=48892468

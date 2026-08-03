@@ -1,71 +1,32 @@
 # Getting started
 
-## Install
+First, install ParaSpace and prepare your machine:
 
-```sh
-npm i -g paraspace
-```
+[Install ParaSpace](./install.md)
 
-`para` drives [Incus](https://linuxcontainers.org/incus/) and Caddy on the
-host.
+Once `para doctor` reports that your machine is ready, choose the path that
+matches what you are doing.
 
-- On **macOS**, `brew install caddy colima incus`.
-- On **Linux**, [install Caddy](https://caddyserver.com/docs/install) and
-  [install Incus](https://linuxcontainers.org/incus/docs/main/tutorial/first_steps/).
+## Use a project that already supports ParaSpace
 
-Then check the machine is ready:
+Choose this path when the repository already contains a `.paraspace/`
+directory.
 
-```sh
-para doctor
-```
+You will build the project image, launch a workspace, and enter its clone.
 
-It prints what's wrong and how to fix it. See
-[Troubleshooting](./troubleshooting.md).
+[Use a ParaSpace project](./using-a-project.md)
 
-## Using a `para`-enabled repo
+## Add ParaSpace to your project
 
-If the repo already has a `.paraspace/` directory, you're three commands from a
-running workspace:
+Choose this path when you want to add ParaSpace to a repository you maintain.
 
-```sh
-para image build  # build the project's base image, once per project and arch
-para up ws1       # launch an isolated workspace
-para sh ws1       # shell into the clone
-```
+You will scaffold a `.paraspace/` directory, configure the project image and
+lifecycle hooks, and commit the setup for other contributors and agents.
 
-`para ls` prints each workspace's URL. Opening one is a
-[project command](./commands.md#project-commands), and most templates ship
-`para web`.
+[Add ParaSpace to a project](./project-setup.md)
 
-Two things to expect on a fresh machine:
+## Learn more
 
-- **`para image build` takes several minutes.** It's per-project and per-arch,
-  and it only happens again when the image source changes.
-- **The first `up` may pause at a printed SSH key**, so you can authorize it
-  with your git host. See [Shared authentication](./shared-auth.md).
+[Running coding agents](./agents.md) covers the workflow ParaSpace is built
+for. [How it works](./how-it-works.md) explains the architecture.
 
-Your browser will distrust the workspace's certificate until you run
-`caddy trust` once. See [Workspace URLs](./urls.md).
-
-`para up` starts everything it needs, including para's Caddy. The full surface
-is in [Commands](./commands.md).
-
-## Enabling your own project
-
-The only thing `para` needs from a project is a `.paraspace/` directory at the
-repo root. Commit it, and every contributor and every agent gets the workflow
-above.
-
-```sh
-para init         # scaffold .paraspace/ from a working template
-```
-
-Then point it at your repo and your stack. The walkthrough is
-[Project setup](./project-setup.md).
-
-## Next
-
-- [Running coding agents](./agents.md) is the workflow para is built for.
-- [How it works](./how-it-works.md) is the architecture.
-- [Workspace URLs](./urls.md) covers clean `:443` URLs, your own domain, and
-  browser trust.

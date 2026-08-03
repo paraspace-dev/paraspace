@@ -13,19 +13,21 @@ a workspace lives in a `.paraspace/` directory at your repo root.
 ## Where to start
 
 **I want to try it.** [Why ParaSpace](./why.md) makes the case ·
-[Getting started](./getting-started.md) installs it and launches your first
-workspace · [How it works](./how-it-works.md) is the mental model ·
-[Prior art](./prior-art.md) compares the alternatives, including when to pick
-something else.
+[Install ParaSpace](./install.md) prepares your machine · [Use a ParaSpace
+project](./using-a-project.md) launches your first workspace in a repo that
+already has `.paraspace/` · [How it works](./how-it-works.md) is the mental
+model · [Prior art](./prior-art.md) compares the alternatives, including when
+to pick something else.
 
 **I want to run agents in parallel.** [Running coding agents](./agents.md)
 covers one agent per workspace, running an agent with permissions wide open,
 what that does and doesn't isolate, and the review loop.
 
-**I want to add para to my repo.** [Project setup](./project-setup.md) starts
-at `para init`, then walks the pieces that make a project para-enabled: the
-[Parafile](./parafile.md), the [hooks](./hooks.md), the [image](./image.md),
-and any [commands](./commands.md#project-commands) you want to add.
+**I want to add para to my repo.** [Add ParaSpace to a
+project](./project-setup.md) starts at `para init`, then walks the pieces that
+make a project para-enabled: the [Parafile](./parafile.md), the
+[hooks](./hooks.md), the [image](./image.md), and any
+[commands](./commands.md#project-commands) you want to add.
 [Mods](./mods.md) are how you vendor a ready-made piece of that instead of
 writing it. The [Cookbook](./cookbook.md) has recipes for the common ones.
 

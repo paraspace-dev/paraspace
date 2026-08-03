@@ -55,8 +55,10 @@ Full docs at **[paraspace.dev](https://paraspace.dev)**, and in
 - [Why ParaSpace](./docs/why.md) (the case, and what it costs) ·
   [Prior art](./docs/prior-art.md) (how it compares, and when to pick
   something else)
-- [Getting started](./docs/getting-started.md) · [How it
-  works](./docs/how-it-works.md) · [Running coding
+- [Getting started](./docs/getting-started.md) (which path you want) ·
+  [Install ParaSpace](./docs/install.md) · [Use a ParaSpace
+  project](./docs/using-a-project.md)
+- [How it works](./docs/how-it-works.md) · [Running coding
   agents](./docs/agents.md)
 - [Project setup](./docs/project-setup.md) (adapting `para` to your project) ·
   [Cookbook](./docs/cookbook.md) (recipes for the common needs)

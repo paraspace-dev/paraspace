@@ -57,6 +57,9 @@ export default defineConfig({
             { text: 'Overview', link: '/docs/' },
             { text: 'Why ParaSpace', link: '/docs/why' },
             { text: 'Getting started', link: '/docs/getting-started' },
+            { text: 'Install ParaSpace', link: '/docs/install' },
+            { text: 'Use a ParaSpace project', link: '/docs/using-a-project' },
+            { text: 'Add ParaSpace to a project', link: '/docs/project-setup' },
             { text: 'How it works', link: '/docs/how-it-works' },
             { text: 'Prior art', link: '/docs/prior-art' },
           ],
@@ -65,7 +68,6 @@ export default defineConfig({
           text: 'Guides',
           items: [
             { text: 'Running coding agents', link: '/docs/agents' },
-            { text: 'Project setup', link: '/docs/project-setup' },
             { text: 'Cookbook', link: '/docs/cookbook' },
             { text: 'Workspace URLs', link: '/docs/urls' },
             { text: 'Shared authentication', link: '/docs/shared-auth' },

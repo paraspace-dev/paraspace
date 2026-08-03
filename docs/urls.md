@@ -22,8 +22,8 @@ was running unprivileged, or you dismissed the prompt), install it by hand:
 caddy trust    # once per machine
 ```
 
-That covers the system store, Firefox, and your host NSS db, enough for
-Firefox and natively-packaged Chrome/Chromium.
+That covers the system store and your host NSS db, which is enough for Firefox
+and natively-packaged Chrome/Chromium.
 
 This is the main reason `para`'s Caddy runs on the **host** rather than inside
 a workspace. One CA, trusted once, and every workspace you ever create gets a

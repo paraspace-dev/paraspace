@@ -24,8 +24,8 @@ ln -sfn "$PARA_SHARED/ssh/id_ed25519" ~/.ssh/id_ed25519
 
 Link the directory a tool keeps its state in, and that tool is authenticated in
 every workspace of the project. The volume is
-[per project](./internals.md#the-shared-home-volume) by default, and you point
-several projects at one `PARA_VOLUME` to share across them.
+[per project](./internals.md#the-shared-home-volume) by default; point several
+projects at one `PARA_VOLUME` to share across them.
 
 Recipes for the common ones are in the [Cookbook](./cookbook.md).
 
@@ -34,7 +34,7 @@ Recipes for the common ones are in the [Cookbook](./cookbook.md).
 Workspaces clone and push over the network, so your host has to trust a key.
 The bundled templates' provision hook generates **one key per project**, on
 that project's shared volume and labelled `para-<hostname>`. It is individually
-revocable, and never your host keys.
+revocable, and it is never one of your host keys.
 
 Nothing about this is git-specific. A Mercurial, Fossil or Subversion project
 wants the same thing: a key on the shared volume, and whatever config file that

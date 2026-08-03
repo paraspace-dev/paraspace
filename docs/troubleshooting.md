@@ -54,8 +54,8 @@ repositories](https://linuxcontainers.org/incus/docs/main/installing/).
 
 ### Containers won't start at all
 
-> ✗ cgroup-v1 mounted inside /sys/fs/cgroup (…), so containers will not start
-> until: sudo umount -l …
+> ✗ cgroup-v1 mounted inside /sys/fs/cgroup (…). No container will start until
+> you unmount it: sudo umount -l …
 
 A named cgroup-v1 hierarchy mounted under `/sys/fs/cgroup` makes LXC fail every
 container start with a cryptic `Failed to create cgroup at_mnt`. Unmount it, and
@@ -137,7 +137,8 @@ authentication](./shared-auth.md).
 Caddy is proxying to a port nothing is listening on. Almost always a `boot` hook
 that returned zero before its services were actually up. The
 [readiness contract](./hooks.md#boot) requires that it return only once every
-routed service is listening (`docker compose up -d --wait`). Check from inside:
+routed service is listening (`docker compose up -d --wait` does that for a
+Compose stack; anything else needs its own wait). Check from inside:
 
 ```sh
 para sh <name> -c 'ss -ltnp'

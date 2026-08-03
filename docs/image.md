@@ -20,12 +20,13 @@ para's own mechanism needs very little:
   piped or redirected, both use plain `su -` and work on a busybox image;
 - **git**, if your hooks clone. para itself never runs git.
 
-Everything else is your project's choice. If your stack is Docker Compose, as
-the bundled templates' is, the image also needs **docker**, that workspace user
-in the `docker` group, and nesting that resolves to **overlayfs**. On a btrfs
-or ZFS pool it silently [falls back to the very slow `vfs`
+Everything else is your project's choice, and nothing here requires containers.
+If your stack runs them, as `void-docker-gh`'s does, the image also needs
+**docker**, that workspace user in the `docker` group, and nesting that
+resolves to **overlayfs**. On a btrfs or ZFS pool it silently [falls back to
+the very slow `vfs`
 driver](./troubleshooting.md#everything-inside-the-workspace-is-slow). para
-doesn't check that; the templates' `hooks/image-build` does.
+doesn't check that; `void-docker-gh`'s `hooks/image-build` does.
 
 For full ergonomics also include `tmux`, a login shell like `zsh`, and whatever
 agent CLI you use. para degrades rather than breaks without them.
@@ -40,8 +41,8 @@ The command is base-agnostic plumbing:
    enough to the way `para up` pushes it to `~/.paraspace` that `$PARA_HOOKS`
    and `$PARA_SKEL` name real paths in there. Your `.env` is the exception, so
    `$PARA_HOST_ENV` names a file the builder does not have;
-4. runs **`hooks/image-build`** as root, with no tty and no stdin, yours first
-   and then any a mod vendored under `.paraspace/mods/`;
+4. runs **`hooks/image-build`** as root, with no tty and no stdin: yours first,
+   then any a mod vendored under `.paraspace/mods/`;
 5. removes `/opt/.paraspace` and publishes the result as **`$PARA_IMAGE`**. A
    failed or interrupted build leaves the existing image untouched.
 
@@ -67,7 +68,7 @@ Two caveats:
 
 The templates'
 [`hooks/image-build`](https://github.com/paraspace-dev/paraspace/blob/main/templates/void-docker-gh/.paraspace/hooks/image-build)
-is the reference, a package list, a user, and Docker set up for nesting.
+is the reference: a package list, a user, and Docker set up for nesting.
 
 ## Checking it with `para image status`
 

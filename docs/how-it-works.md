@@ -34,7 +34,7 @@ the Incus bridge. Whatever the project runs inside (bare processes or nested
 containers) binds its usual ports on that IP, so workspaces never collide with
 each other or with the host, and nothing gets remapped.
 
-A workspace has two doors, its URL and `para sh`.
+A workspace has two doors: its URL, and `para sh`.
 
 ## The pieces
 
@@ -53,8 +53,8 @@ A workspace has two doors, its URL and `para sh`.
 
 There is no ParaSpace daemon or database. A workspace records its own identity
 on its container, so `incus` is the only thing that has to remember anything.
-`para up` starts what it needs, including Caddy, which besides the Incus daemon
-is the only para-related process on your host.
+`para up` starts what it needs, including Caddy. Besides the Incus daemon, that
+Caddy is the only para-related process on your host.
 
 ## macOS adds one layer
 
@@ -68,8 +68,8 @@ container IPs through the VM's network (Colima's `--network-address`). The
 
 - [Internals](./internals.md) covers self-describing workspaces, the shared
   volume, machine-global names, and where state lives.
-- [Commands](./commands.md) is the full surface, and how a project adds verbs
-  of its own.
+- [Commands](./commands.md) covers the full surface, and how a project adds
+  verbs of its own.
 
 [Incus]: https://linuxcontainers.org/incus/
 [Caddy]: https://caddyserver.com/

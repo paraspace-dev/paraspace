@@ -19,11 +19,11 @@ workspace · [How it works](./how-it-works.md) is the mental model ·
 something else.
 
 **I want to run agents in parallel.** [Running coding agents](./agents.md)
-covers one agent per workspace, running one with permissions wide open, what
-that does and doesn't isolate, and the review loop.
+covers one agent per workspace, running an agent with permissions wide open,
+what that does and doesn't isolate, and the review loop.
 
 **I want to add para to my repo.** [Project setup](./project-setup.md) starts
-at `para init`, then walks the pieces that make a project para-enabled, the
+at `para init`, then walks the pieces that make a project para-enabled: the
 [Parafile](./parafile.md), the [hooks](./hooks.md), the [image](./image.md),
 and any [commands](./commands.md#project-commands) you want to add.
 [Mods](./mods.md) are how you vendor a ready-made piece of that instead of

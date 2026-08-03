@@ -17,7 +17,7 @@ const ROWS = [
   {
     key: 'planet',
     title: 'Sandboxed',
-    body: 'Set your agent harness to <code>--yolo</code> mode and enjoy peace of mind. Each workspace runs in an unprivileged system container, so it boots fast, costs little to keep around, and runs containerized stacks inside it. Run many at once and none of them can see another\'s branch, database, or half-finished edits.',
+    body: 'Set your agent harness to <code>--yolo</code> mode and enjoy peace of mind. Each workspace runs in an unprivileged system container, so it boots fast, costs little to keep around, and can run containerized stacks inside it. Run many at once and none of them can see another\'s branch, database, or half-finished edits.',
   },
   {
     key: 'key',

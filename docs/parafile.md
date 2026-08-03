@@ -64,7 +64,8 @@ normalized space-separated list.
 `caddy validate` runs before every reload, so any configuration issues
 fail loudly.
 
-Empty means this workspace serves no HTTP, a worker or a bare box. `para ls`
+Empty means this workspace serves no HTTP, which is what a worker or a bare box
+wants. `para ls`
 shows no URL, `$PARA_URL` is empty in your hooks, and `para doctor` mentions it
 in case you didn't mean it. Note that only a **bare port** creates
 `https://<name>.$PARA_DOMAIN`; a subdomain-only list has no apex site.
@@ -83,7 +84,7 @@ default, so your distro can't change under you when para updates.
 
 The bootstrap is one `sh -c` line run in the builder before your
 `.paraspace/hooks/image-build`. Its job is to leave **bash** in the image (para
-runs it with `bash`) and refresh the package index if the base needs it, so
+runs it with `bash`) and refresh the package index if the base needs it:
 `xbps-install -Syu xbps bash` on Void, `apk add --no-cache bash` on Alpine,
 `apt-get update` on Debian. Leave it unset if your base needs nothing.
 

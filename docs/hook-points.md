@@ -62,7 +62,7 @@ runs are separate processes, so:
 - **Don't re-source `~/.paraspace/env`** to get para's variables "back". It
   holds your project's values, so doing that mid-run silently repoints
   `$PARA_HOOKS` at your `hooks/` even when the hook reading it came from
-  somewhere else, so wrong files and no error.
+  somewhere else. Wrong files, no error.
 
 ## Reading a failure
 

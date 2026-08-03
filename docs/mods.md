@@ -60,8 +60,9 @@ when a mod ships any. Past the engine's own verbs, two rules settle a name:
 
 - **Your own `commands/` beats any mod's.** Dropping a file in
   `.paraspace/commands/<verb>` is how you override one you don't like.
-- **More than one mod defining a verb is refused**, naming every file, because
-  para promises no order between mods. Delete one, or shadow it with your own.
+- **More than one mod defining a verb is refused**, and the error names every
+  file, because para promises no order between mods. Delete one, or shadow it
+  with your own.
 
 `para --help` names the mod each verb came from, and marks a verb that can't run;
 `para doctor` reports why before you trip over it.
@@ -161,6 +162,6 @@ there. Its README lists every path it claims; read that before the first `up`.
 
 **A mod with an `image-build` hook does nothing until you rebuild.** Add the
 mod, run `para up`, and the dotfiles are there but the editor they configure
-isn't. Nothing warns you, since [para tracks no image drift at
-all](./image.md), so read the mod's README for whether it fills `image-build`,
-and budget the minutes if it does.
+isn't. Nothing warns you, because [para tracks no image drift at
+all](./image.md). Read the mod's README for whether it fills `image-build`, and
+budget the minutes if it does.

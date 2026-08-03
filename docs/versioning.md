@@ -47,10 +47,10 @@ into a scratch directory to diff against a current template. Otherwise:
 |---|---|
 | guest staging dir `~/.para/` | `~/.paraspace/`, the same name as the host directory |
 | `PARA_VERSION` (the key a project declared) | `PARA_CONTRACT`, the same name para uses for its own |
-| `$PROJECT_ROOT` while the `Parafile` is sourced | `$PARA_PROJECT_DIR`, same value, and it reaches hooks too |
+| `$PROJECT_ROOT` while the `Parafile` is sourced | `$PARA_PROJECT_DIR`, the same value, and it reaches hooks too |
 | `$PARA_ROUTES` comma-separated | space-separated: `for r in $PARA_ROUTES` |
 | `parse_routes` / `route_ports` helpers | delete them; `${r##*:}` is the port |
-| hooks run as `bash <path>` | still `bash <path>`, and the exec bit and the shebang are both ignored |
+| hooks run as `bash <path>` | still `bash <path>`, with the exec bit and the shebang both ignored |
 | `.env` seeded to `~/.para/host.env` | `~/.paraspace/host.env`, pushed only if the file exists |
 | `PARA_HOST_ENV` unset/empty/set three-way | defaults to the project's `.env`; used if present |
 | unset `PARA_ROUTES` was refused | unset means empty means no HTTP; `para doctor` mentions it |
@@ -79,7 +79,7 @@ is listed here, and each is a hand edit to a `.paraspace/` scaffolded before it.
 - **`.paraspace/image-build.sh` → `.paraspace/hooks/image-build`.** One rule for
   every hook, `para` runs it by name out of `hooks/`. `git mv` it. The old name
   is not recognized, and nothing reads it. `para image build` says
-  `no 'image-build' hook` and names the path it wanted.
+  `no 'image-build' hook` and names the path it wants instead.
 - The builder now gets your **whole `.paraspace/`** at `/opt/.paraspace`, so a
   build hook reads `$PARA_HOOKS` and `$PARA_SKEL` like any other hook, and gets
   no stdin. A build hook that piped its own input, or that ran a package manager
@@ -90,8 +90,8 @@ is listed here, and each is a hand edit to a `.paraspace/` scaffolded before it.
   with no `mods/`.
 - **A verb resolves to more than one `commands/`**, and `$PARA_MOD_DIR` is new.
   para runs your `commands/<verb>` if you have it, else the one mod that does.
-  See [Mods](./mods.md#verbs-a-mod-brings). This is additive, since with no
-  `mods/`, or with no mod that ships `commands/`, nothing resolves differently.
+  See [Mods](./mods.md#verbs-a-mod-brings). This is additive: with no `mods/`,
+  or with no mod that ships `commands/`, nothing resolves differently.
 - **`.paraspace/run-hook` is a name para owns**, alongside `env` and `host.env`.
   para writes its runner there on every push, so a file of yours at that path is
   overwritten.
@@ -99,9 +99,8 @@ is listed here, and each is a hand edit to a `.paraspace/` scaffolded before it.
   there. A hook runs as `bash <the file>` whatever its mode, so a
   `core.fileMode=false` checkout stops breaking a workspace, but a helper *you*
   run by path out of `hooks/` now needs `bash` in front of it, or its own exec
-  bit committed. `commands/` is unchanged, since a command honours its own
-  shebang, so it still needs the bit, and `para init` and `para mod add` both
-  set it.
+  bit committed. `commands/` is unchanged: a command honours its own shebang,
+  so it still needs the bit, and `para init` and `para mod add` both set it.
 
 At 1.0 this section closes and anything that breaks a `.paraspace/` bumps the
 number instead.

@@ -25,8 +25,8 @@ whatever runs there runs as you, on your host, with your keys in reach.
 
 ### Port offsets and compose overrides
 
-Deconflict the ports and you can run two stacks at once. It works, and it costs
-you a growing pile of per-task configuration that every contributor has to
+Deconflict the ports and you can run two stacks at once. It works, at the cost
+of a growing pile of per-task configuration that every contributor has to
 understand, and it solves nothing about isolation.
 
 ### A devcontainer per branch
@@ -66,7 +66,7 @@ or a remote-IDE tunnel.
 [Docker's `sbx`](https://www.docker.com/) target the newer shape of ephemeral
 sandboxes an agent drives through an SDK, sold per second.
 
-The right tool when the *agent* is the product, where code runs on behalf of
+The right tool when the *agent* is the product, when code runs on behalf of
 your users and has to be someone else's liability. Overkill when the agent is
 just you, working on your own repo, on hardware you already own.
 
@@ -128,9 +128,9 @@ the "how" is usually what decides it.
 
 ### On nested containers
 
-Running your Compose stack *inside* the isolated workspace is the thing most of
-these have to solve, and how they solve it matters more than whether they do.
-There are three routes:
+Running containers *inside* the isolated workspace is the thing most of these
+have to solve, and how they solve it matters more than whether they do. There
+are three routes:
 
 1. **Mount the host's Docker socket.** Easy, and it hands whatever is in the
    container control of the *host* daemon, which can start a privileged

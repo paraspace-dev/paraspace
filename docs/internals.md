@@ -32,8 +32,8 @@ at one `PARA_VOLUME` to share auth across them. `para rm` never touches it.
 
 A name maps to one `para-<name>` container, so `sh`/`rm`/`down` address it by
 bare name from anywhere with no ambiguity. `para up <name>` refuses a name
-already owned by another project, and names the owner, rather than adopting its
-container.
+already owned by another project rather than adopting its container, and it
+names the owner.
 
 ## Project discovery
 

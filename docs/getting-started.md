@@ -52,8 +52,9 @@ is in [Commands](./commands.md).
 
 ## Enabling your own project
 
-`para` needs one thing from a project, a `.paraspace/` directory at the repo
-root. Commit it, and every contributor and every agent gets the workflow above.
+The only thing `para` needs from a project is a `.paraspace/` directory at the
+repo root. Commit it, and every contributor and every agent gets the workflow
+above.
 
 ```sh
 para init         # scaffold .paraspace/ from a working template

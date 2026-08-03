@@ -1,8 +1,8 @@
 # Commands
 
 `para --help` is always current for the build you're running; this page is the
-same surface with room to explain. It comes in two halves. The **engine verbs**
-below are fixed, and the **project commands** your repo adds are its own, plus
+same surface with room to explain. It comes in two halves: the **engine verbs**
+below, which are fixed, and the **project commands** your repo adds, including
 any a [mod](./mods.md) brought with it.
 
 Only `para up`, `para image …` and `para mod add` must run inside a project (a
@@ -13,7 +13,7 @@ anywhere, including `para init`, which is how you *create* one.
 
 | Command | What it does |
 |---|---|
-| `para up <name>` | create or reconverge a workspace, then boot it by launching it, attaching the shared volume, pushing `.paraspace/`, running the hooks and publishing the routes. Idempotent |
+| `para up <name>` | create or reconverge a workspace, then boot it: launch, attach the shared volume, push `.paraspace/`, run the hooks, publish the routes. Idempotent |
 | `para down <name>` | stop the container. Data is kept; `para up` resumes it |
 | `para rm <name>` | delete the workspace. The shared volume is untouched |
 | `para ls [-a\|--all] [--names]` | list this project's workspaces; `--all` spans every project, `--names` prints bare names (this is what completion reads) |

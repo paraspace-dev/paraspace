@@ -15,7 +15,7 @@ shared), clone the repo, authenticate, render `.env`, and whatever else your
 stack needs.
 
 It must be **idempotent**, because `para up` re-runs it on every converge, and
-"fix the hook, re-run `up`" is the normal loop. It may prompt, since para gives
+"fix the hook, re-run `up`" is the normal loop. It may also prompt: para gives
 it a tty when there's a human on both ends, which is where the ssh-key and `gh`
 flows live.
 
@@ -25,11 +25,12 @@ until the guest resolves the host you name.
 
 ### `boot`
 
-Brings the stack up. The **readiness contract** is to return zero only once
-every routed service is actually listening, e.g.
+Brings the stack up, whatever your stack is. The **readiness contract** is to
+return zero only once every routed service is actually listening:
 
 ```sh
-docker compose up -d --wait          # blocks until healthchecks pass
+docker compose up -d --wait                    # if you use Compose
+until nc -z localhost 3000; do sleep 1; done   # or wait on the port yourself
 ```
 
 `para` gates on the container agent (and `$PARA_READY_HOST`, if you set one)
@@ -41,10 +42,10 @@ Everything you want baked into the base image rather than installed per
 workspace: packages, the workspace user, a toolchain. `para image build` runs it
 once, in a throwaway container, and every workspace is a clone of the result.
 
-You're **root** here, and there is no workspace yet, so no `$HOME`, and the user
+You're **root** here, and there is no workspace yet: no `$HOME`, and the user
 you're about to create doesn't exist. `$PARA_HOOKS` and `$PARA_SKEL` still point
 at your files, so seeding from `skel/` works as it does in `provision`. Your
-`.env` is the exception, since `$PARA_HOST_ENV` names a file only a workspace
+`.env` is the exception, because `$PARA_HOST_ENV` names a file only a workspace
 has, so read secrets at `provision`. **Nothing can prompt you** either, so a
 package manager that stops to ask will hang the build. Pass `-y`.
 
@@ -88,7 +89,7 @@ re-cloning, and a hook can seed from `$PARA_SKEL` before the clone exists.
 
 ## The environment para injects
 
-`para` forwards **every `PARA_*` variable in scope**, meaning your user config,
+`para` forwards **every `PARA_*` variable in scope**: your user config,
 everything your `Parafile` sets, and the per-workspace values para computes. So
 any `PARA_FOO` you invent reaches your hooks for free.
 
@@ -113,7 +114,7 @@ arrays fare no better. Pass a delimited string and split it in the hook, the way
 | `PARA_USER`, `PARA_UID`, `PARA_GID` | the workspace user's identity |
 | `PARA_HOSTNAME` | the host's short hostname, used as the ssh-key label |
 | `PARA_GIT_NAME`, `PARA_GIT_EMAIL` | your host git identity, for a seeded gitconfig |
-| `PARA_CONTRACT` | the [contract](./versioning.md) your `Parafile` targets, and para has already refused a mismatch by the time a hook runs, so this is only ever the one you asked for |
+| `PARA_CONTRACT` | the [contract](./versioning.md) your `Parafile` targets. para has already refused a mismatch by the time a hook runs, so this is only ever the one you asked for |
 
 `PARA_NONINTERACTIVE` is yours rather than para's. Set it in the environment to
 force the scripted path, and para forwards it like any other `PARA_*` so your
@@ -138,8 +139,8 @@ the value should live**:
 | a value every workspace shares | a file under `$PARA_SHARED` | every workspace of the project | the shared volume |
 
 Name what you write after whoever owns it (`/etc/profile.d/dotfiles.sh`,
-`$PARA_SHARED/dotfiles/`), so two things filling the same hook can't land on one
-path without you noticing.
+`$PARA_SHARED/dotfiles/`), so two things filling the same hook can't collide on
+one path.
 
 **The one that surprises people.** Within a single `provision`, files cross but
 the environment doesn't. Every hook filling a name inherits the environment para

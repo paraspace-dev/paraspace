@@ -5,10 +5,11 @@ Guidance for Claude Code working in this repo.
 ## What this is
 
 ParaSpace ships the `para` tool, which gives you parallel dev workspaces. Each
-workspace is an unprivileged Incus system container with its own clone, Docker
-stack, bridge IP, and `https://<name>.<domain>` URL. **It is a standalone,
-self-contained, MIT-licensed npm package (`paraspace`)**, published from a `v*`
-tag by `.github/workflows/publish.yml`.
+workspace is an unprivileged Incus system container with its own clone, its own
+stack, a bridge IP, and a `https://<name>.<domain>` URL. Nesting means a stack
+of containers can run inside one, but no project has to have one. **It is a
+standalone, self-contained, MIT-licensed npm package (`paraspace`)**, published
+from a `v*` tag by `.github/workflows/publish.yml`.
 
 The README is the funnel (install, quick start, pointers). `docs/` is the
 authoritative spec, and it owns the `Parafile` schema (`docs/parafile.md`), the

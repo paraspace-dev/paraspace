@@ -1,7 +1,7 @@
 # Project setup
 
-`para` needs one thing from a project, a **`.paraspace/`** directory at the repo
-root, which it finds by walking up from `$PWD`.
+The only thing `para` needs from a project is a **`.paraspace/`** directory at
+the repo root. It finds one by walking up from `$PWD`.
 
 ## Scaffold with `para init`
 
@@ -34,7 +34,7 @@ and every teammate gets the same workspaces.
 
 ## Make it yours
 
-The scaffolded files are commented and carry working defaults, so read them in
+The scaffolded files are commented and carry working defaults. Read them in
 place. The usual adaptation, in order:
 
 1. **`Parafile`.** Point `PARA_ORIGIN` at your repo, list your `PARA_ROUTES`
@@ -42,8 +42,8 @@ place. The usual adaptation, in order:
    Every var is in [the Parafile reference](./parafile.md).
 2. **`hooks/image-build`.** The packages your stack needs baked into the base
    image, and the workspace user. See [The image contract](./image.md).
-3. **`hooks/provision`.** Everything before boot, so seed the shared volume,
-   clone, and render `.env`. The template's version handles the common case.
+3. **`hooks/provision`.** Everything before boot: seed the shared volume,
+   clone, render `.env`. The template's version handles the common case.
 4. **`hooks/boot`.** Bring your stack up, and return zero only once every
    routed service is actually listening. See [Hooks](./hooks.md).
 

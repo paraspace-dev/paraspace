@@ -26,9 +26,8 @@ pick one over `para`.
 
 ## The solution
 
-ParaSpace makes one choice that answers most of that. A workspace is an
-unprivileged system container on your own machine, and everything below follows
-from it.
+ParaSpace answers all of it with one choice. A workspace is an unprivileged
+system container on your own machine, and everything below follows from that.
 
 ### Reserve nothing
 
@@ -37,15 +36,13 @@ doesn't need to reserve large chunks of resources up front. At idle, it costs
 almost nothing. When busy, it borrows from the same pool as everything else.
 That is what makes a dozen ParaSpace workspaces running at once possible even
 on modest hardware. On macOS the Linux VM underneath reserves once for the
-whole machine, not once per workspace, which
-[How it works](./how-it-works.md#macos-adds-one-layer) covers.
+whole machine, not once per workspace.
+[How it works](./how-it-works.md#macos-adds-one-layer) covers that layer.
 
-It is a *system* container, so it holds containers of its own. Your Compose
-stack boots inside it on its own Docker daemon, with no host socket and no
-`--privileged`, and one kernel serves every layer.
+It is a *system* container, so it can hold containers of its own. A Docker
+stack can boot inside it on its own Docker daemon, with no host socket and no
+`--privileged`. Your one kernel serves every layer.
 [Prior art](./prior-art.md#on-nested-containers) has the mechanics.
-
-Parallel spaces, each one full of spaces. That is where the name comes from.
 
 ### It runs on your machine, in a real terminal
 
@@ -76,7 +73,7 @@ workspace. Inside one:
 
 - it is an **unprivileged** container,
 - **nothing of your host is mounted.** para pushes your `.paraspace/` directory
-  and, optionally, one `.env`, and that is the whole surface. Your home
+  and, optionally, one `.env`. That is the whole surface, and your home
   directory, SSH keys and cloud credentials aren't there to be read;
 - it's disposable: `para rm my-feature` and the whole thing is gone.
 
@@ -99,9 +96,9 @@ bind mount.
 
 Every workspace gets its own bridge IP, so your stack binds its **usual ports**
 on it. Port 3000 is port 3000 in every workspace, with no offsets, no override
-files, and no compose config that knows it's being sandboxed. Caddy runs on your
-host and its entire job is to map workspace subdomains to each port you want to
-access, e.g.:
+files, and nothing in your stack's config that knows it's being sandboxed.
+Caddy runs on your host and its entire job is to map workspace subdomains to
+each port you want to access, e.g.:
 
 ```
 https://my-feature.paraspace.dev     →  10.x.x.201:3000
@@ -110,9 +107,9 @@ https://db.my-feature.paraspace.dev  →  10.x.x.201:8081
 
 Nothing is remapped or path-rewritten, and there's no `X-Forwarded-Prefix` your
 app has to learn about, which is why WebSockets and hot reload work without
-anyone configuring them. Your Compose stack runs *inside* the workspace,
-unchanged, on the ports it already uses. Routes are one line of your
-[`Parafile`](./parafile.md).
+anyone configuring them. Your stack runs *inside* the workspace, unchanged, on
+the ports it already uses, whether that's a single process or a dozen
+containers. Routes are one line of your [`Parafile`](./parafile.md).
 
 ### A thin engine your project takes over
 

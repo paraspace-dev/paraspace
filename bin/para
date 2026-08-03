@@ -146,7 +146,7 @@ normalize_routes() {
 # Commands that clone, boot or build need a project; the rest work anywhere.
 require_project() {
   [ -n "$PARA_PROJECT_DIR" ] \
-    || die "not inside a para project. No .paraspace/ directory from \$PWD upward. cd into one, or set PARA_PROJECT_DIR."
+    || die "not inside a para project: no .paraspace/ directory from \$PWD upward. cd into one, or set PARA_PROJECT_DIR."
   if [ -n "$PARA_CONTRACT" ] && [ "$PARA_CONTRACT" != "$CONTRACT" ]; then
     die "this project targets para contract $PARA_CONTRACT, but this para provides $CONTRACT. See docs/versioning.md."
   fi
@@ -214,7 +214,7 @@ ws_list() { # ws_list [<project>] -> CSV: name,state,project,domain,ip,routes
 # Non-zero if there is no such workspace.
 ws_load() {
   local rows row
-  rows="$(ws_list)" || die "cannot read the workspace list from incus, so refusing to guess whether '$1' exists."
+  rows="$(ws_list)" || die "cannot read the workspace list from incus. Refusing to guess whether '$1' exists."
   row="$(awk -F, -v ct="$CT_PREFIX$1" '$1 == ct' <<<"$rows")"
   [ -n "$row" ] || return 1
   # shellcheck disable=SC2034  # a row reader exposes the whole row, used or not
@@ -361,7 +361,7 @@ caddy_sites() {
   # indistinguishable from "no workspaces", and the config that gets written is
   # a valid one with every route on the machine missing.
   rows="$(ws_list)" \
-    || die "cannot read the workspace list from incus, so refusing to write a Caddyfile that would drop every route."
+    || die "cannot read the workspace list from incus. Refusing to write a Caddyfile that would drop every route."
   while IFS=, read -r name state project domain ip routes; do
     ws="${name#"$CT_PREFIX"}"
     routes="$(normalize_routes "$routes")"
@@ -581,7 +581,7 @@ cmd_up() {
   if [ -n "$urls" ]; then
     log "Workspace '$name' ready → $urls"
   else
-    log "Workspace '$name' ready. No HTTP routes declared, so 'para sh $name' for a shell."
+    log "Workspace '$name' ready. It declares no HTTP routes, so use 'para sh $name' for a shell."
   fi
 }
 
@@ -781,7 +781,7 @@ cmd_image_build() {
   # because an incomplete Parafile is more useful to hear about than an absent
   # incus.
   have_hook image-build \
-    || die "no 'image-build' hook. Add .paraspace/hooks/image-build (renamed from image-build.sh). See docs/image.md."
+    || die "no 'image-build' hook. Write one at .paraspace/hooks/image-build (it was image-build.sh before contract 1). See docs/image.md."
   local base="$PARA_IMAGE_BASE"
   [ "$from_current" -eq 0 ] || base="$PARA_IMAGE"
   [ -n "$base" ] \
@@ -1044,7 +1044,7 @@ run_project_command() {
   # Refuse rather than pick: para promises no order between mods, so running one
   # of them would be a coin toss the reader cannot see the result of.
   if command_conflict "$verb"; then
-    die "more than one mod defines '$verb'. rm one of these, or shadow it with your own .paraspace/commands/$verb:
+    die "more than one mod defines '$verb'. Remove one of these, or shadow it with your own .paraspace/commands/$verb:
 $(command_files "$verb")"
   fi
   # PARA_HOOKS and PARA_SKEL name paths inside a workspace, so an inherited pair
@@ -1127,7 +1127,7 @@ doctor_host() {
   fi
   # The wildcard must resolve to this machine or no workspace URL will load.
   if ! command -v getent >/dev/null 2>&1; then
-    d_warn "no getent here, so check by hand that *.$PARA_DOMAIN resolves to 127.0.0.1"
+    d_warn "no getent here. Check by hand that *.$PARA_DOMAIN resolves to 127.0.0.1"
   elif getent hosts "doctor.$PARA_DOMAIN" | grep -q '^127\.'; then
     d_ok "*.$PARA_DOMAIN resolves to 127.0.0.1"
   else
@@ -1137,7 +1137,7 @@ doctor_host() {
   # container start with a cryptic "Failed to create cgroup at_mnt".
   local v1
   v1="$(awk '$3 == "cgroup" && $2 ~ /^\/sys\/fs\/cgroup\//{print $2}' /proc/mounts 2>/dev/null | tr '\n' ' ')"
-  [ -z "$v1" ] || d_bad "cgroup-v1 mounted inside /sys/fs/cgroup (${v1% }), so containers will not start until: sudo umount -l ${v1% }"
+  [ -z "$v1" ] || d_bad "cgroup-v1 mounted inside /sys/fs/cgroup (${v1% }). No container will start until you unmount it: sudo umount -l ${v1% }"
 }
 
 doctor_incus() {
@@ -1288,9 +1288,9 @@ usage_project_commands() {
     # the engine owns the name, or more than one mod claims it. Either way there
     # is nothing worth crediting and no summary worth advertising.
     if is_engine_verb "$verb"; then
-      printf '  %-25s %s\n' "$verb" "never runs, the engine verb wins (para doctor)"
+      printf '  %-25s %s\n' "$verb" "never runs, since the engine verb wins (para doctor)"
     elif command_conflict "$verb"; then
-      printf '  %-25s %s\n' "$verb" "never runs, more than one mod defines it (para doctor)"
+      printf '  %-25s %s\n' "$verb" "never runs, since more than one mod defines it (para doctor)"
     else
       printf '  %-25s %s%s\n' "$verb" "$(command_summary "$path")" "${pdir:+ [${pdir##*/}]}"
     fi
@@ -1305,7 +1305,7 @@ cmd_completions() {
 	autoload -U +X bashcompinit && bashcompinit
 	EOF
       ;;
-    *) die "usage: para completions <bash|zsh>  (then: source <(para completions bash))" ;;
+    *) die "usage: para completions <bash|zsh>. Then: source <(para completions bash)" ;;
   esac
   cat <<-'EOF'
 	_para() {

@@ -98,22 +98,21 @@ import Wordmark from './Wordmark.vue'
 
 /*
  * The two lenses are one rule mirrored, so everything that differs between them
- * is a value rather than a second copy: --dx puts their centers 0.72 diameters
- * apart (enough overlap to read as one shared region, not so much that either
- * loses its own crescent), --dx-drift is where each wanders, and the two --dur
- * are coprime enough never to fall into step.
+ * is a value rather than a second copy: --dx puts their centers 0.62 diameters
+ * apart, which is the split public/logo.svg is drawn at, --dx-drift is where
+ * each wanders, and the two --dur are coprime enough never to fall into step.
  */
 .a {
   --c: var(--pv-lens-a);
-  --dx: -36%;
-  --dx-drift: -37.5%;
+  --dx: -31%;
+  --dx-drift: -32.5%;
   --dur: 48s;
 }
 
 .b {
   --c: var(--pv-lens-b);
-  --dx: 36%;
-  --dx-drift: 37.5%;
+  --dx: 31%;
+  --dx-drift: 32.5%;
   --dur: 61s;
 }
 

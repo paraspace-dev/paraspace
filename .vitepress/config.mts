@@ -79,6 +79,7 @@ export default defineConfig({
           text: 'Guides',
           items: [
             { text: 'Running coding agents', link: '/docs/agents' },
+            { text: 'The Claude Code plugin', link: '/docs/claude-plugin' },
             { text: 'Cookbook', link: '/docs/cookbook' },
             { text: 'Workspace URLs', link: '/docs/urls' },
             { text: 'Shared authentication', link: '/docs/shared-auth' },

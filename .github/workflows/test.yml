@@ -1,15 +1,17 @@
 name: test
 
 # The CLI tier of the para suite (test/run --cli): argument handling, help text,
-# and `para init`. It needs only bash + the checkout, with no incus, so it runs on
-# GitHub-hosted runners. The e2e tier (test/run --e2e) drives real Incus
-# workspaces and is run locally / on a self-hosted incus runner, not here.
+# `para init`, and the plugin the package ships. It needs only bash, node and
+# the checkout, with no incus, and GitHub-hosted ubuntu-latest already has bash
+# and node, so nothing installs here and there is no setup-node step. The e2e
+# tier (test/run --e2e) drives real Incus workspaces and is run locally / on a
+# self-hosted incus runner, not here.
 on:
   push:
     branches: [main]
   pull_request:
 
-# Read-only: this job only checks out and runs bash.
+# Read-only: this job checks out the repo and runs the suite, writing nothing.
 permissions:
   contents: read
 

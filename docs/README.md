@@ -29,7 +29,9 @@ make a project para-enabled: the [Parafile](./parafile.md), the
 [hooks](./hooks.md), the [image](./image.md), and any
 [commands](./commands.md#project-commands) you want to add.
 [Mods](./mods.md) are how you vendor a ready-made piece of that instead of
-writing it. The [Cookbook](./cookbook.md) has recipes for the common ones.
+writing it. The [Cookbook](./cookbook.md) has recipes for the common ones. Or
+have the [Claude Code plugin](./claude-plugin.md) do it from what your repo
+already says about itself.
 
 **Something is broken.** [Troubleshooting](./troubleshooting.md) starts at
 `para doctor` and explains what its checks mean.

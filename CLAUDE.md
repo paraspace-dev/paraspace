@@ -69,6 +69,15 @@ the constant and [`docs/versioning.md`](./docs/versioning.md).
   functions run in name order, so write them **order-independent**. See
   [`test/README.md`](./test/README.md) for the full conventions (tier choice,
   `|| return 1`, `eventually`, per-workspace asserts).
+- **`skills/` defers to the spec; it does not restate it.**
+  `skills/paraspace-setup/` is the Claude Code plugin this repo publishes
+  (`.claude-plugin/`, also in the npm `files`). It owns only the judgment
+  `docs/` deliberately omits, and links rather than copies for the rest. See
+  [`docs/claude-plugin.md`](./docs/claude-plugin.md). `test/cli/test_plugin.sh`
+  covers what nothing else here would catch, since an agent improvises around a
+  break instead of failing. It checks that the manifests parse, that every
+  bundled path the skill names resolves, and that the probe survives a machine
+  with nothing installed on it.
 - The `zsh` `skel/` is intentionally not linted (ShellCheck parses only sh/bash).
 - `plans/` holds design notes for in-flight work; not shipped in the npm `files`.
 

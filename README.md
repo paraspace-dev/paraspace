@@ -61,7 +61,8 @@ Full docs at **[paraspace.dev](https://paraspace.dev)**, and in
 - [How it works](./docs/how-it-works.md) · [Running coding
   agents](./docs/agents.md)
 - [Project setup](./docs/project-setup.md) (adapting `para` to your project) ·
-  [Cookbook](./docs/cookbook.md) (recipes for the common needs)
+  [The Claude Code plugin](./docs/claude-plugin.md) (having it do that for
+  you) · [Cookbook](./docs/cookbook.md) (recipes for the common needs)
 - [Commands](./docs/commands.md) · [The Parafile](./docs/parafile.md) ·
   [Hooks](./docs/hooks.md) · [Mods](./docs/mods.md) · [The image
   contract](./docs/image.md) · [Contract versioning](./docs/versioning.md)
@@ -94,7 +95,8 @@ To release, from `main`:
 npm run release patch      # or minor, major, prerelease, or an exact 1.0.0
 ```
 
-That runs the gates, bumps `package.json`, tags and pushes;
+That runs the gates, bumps `package.json` (and the plugin manifest with it), tags
+and pushes;
 [`publish.yml`](./.github/workflows/publish.yml) publishes the tag to npm over
 [trusted publishing](https://docs.npmjs.com/trusted-publishers), so there is no
 token in the repo and npm attests the provenance itself. A `prerelease` goes

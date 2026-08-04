@@ -28,10 +28,12 @@ as the substring match it looks like.
 
 ## What each tier covers
 
-**CLI tier** (`test/cli/`) needs no incus. Argument handling, `para --help`, and
-`para init` (pure filesystem). This is what runs on every push
-([`.github/workflows/test.yml`](../.github/workflows/test.yml)), alongside the
-ShellCheck gate ([`bin/lint`](../bin/lint)).
+**CLI tier** (`test/cli/`) needs no incus. Argument handling, `para --help`,
+`para init` (pure filesystem), and what the package ships to an agent, meaning
+the `.claude-plugin/` manifests and the `skills/paraspace-setup/` skill
+(`test_plugin.sh`, the one file here that needs `node`). This is what runs on
+every push ([`.github/workflows/test.yml`](../.github/workflows/test.yml)),
+alongside the ShellCheck gate ([`bin/lint`](../bin/lint)).
 
 **e2e tier** (`test/e2e/`) is the real mechanism, exercised through actual `para`
 commands against a live Incus workspace:

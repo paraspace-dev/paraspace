@@ -219,3 +219,8 @@ GitHub and npm too. Keep pages plain GitHub-flavored markdown that reads
 correctly in all three places. The only generator-specific syntax in use is the
 lander's frontmatter and GitHub-style alert blockquotes. **A new page also needs
 a `sidebar` entry** in the config.
+
+`public/logo.svg` is the mark, the poster's two lenses flattened to read at tab
+size. It serves as both the navbar logo and the favicon. Editing it means
+rerunning `bin/site-icons`, which renders the PNGs that Safari and iOS need,
+and committing what that writes.

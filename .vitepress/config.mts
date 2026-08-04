@@ -11,20 +11,29 @@ export default defineConfig({
   cleanUrls: true,
   lastUpdated: true,
 
-  // The two faces the first screen actually paints: the body sans and the mono
-  // the poster's host list is set in. Preloaded so neither swaps under the
-  // reader, and the rest of Plex Mono's weights can wait for the stylesheet. The
-  // wordmark needs no font at all; it's drawn (see theme/Wordmark.vue). Fonts
-  // are fetched in CORS mode even same-origin, hence the crossorigin attribute.
-  head: (
-    [
-      '/fonts/ibm-plex-sans-latin-var.woff2',
-      '/fonts/ibm-plex-mono-latin-400.woff2',
-    ] as const
-  ).map((href) => [
-    'link',
-    { rel: 'preload', href, as: 'font', type: 'font/woff2', crossorigin: '' },
-  ]),
+  head: [
+    // public/logo.svg is the mark. Safari ignores rel=icon SVGs and iOS wants
+    // an opaque square, so both PNGs are rendered from it by bin/site-icons.
+    ['link', { rel: 'icon', type: 'image/svg+xml', href: '/logo.svg' }],
+    ['link', { rel: 'icon', type: 'image/png', sizes: '32x32', href: '/favicon.png' }],
+    ['link', { rel: 'apple-touch-icon', href: '/apple-touch-icon.png' }],
+
+    // The two faces the first screen actually paints: the body sans and the
+    // mono the poster's host list is set in. Preloaded so neither swaps under
+    // the reader, and the rest of Plex Mono's weights can wait for the
+    // stylesheet. The wordmark needs no font at all; it's drawn (see
+    // theme/Wordmark.vue). Fonts are fetched in CORS mode even same-origin,
+    // hence the crossorigin attribute.
+    ...(
+      [
+        '/fonts/ibm-plex-sans-latin-var.woff2',
+        '/fonts/ibm-plex-mono-latin-400.woff2',
+      ] as const
+    ).map((href) => [
+      'link',
+      { rel: 'preload', href, as: 'font', type: 'font/woff2', crossorigin: '' },
+    ]),
+  ],
 
   srcExclude: [
     'README.md',
@@ -47,6 +56,8 @@ export default defineConfig({
   },
 
   themeConfig: {
+    logo: '/logo.svg',
+
     nav: [{ text: 'Docs', link: '/docs/', activeMatch: '^/docs/' }],
 
     sidebar: {

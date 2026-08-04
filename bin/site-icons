@@ -1,0 +1,50 @@
+#!/usr/bin/env bash
+set -euo pipefail
+# ============================================================================
+# site-icons - render the raster favicons from public/logo.svg.
+#
+# public/logo.svg is the mark, and it is what modern browsers load as the
+# favicon and what the navbar shows beside the site title. Two consumers can't
+# read it: Safari ignores rel=icon SVGs, and iOS wants an opaque square for the
+# home screen. Both are rendered from it here rather than drawn again, so the
+# geometry keeps one home.
+#
+# Run this after editing public/logo.svg and commit what it writes. The site
+# build doesn't, so a stale PNG stays invisible until someone opens Safari.
+#
+#   Usage: bin/site-icons
+#
+# Needs `inkscape` on PATH (any 1.x).
+# ============================================================================
+
+root="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$root/public"
+
+if ! command -v inkscape >/dev/null; then
+  echo "site-icons: needs inkscape on PATH (https://inkscape.org/release/)" >&2
+  exit 1
+fi
+
+echo "site-icons: rendering from public/logo.svg"
+
+# A tab icon sits in a square slot, so the 86x50 mark is centred in one and the
+# padding stays transparent. Rendering the mark alone would give a 32x19 file,
+# and the rel=icon that points at it claims 32x32.
+inkscape --pipe -w 32 -o favicon.png >/dev/null 2>&1 <<'EOF'
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 86 86">
+  <image href="logo.svg" y="18" width="86" height="50"/>
+</svg>
+EOF
+echo "  public/favicon.png"
+
+# The home-screen icon is the mark inset on the site's dark sheet, since iOS
+# composites it onto an opaque tile and transparency there comes out black. The
+# mark is 86x50, so 148x86 centres it at 82% of a 180 tile. Piped rather than
+# written out, and the href resolves against public/, which is the cwd.
+inkscape --pipe -w 180 -o apple-touch-icon.png >/dev/null 2>&1 <<'EOF'
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 180">
+  <rect width="180" height="180" rx="40" fill="#14151a"/>
+  <image href="logo.svg" x="16" y="47" width="148" height="86"/>
+</svg>
+EOF
+echo "  public/apple-touch-icon.png"

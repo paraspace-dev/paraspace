@@ -1,6 +1,6 @@
 # Why ParaSpace
 
-Running `n` coding agents on a project in parallel and not having to babysit
+Running parallel coding agent tasks on a project *and* not having to babysit
 them are the same problem: each agent needs somewhere to work that is neither
 your working copy nor your host.
 
@@ -14,16 +14,17 @@ afterward. Letting one agent reconfigure the underlying stack is even riskier.
 Giving each agent a real place to work eliminates that entire class of
 problems. Assembling that place is harder than it sounds.
 
-A worktree separates files, but not the running stack. Port offsets avoid
-collisions, but quickly become confusing, still run on your host, and require
-parameterizing the stack. Devcontainers can work, but lack the surrounding
-lifecycle management and tie you to Docker's runtime and configuration model. A
-VM per task reserves RAM whether it is busy or not. Cloud sandboxes bill by the
-second while your own machine sits idle. Coder complicates routing and pushes
-you toward a web-based agent harness.
+- A worktree separates files, but not the running stack.
+- Port offsets avoid collisions, but quickly become confusing, still run on
+  your host, and require parameterizing the stack.
+- Devcontainers can work, but lack the surrounding lifecycle management and tie
+  you to Docker's runtime and configuration model.
+- A VM per task reserves RAM whether it is busy or not.
+- Cloud sandboxes bill by the second while your own machine sits idle.
+- Coder complicates routing and pushes you toward a web-based agent harness.
 
 [Prior art](./prior-art.md) covers each option in detail, including when you
-should choose one instead of `para`.
+should choose one instead of ParaSpace.
 
 ## The solution
 

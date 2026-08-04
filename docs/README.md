@@ -1,6 +1,6 @@
-# ParaSpace documentation
+# What is ParaSpace?
 
-`para` runs any number of full, isolated copies of a project side by side on
+ParaSpace runs any number of full, isolated copies of a project side by side on
 your own machine. Each workspace is an unprivileged system container with its
 own clone, its own stack, a static bridge IP, and its own
 `https://<name>.<domain>` URL.

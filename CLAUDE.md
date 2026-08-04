@@ -224,3 +224,10 @@ a `sidebar` entry** in the config.
 size. It serves as both the navbar logo and the favicon. Editing it means
 rerunning `bin/site-icons`, which renders the PNGs that Safari and iOS need,
 and committing what that writes.
+
+**Both the mark and the poster split their circles at 0.62 diameters**, so the
+overlap is the same shape at 16px and at 540px. The number came from measuring
+Mastercard's artwork, and it lands within a rounding of 1/φ (0.618), which is
+about as good a reason as a ratio gets. Moving it means moving `--dx` in
+`Poster.vue` and the centres in `public/logo.svg` together, or the diagram
+starts saying two different things about how much two workspaces share.

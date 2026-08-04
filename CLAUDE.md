@@ -46,10 +46,9 @@ the constant and [`docs/versioning.md`](./docs/versioning.md).
 - **Pure shell.** `bin/para` is one lean bash script (`set -euo pipefail`),
   organized as small helpers plus `cmd_*` handlers dispatched from `main()`.
   Expect terse helpers, `log/warn/die/need`, lowercase function names, and
-  POSIX-ish code where practical. It is the minimal-engine rewrite
-  ([`plans/minimal-engine.md`](./plans/minimal-engine.md)) that replaced a
-  2,244-line predecessor, and it is the reference for **House style** below.
-  New code should read like it.
+  POSIX-ish code where practical. It is the minimal-engine rewrite that
+  replaced a 2,244-line predecessor, and it is the reference for **House
+  style** below. New code should read like it.
 - **ShellCheck is the static gate**, run via `bin/lint` (or `npm run lint`), and
   CI runs the same on every push and PR. It lints the CLI, the runner, the
   templates' and `mods/`' hooks, and the `test/` scripts (discovered by

@@ -44,14 +44,13 @@ const ROWS = [
 const root = ref(null)
 
 /*
- * The reveal is added by script and only ever by script: without it every row
- * is already in its finished state, so a reader with no JS, or one who asked
- * for less motion, gets the page rather than five empty gaps.
+ * What hides the rows is html.pv-anim, stamped in <head> (see
+ * .vitepress/config.mts) and only ever by script, so a reader with no JS, or
+ * one who asked for less motion, gets the page rather than five empty gaps.
  */
 onMounted(() => {
   if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
 
-  root.value.classList.add('js')
   const io = new IntersectionObserver(
     (entries) => {
       for (const entry of entries) {
@@ -348,29 +347,29 @@ onMounted(() => {
  * Each row arrives from its own side: the lens travels further than the copy,
  * so the light leads and the words follow it in.
  */
-.js .row .art,
-.js .row .copy {
+html.pv-anim .row .art,
+html.pv-anim .row .copy {
   opacity: 0;
   transition:
     opacity 0.75s ease,
     transform 0.75s cubic-bezier(0.16, 0.84, 0.28, 1);
 }
 
-.js .row .art {
+html.pv-anim .row .art {
   transform: translateX(-38px);
 }
 
-.js .row.flip .art {
+html.pv-anim .row.flip .art {
   transform: translateX(38px);
 }
 
-.js .row .copy {
+html.pv-anim .row .copy {
   transform: translateY(20px);
   transition-delay: 0.12s;
 }
 
-.js .row.in .art,
-.js .row.in .copy {
+html.pv-anim .row.in .art,
+html.pv-anim .row.in .copy {
   opacity: 1;
   transform: none;
 }
@@ -402,8 +401,8 @@ onMounted(() => {
     margin-inline: auto;
   }
 
-  .js .row .art,
-  .js .row.flip .art {
+  html.pv-anim .row .art,
+  html.pv-anim .row.flip .art {
     transform: translateY(24px);
   }
 }

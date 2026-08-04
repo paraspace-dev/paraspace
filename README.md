@@ -7,7 +7,7 @@ several coding agents (or you) can build, run and break things in parallel
 without colliding.
 
 📖 **[Documentation](https://paraspace.dev)** · [Why
-ParaSpace](./docs/why.md) · [Getting started](./docs/getting-started.md)
+ParaSpace](./docs/why.md) · [Install ParaSpace](./docs/install.md)
 
 ## Install
 
@@ -55,8 +55,7 @@ Full docs at **[paraspace.dev](https://paraspace.dev)**, and in
 - [Why ParaSpace](./docs/why.md) (the case, and what it costs) ·
   [Prior art](./docs/prior-art.md) (how it compares, and when to pick
   something else)
-- [Getting started](./docs/getting-started.md) (which path you want) ·
-  [Install ParaSpace](./docs/install.md) · [Use a ParaSpace
+- [Install ParaSpace](./docs/install.md) · [Use a ParaSpace
   project](./docs/using-a-project.md)
 - [How it works](./docs/how-it-works.md) · [Running coding
   agents](./docs/agents.md)

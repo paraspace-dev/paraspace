@@ -1,9 +1,11 @@
 # What is ParaSpace?
 
-ParaSpace runs any number of full, isolated copies of a project side by side on
-your own machine. Each workspace is an unprivileged system container with its
-own clone, its own stack, a static bridge IP, and its own
-`https://<name>.<domain>` URL.
+ParaSpace ships the `para` cli tool, which gives every task its own full,
+isolated copy of a project, so several coding agents can work at once without
+stepping on each other's branch, database, or half-finished edits.
+
+Each workspace is a local unprivileged system container with its own clone, its
+own stack, a static bridge IP, and its own `https://<name>.<domain>` URL.
 
 [Incus](https://linuxcontainers.org/incus/) runs the containers.
 [Caddy](https://caddyserver.com/) runs on your host and points each workspace's
@@ -12,24 +14,26 @@ a workspace lives in a `.paraspace/` directory at your repo root.
 
 ## Where to start
 
-**I want to try it.** [Why ParaSpace](./why.md) makes the case ·
-[Install ParaSpace](./install.md) prepares your machine · [Use a ParaSpace
-project](./using-a-project.md) launches your first workspace in a repo that
-already has `.paraspace/` · [How it works](./how-it-works.md) is the mental
-model · [Prior art](./prior-art.md) compares the alternatives, including when
-to pick something else.
+**I want to try it.**
 
-**I want to run agents in parallel.** [Running coding agents](./agents.md)
-covers one agent per workspace, running an agent with permissions wide open,
-what that does and doesn't isolate, and the review loop.
+- [Install ParaSpace](./install.md) to prepare your machine
+- [Use a ParaSpace project](./using-a-project.md) on repos that already have
+  `.paraspace/`
+- [Running coding agents](./agents.md) in parallel
+- [Why ParaSpace](./why.md) explains the approach
+- [How it works](./how-it-works.md) and the mental model
 
-**I want to add para to my repo.** [Add ParaSpace to a
-project](./project-setup.md) starts at `para init`, then walks the pieces that
-make a project para-enabled: the [Parafile](./parafile.md), the
-[hooks](./hooks.md), the [image](./image.md), and any
-[commands](./commands.md#project-commands) you want to add.
-[Mods](./mods.md) are how you vendor a ready-made piece of that instead of
-writing it. The [Cookbook](./cookbook.md) has recipes for the common ones.
+**I want to add ParaSpace to my repo.**
+
+- [Add ParaSpace to a project](./project-setup.md) starts at `para init`, then
+  walks the pieces that make a project para-enabled, the
+  [Parafile](./parafile.md), the [hooks](./hooks.md), the [image](./image.md),
+  and any [commands](./commands.md#project-commands) you want to add
+- [Mods](./mods.md) are how you vendor a ready-made piece of that instead of
+  writing it
+- [The Cookbook](./cookbook.md) has recipes for the common ones
+- [Prior art](./prior-art.md) compares the alternatives, including when to pick
+  something else
 
 **Something is broken.** [Troubleshooting](./troubleshooting.md) starts at
 `para doctor` and explains what its checks mean.

@@ -12,6 +12,17 @@ export default defineConfig({
   lastUpdated: true,
 
   head: [
+    // Arms the scroll reveals (theme/TerminalDemo.vue, theme/Features.vue).
+    // Every page is server-rendered, so a class added on mount arrives after
+    // the browser has already painted the finished state, and the reveal reads
+    // as the terminal appearing and then fading out. In <head> it lands before
+    // the first paint. Only ever set by script, so no-JS readers keep the page.
+    [
+      'script',
+      {},
+      "try{if(!matchMedia('(prefers-reduced-motion: reduce)').matches)document.documentElement.classList.add('pv-anim')}catch(e){}",
+    ],
+
     // public/logo.svg is the mark. Safari ignores rel=icon SVGs and iOS wants
     // an opaque square, so both PNGs are rendered from it by bin/site-icons.
     ['link', { rel: 'icon', type: 'image/svg+xml', href: '/logo.svg' }],
@@ -67,7 +78,6 @@ export default defineConfig({
           items: [
             { text: 'Overview', link: '/docs/' },
             { text: 'Why ParaSpace', link: '/docs/why' },
-            { text: 'Getting started', link: '/docs/getting-started' },
             { text: 'Install ParaSpace', link: '/docs/install' },
             { text: 'Use a ParaSpace project', link: '/docs/using-a-project' },
             { text: 'Add ParaSpace to a project', link: '/docs/project-setup' },

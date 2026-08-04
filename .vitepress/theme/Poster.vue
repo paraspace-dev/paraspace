@@ -33,7 +33,7 @@ import Wordmark from './Wordmark.vue'
         and its own https URL. Run coding agents in parallel without collisions.
       </p>
       <div class="actions">
-        <a class="para-btn brand" href="/docs/getting-started">Get started</a>
+        <a class="para-btn brand" href="/docs/install">Get started</a>
         <a class="para-btn alt" href="/docs/why">Why ParaSpace</a>
       </div>
       <p class="hosts">

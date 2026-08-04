@@ -12,13 +12,13 @@ import { onMounted, ref } from 'vue'
 const root = ref(null)
 
 /*
- * Same reveal as the feature rows: added by script and only ever by script, so
- * a reader with no JS gets the terminal running rather than an empty pane.
+ * Same reveal as the feature rows. What hides the terminal is html.pv-anim,
+ * stamped in <head> (see .vitepress/config.mts) rather than here, because this
+ * runs after the server-rendered page has painted.
  */
 onMounted(() => {
   if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
 
-  root.value.classList.add('js')
   const io = new IntersectionObserver(
     ([entry]) => {
       if (!entry.isIntersecting) return
@@ -307,7 +307,7 @@ html:not(.dark) .term {
  * The terminal arrives the way the feature rows below it do, with a rise and a
  * fade, one gesture, once.
  */
-.para-hero.js {
+html.pv-anim .para-hero {
   opacity: 0;
   transform: translateY(28px);
   transition:
@@ -315,7 +315,7 @@ html:not(.dark) .term {
     transform 0.7s cubic-bezier(0.16, 0.84, 0.28, 1);
 }
 
-.para-hero.js.in {
+html.pv-anim .para-hero.in {
   opacity: 1;
   transform: none;
 }
@@ -323,11 +323,11 @@ html:not(.dark) .term {
 /* And the session waits for it. One rule holds every clock in here (the typing,
    the output lines, the two panes, the cursor), so there is no timeline that can
    start early. */
-.para-hero.js * {
+html.pv-anim .para-hero * {
   animation-play-state: paused;
 }
 
-.para-hero.js.in * {
+html.pv-anim .para-hero.in * {
   animation-play-state: running;
 }
 

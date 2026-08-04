@@ -170,9 +170,9 @@ See [Prior art](./prior-art.md) for a comparison with the alternatives.
 
 ## Next
 
-[Install ParaSpace](./install.md) to set up your machine · [How it
-works](./how-it-works.md) for the architecture · [Running coding
-agents](./agents.md) for the workflow · [Prior art](./prior-art.md) for the
-alternatives
+- [Install ParaSpace](./install.md) to set up your machine
+- [How it works](./how-it-works.md) for the architecture
+- [Running coding agents](./agents.md) for the workflow
+- [Prior art](./prior-art.md) for the alternatives
 
 [hn]: https://news.ycombinator.com/item?id=48892468

@@ -136,20 +136,29 @@ import Wordmark from './Wordmark.vue'
 /* ---- Underglow, grain, vignette ---------------------------------------- */
 
 /* The warm bed the Venn sits in, low and wide and centered under the
-   intersection, so the page has one light source and it's the overlap. */
+   intersection, so the page has one light source and it's the overlap. It is
+   wide and shallow enough not to read as a third lens, and it falls off on the
+   curve .pv-lens::before explains, since the ramp this replaced held one slope
+   and then stopped at 76% of the box, where the eye duly found it. */
 .under {
   position: absolute;
-  top: calc(var(--pv-eye) + var(--pv-lens-d) * 0.18);
+  top: calc(var(--pv-eye) + var(--pv-lens-d) * 0.28);
   left: 50%;
-  width: calc(var(--pv-lens-d) * 2.1);
-  height: calc(var(--pv-lens-d) * 0.9);
-  margin-left: calc(var(--pv-lens-d) * -1.05);
+  width: calc(var(--pv-lens-d) * 2.5);
+  height: calc(var(--pv-lens-d) * 0.7);
+  margin-left: calc(var(--pv-lens-d) * -1.25);
   border-radius: 50%;
   mix-blend-mode: var(--pv-blend);
   background: radial-gradient(
     closest-side,
-    color-mix(in srgb, var(--pv-under) 34%, transparent),
-    transparent 76%
+    color-mix(in srgb, var(--pv-under) 30%, transparent) 0%,
+    color-mix(in srgb, var(--pv-under) 26%, transparent) 18%,
+    color-mix(in srgb, var(--pv-under) 20%, transparent) 36%,
+    color-mix(in srgb, var(--pv-under) 13.5%, transparent) 52%,
+    color-mix(in srgb, var(--pv-under) 7.5%, transparent) 68%,
+    color-mix(in srgb, var(--pv-under) 3.4%, transparent) 82%,
+    color-mix(in srgb, var(--pv-under) 1.1%, transparent) 92%,
+    transparent 100%
   );
   animation: rise 1.9s ease-out both;
 }

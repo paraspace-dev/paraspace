@@ -26,7 +26,10 @@ set -euo pipefail
 # ============================================================================
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
+# The package itself, for tests about what it ships rather than what para does.
+# Always this checkout, even when $PARA points at an engine somewhere else.
 REPO="$(cd "$HERE/.." && pwd)"
+export REPO
 # Overridable, so an engine under development can be driven by the same suite:
 #   PARA=/path/to/para test/run --e2e
 : "${PARA:=$REPO/bin/para}"

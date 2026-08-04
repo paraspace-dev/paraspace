@@ -139,8 +139,11 @@ import Wordmark from './Wordmark.vue'
    intersection, so the page has one light source and it's the overlap. Faint
    on purpose, and far wider than it is tall, because anything stronger or
    rounder than this reads as a third lens instead of as the light the other
-   two are sitting in. It falls off on the curve .pv-lens::before explains.
-   The first stop is the dial; every other one is a fraction of it. */
+   two are sitting in. It falls off on the curve .pv-lens::before explains and
+   carries the same --pv-d, since yellow screened onto the dark sheet gains far
+   more lightness than the same yellow multiplied into paper, and without the
+   dial the bed is twice the presence in one theme that it is in the other.
+   The first stop is the amplitude; every other one is a fraction of it. */
 .under {
   position: absolute;
   top: calc(var(--pv-eye) + var(--pv-lens-d) * 0.31);
@@ -152,13 +155,13 @@ import Wordmark from './Wordmark.vue'
   mix-blend-mode: var(--pv-blend);
   background: radial-gradient(
     closest-side,
-    color-mix(in srgb, var(--pv-under) 14%, transparent) 0%,
-    color-mix(in srgb, var(--pv-under) 12.3%, transparent) 18%,
-    color-mix(in srgb, var(--pv-under) 9.5%, transparent) 36%,
-    color-mix(in srgb, var(--pv-under) 6.3%, transparent) 52%,
-    color-mix(in srgb, var(--pv-under) 3.5%, transparent) 68%,
-    color-mix(in srgb, var(--pv-under) 1.6%, transparent) 82%,
-    color-mix(in srgb, var(--pv-under) 0.5%, transparent) 92%,
+    color-mix(in srgb, var(--pv-under) calc(var(--pv-d) * 9%), transparent) 0%,
+    color-mix(in srgb, var(--pv-under) calc(var(--pv-d) * 7.9%), transparent) 18%,
+    color-mix(in srgb, var(--pv-under) calc(var(--pv-d) * 6.1%), transparent) 36%,
+    color-mix(in srgb, var(--pv-under) calc(var(--pv-d) * 4.1%), transparent) 52%,
+    color-mix(in srgb, var(--pv-under) calc(var(--pv-d) * 2.3%), transparent) 68%,
+    color-mix(in srgb, var(--pv-under) calc(var(--pv-d) * 1%), transparent) 82%,
+    color-mix(in srgb, var(--pv-under) calc(var(--pv-d) * 0.3%), transparent) 92%,
     transparent 100%
   );
   animation: rise 1.9s ease-out both;

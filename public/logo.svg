@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 86 50">
+  <!-- The poster's two lenses, flattened: r=25 with centres 36 apart, which is
+       the 0.72 diameters Poster.vue splits them by. The hues are halfway
+       between the two themes' lenses and the overlap is those two multiplied,
+       so one file reads on the dark sheet and on the paper. -->
+  <title>ParaSpace</title>
+  <circle cx="25" cy="25" r="25" fill="#4a91ae"/>
+  <circle cx="61" cy="25" r="25" fill="#6ea969"/>
+  <path d="M43 7.651A25 25 0 0 1 43 42.349A25 25 0 0 1 43 7.651Z" fill="#206048"/>
+</svg>

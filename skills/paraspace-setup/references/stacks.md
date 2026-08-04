@@ -7,6 +7,8 @@ returns immediately produces a workspace that reports ready and serves 502s.
 Every pattern below exists to satisfy that one sentence.
 
 Contents: [readiness helpers](#readiness-helpers) ·
+[binding](#bind-on-every-interface-not-loopback) ·
+[hostnames](#let-the-framework-accept-the-workspaces-hostname) ·
 [docker compose](#1-docker-compose) · [system services](#2-system-services-plus-an-app-process)
 · [bare processes](#3-bare-processes-no-init-involved) · [k3s](#4-k3s-inside-the-workspace)
 · [hybrid](#5-hybrid-services-in-containers-and-the-app-bare) · [seed data](#seed-data-and-migrations)
@@ -53,8 +55,9 @@ wait_port 3000 120 || die "nothing on :3000 after 120s"
 wait_port 3000 120 || { tail -50 ~/log/dev.log >&2; die "the dev server never came up"; }
 ```
 
-`ss` is in `iproute2` on every base in `references/bases.md`. Install it there,
-and the guard above blames the missing package instead of blaming your app.
+`ss` comes from `iproute2`, which `references/bases.md` names per base. Install
+it there and the guard above blames the missing package instead of blaming your
+app.
 
 A boot hook that starts several things should wait for each of them, and the
 routed ones are non-negotiable:
@@ -67,6 +70,57 @@ done
 
 That loop is worth writing verbatim in most projects, because it reads the
 routes para actually published and so can't drift from the `Parafile`.
+
+## Bind on every interface, not loopback
+
+Caddy runs on the **host** and proxies to the container's bridge IP, so a port
+bound on `127.0.0.1` inside the workspace is one it can never reach. The
+readiness contract doesn't catch it either, because `ss -ltn "sport = :3000"`
+matches a loopback bind, so `wait_port` returns zero, `boot` succeeds, para
+publishes the route, and the URL 502s. `wait_http "http://127.0.0.1:3000"` is a
+liveness check for the same reason. It proves the app answers, not that Caddy
+can reach it.
+
+Most dev servers bind loopback by default. The spellings:
+
+| Stack | Bind |
+|---|---|
+| Rails | `bin/rails server -b 0.0.0.0` (under `bin/dev`, in `Procfile.dev`) |
+| Django | `manage.py runserver 0.0.0.0:8000` |
+| Vite | `vite --host` (or `server.host: true`) |
+| Next | `next dev -H 0.0.0.0` |
+| compose | `ports: "3000:3000"`, never `"127.0.0.1:3000:3000"` |
+
+Then assert the address and not just the port, which is one more line in the
+routed-port loop above:
+
+```sh
+ss -ltn | grep -qE "(0\.0\.0\.0|\[::\]):${r##*:}\b" ||
+  die "routed port ${r##*:} is on loopback only; rebind it on 0.0.0.0 for Caddy"
+```
+
+## Let the framework accept the workspace's hostname
+
+`https://<name>.$PARA_DOMAIN` is a Host header the app has never seen, and
+frameworks reject unknown hosts by default. Rails 6+ answers 403 "Blocked
+hosts", Django 400 "Invalid HTTP_HOST header", Vite 403. The tell is that the
+body is the *framework's* own error page, where a routing problem would give you
+Caddy's 502 instead. Because it looks like the app, this is the failure most
+often declared a success.
+
+| Stack | Setting |
+|---|---|
+| Rails | `config.hosts << ".#{ENV['PARA_DOMAIN']}"` in `config/environments/development.rb` |
+| Django | `ALLOWED_HOSTS = ['.paraspace.dev']`, where a leading dot means every subdomain |
+| Vite | `server.allowedHosts: ['.paraspace.dev']` |
+| Next | `allowedDevOrigins: ['*.paraspace.dev']` |
+| Phoenix | `check_origin: false` in `config/dev.exs` |
+
+`PARA_DOMAIN` is a `Parafile` variable, and hooks and `para sh` both have it in
+the environment, so read it from there wherever the config language can. A
+hardcoded `paraspace.dev` breaks for the first team that sets its own domain.
+Commit the setting to the repo's dev config if the team is adopting para, and
+write it from `boot` while you're only proving the adoption works.
 
 ## 1. Docker Compose
 
@@ -209,8 +263,19 @@ wherever it's cheapest:
   restore per workspace is usually fine and keeps each workspace's database its
   own.
 
-para's own `cookbook.md` has the concrete recipe, so read that rather than
-re-deriving one.
+para's own `cookbook.md` has the concrete recipe for fetching a dump from a URL,
+so read that rather than re-deriving one. When the dump is instead a file on the
+human's machine, any running workspace of the project is a door to the same
+volume:
+
+```sh
+incus file push seed.dump "para-<ws>/para/shared/seed.dump"    # fastest for gigabytes
+para sh <ws> -c 'cat > /para/shared/seed.dump' < seed.dump     # the same door as everything else
+```
+
+Both the dump and one restored copy per workspace live on one incus pool, so
+check there is room for both before you start. `incus storage info "$PARA_POOL"`
+tells you, with the pool name `para doctor` prints.
 
 ## Routes
 

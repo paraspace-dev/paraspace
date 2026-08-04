@@ -2,7 +2,9 @@
 
 `image.md` and `parafile.md` define `PARA_IMAGE_BASE`, `PARA_IMAGE_BOOTSTRAP`
 and what `para image build` does with them. This page is the part they leave to
-you: *which* base, and what goes in the hook.
+you: *which* base, and what goes in the hook. (Bare filenames like those two are
+pages of the **installed** para's `docs/`, at the path `scripts/para-probe`
+printed, or <https://paraspace.dev/docs/>.)
 
 One mechanical fact decides how you write every line. `image-build` runs as root
 with **no tty and no stdin**, so a package manager that stops to ask will hang
@@ -15,17 +17,28 @@ a CI runner image, or the team's servers are all better reasons than novelty.
 Void is what the bundled templates use, it is not a requirement, and a Void
 image is a poor fit for a team that has never used it.
 
-| Base | `PARA_IMAGE_BOOTSTRAP` | Install line | Notes |
-|---|---|---|---|
-| `images:debian/13` | `apt-get update` | `DEBIAN_FRONTEND=noninteractive apt-get install -y …` | best default for most stacks: widest package coverage, systemd, util-linux `su` |
-| `images:ubuntu/24.04` | `apt-get update` | same | same as Debian; pick it if the team's servers are Ubuntu |
-| `images:alpine/3.21` | `apk add --no-cache bash` | `apk add --no-cache …` | tiny and fast, but read the Alpine caveats below before choosing it |
-| `images:voidlinux` | `xbps-install -Syu xbps bash` | `xbps-install -Sy …` | what the templates ship; rolling, runit, see the partial-upgrade note |
-| `images:fedora/43` | `dnf -y makecache` | `dnf install -y …` | fine; larger images |
-| `images:archlinux` | `pacman -Syu --noconfirm` | `pacman -S --noconfirm …` | rolling; `-Sy` without the `u` is the partial-upgrade footgun, same as Void's |
+Aliases move over time, so confirm the one you pick before you build on it.
+`incus image list images: <distro>` takes a second, and the failure it saves you
+is minutes into a build.
 
-Aliases move over time. Run `incus image list images: <distro>` on the machine
-to check, which takes a second.
+| Base | `PARA_IMAGE_BOOTSTRAP` |
+|---|---|
+| `images:debian/13` | `apt-get update` |
+| `images:ubuntu/24.04` | `apt-get update` |
+| `images:alpine/3.21` | `apk add --no-cache bash` |
+| `images:voidlinux` | `xbps-install -Syu xbps bash` |
+| `images:fedora/43` | `dnf -y makecache` |
+| `images:archlinux` | `pacman -Syu --noconfirm` |
+
+The bootstrap is one `sh -c` line, and leaving **bash** in the builder is the
+only thing para asks of it.
+
+**Packaging is your job, not this page's.** Which package carries a binary, what
+a distro splits in two, and what `--no-install-recommends` drops all drift
+faster than any page can track, and a confident sentence here would be wrong for
+somebody within a release. Check it in the builder rather than trusting a
+recollection, yours or this file's. That is what the contract check below is
+for.
 
 ## Proving you met the contract
 
@@ -47,46 +60,49 @@ The loop matters. `command -v bash git` returns success when **either** name
 resolves, and bash is guaranteed present, so the one-line version can only ever
 pass, including on an image with no git.
 
-Add `iproute2` too. `ss` is what the readiness helpers in
-`references/stacks.md` poll with, and without it every `boot` blames the app for
-a missing package. `image.md` lists the ergonomic extras worth having.
+**Put every binary the hooks will call in that loop**, not just the two the
+contract names. `ss` is what the readiness helpers in `references/stacks.md`
+poll with, so a base without it makes every `boot` blame the app for a missing
+package. On a Docker stack, `docker` belongs there too: a distro can ship the
+daemon and the client as separate packages, so an install line that reads
+correctly still leaves you a daemon and no client. Rather than remember which
+distros do that, let the loop catch it. `image.md` lists the ergonomic extras
+worth having.
 
-## Per-distro caveats that actually bite
+## Caveats that touch para's own contract
 
-**Alpine.** `useradd`/`groupadd`/`usermod` come from `shadow`, and `su --pty`
-comes from **`util-linux-login`**, since plain `util-linux` leaves `/bin/su` as
-busybox's, which has no `--pty`. Alpine is also musl, so a project with prebuilt
-glibc binaries (some Node native modules, many vendored wheels, Playwright
-browsers) will fail in ways that look like the app's fault. Great for a small
-worker box, risky as a default for an app stack.
+These are here because they break *para*, not because they are distro facts you
+couldn't look up.
 
-**Void.** Installing new packages against freshly-synced repodata without a full
-`-Syu` first is the classic partial-upgrade footgun, so do the full upgrade and
-then install. The Incus base also ships `/tmp` as non-world-writable, which
-breaks any tool that makes `/tmp/<tool>` as a non-root user; `chmod 1777 /tmp`.
-Services are runit: `ln -sf /etc/sv/<svc> /var/service/`.
+**Alpine.** `su --pty` comes from **`util-linux-login`**, since plain
+`util-linux` leaves `/bin/su` as busybox's, which has no `--pty`, and that is
+the `su` an interactive `para sh` needs. `useradd`/`groupadd`/`usermod` come
+from `shadow`. Alpine is also musl, so a project with prebuilt glibc binaries
+(some Node native modules, many vendored wheels, Playwright browsers) fails in
+ways that look like the app's fault.
 
-**Debian/Ubuntu.** `DEBIAN_FRONTEND=noninteractive` on every `apt-get install`,
-and prefer `apt-get` over `apt` in scripts. For Docker, trixie's `docker.io` +
-`docker-compose` (2.26.1) does give you a working `docker compose`; add Docker's
-own apt repo only when you need a version the distro doesn't carry. Either way
-the workspace user goes in the `docker` group, and the driver check that the
-Void template does with runit is `systemctl enable --now docker` here:
+**Void.** The Incus base ships `/tmp` non-world-writable, which breaks any tool
+that makes `/tmp/<tool>` as a non-root user; `chmod 1777 /tmp`. Services are
+runit: `ln -sf /etc/sv/<svc> /var/service/`.
+
+**Anything with systemd.** Services you `enable` in `image-build` come up in
+every workspace, which is usually what you want. Don't `start` something in the
+builder that needs hardware or a network the builder doesn't have.
+
+**Docker in the image**, whatever the distro calls the packages. The workspace
+user joins the `docker` group, the daemon is enabled the way this init system
+does it, and the storage driver gets checked, because a btrfs or ZFS incus pool
+silently gives you `vfs`:
 
 ```sh
 usermod -aG docker "$PARA_USER"
-systemctl enable --now docker
+# then enable the daemon the way this init system does, and wait for it:
 for _ in $(seq 1 30); do docker info >/dev/null 2>&1 && break; sleep 1; done
 case "$(docker info --format '{{.Driver}}')" in
   overlay|overlay2|overlayfs) ;;
   *) echo "error: docker driver is not overlay; use a dir/ext4 incus pool" >&2; exit 1 ;;
 esac
 ```
-
-**Anything with systemd** (Debian, Ubuntu, Fedora, Arch): services you `enable`
-in `image-build` come up automatically in every workspace, which is usually what
-you want. Don't try to `start` something in the builder that needs hardware or a
-network the builder doesn't have.
 
 ## Language runtimes
 
@@ -113,10 +129,13 @@ Three details decide whether this works, and the first is the one that bites:
   0700, where `$PARA_USER` can neither see it nor read it. The same shape
   applies to any version manager that defaults to `$HOME`. Point its data
   directory somewhere system-wide, then make it world-readable.
-- **Put the shell wiring in `/etc/profile.d/`.** Hooks, `para sh -c` and project
-  commands all run through login shells, so a `profile.d` file is how a tool
-  installed at build time is on `PATH` everywhere afterwards. An `export` inside
-  a hook reaches nothing.
+- **Put the shell wiring in `/etc/profile.d/`.** `provision`, `boot` and
+  `para sh -c` get a login shell, so that file is how a build-time tool is on
+  `PATH` afterwards; an `export` inside a hook reaches nothing. Two things it
+  doesn't reach: `image-build` itself is not a login shell, so a mod's
+  `image-build` running after yours needs the absolute path rather than the
+  wiring yours just wrote, and a `para <verb>` project command runs on the
+  *host* under its own shebang, so it never sees the image at all.
 - **Check which shell your workspace user actually logs into.** `/etc/profile.d`
   is read by bash, and the bundled `void-docker-gh` image gives `$PARA_USER`
   zsh, which mostly doesn't read it. Then hooks see the tool and the human's

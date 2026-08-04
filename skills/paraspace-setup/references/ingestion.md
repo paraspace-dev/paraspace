@@ -63,7 +63,8 @@ For other hosts:
   image, which every workspace shares and which outlives all of them.
 - **Internal mirrors, ssh config and `insteadOf`** need to be in place *before*
   the clone. Open a hook point rather than editing the middle of the clone hook:
-  `"$PARA_RUN_HOOK" clone:before`.
+  `"$PARA_RUN_HOOK" clone:before`, which `hook-points.md` covers, including the
+  variables that don't survive the call.
 
 Remember the shared volume holds a key that can push wherever it's authorized,
 and every workspace of the project has it, as does every agent running inside

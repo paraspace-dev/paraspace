@@ -12,7 +12,9 @@
 lives, and `troubleshooting.md` is where each of its checks is explained and
 fixed. **Run doctor, read that page, and when it disagrees with anything here,
 it wins.** This page is only the part neither can know: which platform you're
-on, and where to look when the workspace itself is broken.
+on, and where to look when the workspace itself is broken. (Bare filenames like
+`troubleshooting.md` are pages of the **installed** para's `docs/`, at the path
+`scripts/para-probe` printed, or <https://paraspace.dev/docs/>.)
 
 ## Linux hosts
 
@@ -43,12 +45,15 @@ The containers, the images and the storage pool live **inside the VM**, the
 `incus` CLI on the Mac points into it, and Caddy still runs on the Mac and
 reaches container IPs through the VM's network.
 
+`getting-started.md` has the install line. The step it leaves out is starting
+the VM, and the flag that step needs decides whether Caddy can reach anything.
+Print it, don't run it:
+
 ```sh
-brew install caddy colima incus
 colima start --runtime incus --network-address   # see `colima start --help` for sizing
 ```
 
-What changes in practice, none of which is in the shipped docs:
+What changes in practice once it's up:
 
 - **Colima must be running** before any `para` command that touches Incus.
   `incus daemon unreachable` almost always means it isn't.
@@ -62,8 +67,32 @@ What changes in practice, none of which is in the shipped docs:
   x86 box.
 - **The storage-driver advice above is about the VM's pool**, not APFS.
 - **`colima stop` stops every workspace**, and `para up` brings one back.
-- `:443` binds without `setcap` here, so port-less URLs are just the config
-  change.
+- **Port-less URLs are cheaper here.** `:443` binds without `setcap`, so all it
+  takes is the config change `urls.md` describes.
+
+## When a build hangs with no output
+
+`para image build` prints nothing while the bootstrap downloads, so a stalled
+fetch and a slow one look the same from outside. The symptom that separates them
+is an established connection moving zero bytes. Test the same URL from both
+sides before concluding anything:
+
+```sh
+curl -m 20 -o /dev/null -w '%{http_code} %{size_download}\n' <the repo URL>
+incus exec <a running container> -- \
+  curl -m 20 -o /dev/null -w '%{http_code} %{size_download}\n' <the same URL>
+```
+
+Fine on the host and stalled in the container means the path out of the
+container is the problem rather than the mirror. The usual cause is a VPN or
+tunnel on the host with a smaller MTU than `incusbr0`, with path-MTU discovery
+blocked, so large responses disappear while small ones succeed. **Different
+mirrors take different routes, so switching mirrors can appear to fix it and
+hide the real cause.** Compare the numbers before you believe either story
+(`cat /sys/class/net/*/mtu`). Matching the bridge to the tunnel with
+`incus network set incusbr0 bridge.mtu 1420` changes every container on the box
+and is therefore the human's to run; lowering the MTU on one container is the
+per-build workaround you can use in the meantime.
 
 ## When a workspace is broken
 
@@ -81,8 +110,8 @@ is exactly why `para sh` can't help you there.
 Two failure modes produce silent wrongness rather than an error, so they aren't
 in doctor's list:
 
-- **A tool you added to `image-build` isn't there.** Nothing tracks image drift;
-  rebuild.
+- **A tool you added to `image-build` isn't there.** Nothing tracks image drift,
+  so the only fix is `para image build`.
 - **A variable a hook exported isn't set in the next hook.** The environment
   doesn't cross between hooks, so pass it through a file (`/etc/profile.d/`,
   `$HOME`, `$PARA_SHARED`). `hooks.md` has the table of which file to pick.

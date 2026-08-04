@@ -17,9 +17,24 @@ other change.
 /plugin install paraspace@paraspace
 ```
 
-`/plugin uninstall paraspace` removes it. Using `para` never requires the
-plugin, and nothing it writes depends on it afterward. The `.paraspace/` it
-produces is ordinary files you own.
+`/plugin uninstall paraspace` removes it.
+
+The skill also installs on its own, through the community
+[`skills`](https://github.com/vercel-labs/skills) CLI, a third-party tool rather
+than an Anthropic one. It finds this skill through the repo's
+`.claude-plugin/marketplace.json` and copies the directory (`SKILL.md`,
+`references/`, `scripts/`) into `.claude/skills/paraspace-setup/`.
+
+```sh
+npx skills add paraspace-dev/paraspace
+npx skills add -g paraspace-dev/paraspace   # user-level, for every project
+```
+
+That is the route for an agent that isn't Claude Code. What such an agent does
+with a directory of markdown and one shell script is up to it.
+
+Using `para` never requires the plugin, and nothing it writes depends on it
+afterward. The `.paraspace/` it produces is ordinary files you own.
 
 ## Use it
 

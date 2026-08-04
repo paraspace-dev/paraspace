@@ -27,24 +27,27 @@ fi
 
 echo "site-icons: rendering from public/logo.svg"
 
-# A tab icon sits in a square slot, so the 86x50 mark is centred in one and the
-# padding stays transparent. Rendering the mark alone would give a 32x19 file,
-# and the rel=icon that points at it claims 32x32.
+# Both wrappers drop the mark into a square box and let preserveAspectRatio fit
+# and centre it, so neither one has to know how wide the mark is. Piped rather
+# than written out, and the href resolves against public/, which is the cwd.
+#
+# A tab icon sits in a square slot, so the padding around the mark stays
+# transparent. Rendering the mark alone would give a 32x20 file, and the
+# rel=icon pointing at it claims 32x32.
 inkscape --pipe -w 32 -o favicon.png >/dev/null 2>&1 <<'EOF'
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 86 86">
-  <image href="logo.svg" y="18" width="86" height="50"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <image href="logo.svg" width="100" height="100" preserveAspectRatio="xMidYMid meet"/>
 </svg>
 EOF
 echo "  public/favicon.png"
 
 # The home-screen icon is the mark inset on the site's dark sheet, since iOS
-# composites it onto an opaque tile and transparency there comes out black. The
-# mark is 86x50, so 148x86 centres it at 82% of a 180 tile. Piped rather than
-# written out, and the href resolves against public/, which is the cwd.
+# composites it onto an opaque tile and transparency there comes out black.
 inkscape --pipe -w 180 -o apple-touch-icon.png >/dev/null 2>&1 <<'EOF'
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 180">
   <rect width="180" height="180" rx="40" fill="#14151a"/>
-  <image href="logo.svg" x="16" y="47" width="148" height="86"/>
+  <image href="logo.svg" x="16" y="16" width="148" height="148"
+         preserveAspectRatio="xMidYMid meet"/>
 </svg>
 EOF
 echo "  public/apple-touch-icon.png"

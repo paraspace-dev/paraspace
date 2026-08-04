@@ -1,0 +1,46 @@
+#!/usr/bin/env bash
+set -euo pipefail
+# ============================================================================
+# sync-plugin-version. Put package.json's version in the plugin manifest.
+#
+# The Claude Code plugin IS this package (.claude-plugin/plugin.json ships in
+# the npm files), so one version number has to live in two files. Claude Code
+# falls back to the git SHA when the manifest omits it, which makes every commit
+# look like a new plugin release. So the manifest declares one, and this keeps
+# the two honest.
+#
+# npm runs this through the `version` lifecycle script, after the bump and
+# before the release commit. It stages the manifest so that commit carries it,
+# and a CLI-tier test (test/cli/test_plugin.sh) fails if the two ever disagree.
+#
+#   Usage: bin/sync-plugin-version
+# ============================================================================
+
+# Always the package's own repo, not whatever directory you're standing in.
+cd "$(cd "$(dirname "$0")/.." && pwd)"
+
+manifest=.claude-plugin/plugin.json
+
+die() { echo "sync-plugin-version: $*" >&2; exit 1; }
+
+# Read once and pass it in, so the number that lands in the manifest is the one
+# reported below.
+if ! version="$(node -p 'require("./package.json").version')"; then
+  die "cannot read package.json's version; needs node and valid JSON."
+fi
+
+# Rewriting the file rather than patching a line, because node parses the JSON
+# that npm and Claude Code both read. `version` already exists, so key order and
+# the two-space layout survive untouched.
+if ! node -e '
+  const fs = require("fs");
+  const [file, version] = process.argv.slice(1);
+  const manifest = JSON.parse(fs.readFileSync(file, "utf8"));
+  manifest.version = version;
+  fs.writeFileSync(file, JSON.stringify(manifest, null, 2) + "\n");
+' "$manifest" "$version"; then
+  die "$manifest is not valid JSON (see above). Fix it, then rerun bin/sync-plugin-version."
+fi
+
+git add "$manifest"
+echo "==> $manifest at $version" >&2

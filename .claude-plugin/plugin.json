@@ -1,5 +1,6 @@
 {
   "name": "paraspace",
+  "version": "0.1.0",
   "description": "Set up ParaSpace for a project: write the .paraspace/ directory that turns a repo into parallel Incus dev workspaces, then build the image and prove `para up` boots and serves.",
   "author": {
     "name": "Wes Roberts"

@@ -36,6 +36,7 @@
     "site:preview": "vitepress preview",
     "release": "bin/release",
     "preversion": "npm run check",
+    "version": "bin/sync-plugin-version",
     "prepublishOnly": "npm run check",
     "prune-branches": "bin/prune-branches"
   },

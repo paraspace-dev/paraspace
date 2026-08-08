@@ -1,109 +1,44 @@
 # ParaSpace
 
+[![npm version](https://img.shields.io/npm/v/paraspace.svg)](https://www.npmjs.com/package/paraspace)
+[![test](https://github.com/paraspace-dev/paraspace/actions/workflows/test.yml/badge.svg)](https://github.com/paraspace-dev/paraspace/actions/workflows/test.yml)
+[![lint](https://github.com/paraspace-dev/paraspace/actions/workflows/lint.yml/badge.svg)](https://github.com/paraspace-dev/paraspace/actions/workflows/lint.yml)
+[![License: MIT](https://img.shields.io/npm/l/paraspace.svg)](./LICENSE)
+
 `para` runs any number of full, isolated copies of your project side by side on
 your own machine. Each workspace is an unprivileged [Incus] system container
 with its own clone, its own stack, and its own `https://<name>.<domain>` URL, so
 several coding agents (or you) can build, run and break things in parallel
 without colliding.
 
-📖 **[Documentation](https://paraspace.dev)** · [Why
-ParaSpace](./docs/why.md) · [Install ParaSpace](./docs/install.md)
-
-## Install
-
-```sh
-npm i -g paraspace
-```
-
-`para` drives [Incus] and Caddy on the host.
-
-- On **macOS**, `brew install caddy colima incus`.
-- On **Linux**, [install Caddy](https://caddyserver.com/docs/install) and
-  [install Incus](https://linuxcontainers.org/incus/docs/main/tutorial/first_steps/).
-
-Then `para doctor` tells you if the machine is ready.
-
-## Quick start
-
-```sh
-cd <your project>  # a repo with a .paraspace/ dir, see below
-para image build   # build the project's base image, once per project and arch
-para up ws1        # launch an isolated workspace
-para sh ws1        # shell into the clone
-```
-
-## Set up your project
-
-The only thing `para` needs from a project is a `.paraspace/` dir at the repo
-root. It holds a `Parafile` (config), `hooks/` (provision, boot and
-image-build), and optionally `commands/` (your own `para` verbs). Scaffold it
-from a working template:
-
-```sh
-para init          # from your project root
-```
-
-Then point `PARA_ORIGIN` at your repo, list your `PARA_ROUTES`, and adapt the
-hooks to your stack. The walkthrough is
-[Project setup](./docs/project-setup.md).
-
 ## Documentation
 
-Full docs at **[paraspace.dev](https://paraspace.dev)**, and in
-[`docs/`](./docs/README.md):
+📖 **[Documentation](https://paraspace.dev/docs/)*
 
-- [Why ParaSpace](./docs/why.md) (the case, and what it costs) ·
-  [Prior art](./docs/prior-art.md) (how it compares, and when to pick
-  something else)
-- [Install ParaSpace](./docs/install.md) · [Use a ParaSpace
-  project](./docs/using-a-project.md)
-- [How it works](./docs/how-it-works.md) · [Running coding
-  agents](./docs/agents.md)
-- [Project setup](./docs/project-setup.md) (adapting `para` to your project) ·
-  [Cookbook](./docs/cookbook.md) (recipes for the common needs)
-- [Commands](./docs/commands.md) · [The Parafile](./docs/parafile.md) ·
-  [Hooks](./docs/hooks.md) · [Mods](./docs/mods.md) · [The image
-  contract](./docs/image.md) · [Contract versioning](./docs/versioning.md)
-- [Troubleshooting](./docs/troubleshooting.md) (`para doctor` and what its
-  checks mean)
+- [Install ParaSpace](https://paraspace.dev/docs/install)
+- [Why ParaSpace](https://paraspace.dev/docs/why) ·
+  [Prior art](https://paraspace.dev/docs/prior-art)
+- [Use a ParaSpace project](https://paraspace.dev/docs/using-a-project)
+- [How it works](https://paraspace.dev/docs/how-it-works)
+- [Project setup](https://paraspace.dev/docs/project-setup) ·
+  [Cookbook](https://paraspace.dev/docs/cookbook)
+- [Commands](https://paraspace.dev/docs/commands) · [The Parafile](https://paraspace.dev/docs/parafile) ·
+  [Hooks](https://paraspace.dev/docs/hooks) · [Mods](https://paraspace.dev/docs/mods) · [The image
+  contract](https://paraspace.dev/docs/image) · [Contract versioning](https://paraspace.dev/docs/versioning)
+- [Troubleshooting](https://paraspace.dev/docs/troubleshooting)
 
-## Templates and mods
+## Contributing
 
-[`templates/`](./templates) holds two runnable templates, `void-docker-gh` (the
-`para init` default) and `void-minimal`. Each has its own README, and
-[Project setup](./docs/project-setup.md) compares them.
+PRs are welcome! Please follow the house style.
 
-A template is copied once and owned; a **mod** stays a dependency.
-[`mods/`](./mods) holds the ones this package ships, installed with
-`para mod add <name>`. See [Mods](./docs/mods.md).
-
-## Development
-
-`bin/lint` (ShellCheck) and `test/run` (the behavioral suite) both gate every
-PR. The e2e tier is Linux-only and not run in CI, so run it locally before
-merging anything touching `up`, routes or lifecycle. See
+`bin/lint` and `test/run`  both gate every PR. The e2e tier is Linux-only and not run in CI, so run it locally before merging anything touching `up`, routes or lifecycle. See
 [`test/README.md`](./test/README.md).
 
 `npm run site` previews the VitePress docs; `npm run site:build` checks for
 dead links.
 
-To release, from `main`:
-
-```sh
-npm run release patch      # or minor, major, prerelease, or an exact 1.0.0
-```
-
-That runs the gates, bumps `package.json`, tags and pushes;
-[`publish.yml`](./.github/workflows/publish.yml) publishes the tag to npm over
-[trusted publishing](https://docs.npmjs.com/trusted-publishers), so there is no
-token in the repo and npm attests the provenance itself. A `prerelease` goes
-out under the `next` tag rather than `latest`.
-
-The one-time setup is a trusted publisher, under the package's settings on
-npmjs.com: this repo, workflow `publish.yml`, action `npm publish`.
-
 ## License
 
-[MIT](./LICENSE)
+MIT
 
 [Incus]: https://linuxcontainers.org/incus/

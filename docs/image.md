@@ -36,7 +36,8 @@ agent CLI you use. para degrades rather than breaks without them.
 The command is base-agnostic plumbing:
 
 1. launches a builder from **`$PARA_IMAGE_BASE`** with `security.nesting=true`;
-2. runs **`$PARA_IMAGE_BOOTSTRAP`** in it via `sh -c`, if set;
+2. runs **`$PARA_IMAGE_BOOTSTRAP`** in it via `sh -c`, if there is one, printing
+   the line first;
 3. pushes your whole **`.paraspace/`** to `/opt/.paraspace` in the builder, near
    enough to the way `para up` pushes it to `~/.paraspace` that `$PARA_HOOKS`
    and `$PARA_SKEL` name real paths in there. Your `.env` is the exception, so
@@ -50,8 +51,9 @@ Your project's tree is a build *input*, so step 5 takes it back out before the
 snapshot. A workspace should find its `.paraspace/` at `~`, pushed fresh by
 `para up`, and nowhere else.
 
-Both keys live in the [Parafile](./parafile.md), which is also where the
-per-distro bootstrap examples are.
+Both keys live in the [Parafile](./parafile.md), which is also where the base
+defaults to Void and the bootstrap is
+[derived from it](./parafile.md#para_image_base-and-para_image_bootstrap).
 
 Nothing to build is an error, not a no-op. With no `hooks/image-build`
 anywhere, `para image build` stops before it touches incus rather than

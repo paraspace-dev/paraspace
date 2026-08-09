@@ -172,8 +172,10 @@ cd apps/docs && para up docs-ws    # apps/docs/.paraspace
 ```sh
 # apps/docs/.paraspace/Parafile
 : "${PARA_PROJECT:=acme-docs}"    # "docs" alone is too generic to identify a project
-: "${PARA_ORIGIN:=git@github.com:acme/acme.git}"
 ```
+
+Both clone the whole monorepo, since `PARA_ORIGIN` resolves by walking up to the
+repository each `.paraspace/` sits in.
 
 ### One workspace, a custom env var
 

@@ -29,18 +29,12 @@ that already has application code or an earlier ParaSpace setup. The generated
 The scaffold runs as-is, but it still describes the template's project rather
 than yours. Four files carry almost everything you need to change.
 
-### 1. Set the repository and routes
+### 1. Set the routes
 
-Edit `.paraspace/Parafile`. At minimum:
-
-- point `PARA_ORIGIN` at your Git repository;
-- set `PARA_IMAGE_BASE` to the incus image `para image build` starts from, and
-  `PARA_IMAGE_BOOTSTRAP` to a line that installs bash when the base lacks it;
-- give `PARA_ROUTES` one entry per service port that should get a URL.
+Edit `.paraspace/Parafile`. Usually one line: give `PARA_ROUTES` one entry per
+service port that should get a URL.
 
 ```sh
-: "${PARA_ORIGIN:=git@github.com:acme/example.git}"
-: "${PARA_IMAGE_BASE:=images:debian/13}"
 PARA_ROUTES="${PARA_ROUTES-3000,db:8081}"
 ```
 
@@ -48,13 +42,20 @@ That serves the workspace apex from port 3000 and `db.<name>.<domain>` from
 port 8081. Write your values with the idioms the template uses, so a one-off
 `PARA_ROUTES="3000" para up ws` still wins.
 
+Each workspace clones this repository, because
+[`PARA_ORIGIN`](./parafile.md#para_origin) defaults to its `origin` remote. Set
+it only if you want workspaces cloning something else.
+
 See the [Parafile reference](./parafile.md) for every setting.
 
 ### 2. Build the base image
 
 Edit `.paraspace/hooks/image-build`, which names the packages, tools, and
 workspace user baked into the project's image. Stable dependencies belong here
-rather than in a hook that reruns on every start. See
+rather than in a hook that reruns on every start. The bundled hooks install with
+`xbps`, matching para's default
+[`PARA_IMAGE_BASE`](./parafile.md#para_image_base-and-para_image_bootstrap), so
+another distro means changing both together. See
 [The image contract](./image.md).
 
 ### 3. Provision each workspace

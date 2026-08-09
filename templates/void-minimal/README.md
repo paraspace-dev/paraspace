@@ -12,7 +12,7 @@ than trimming down the runnable [`void-docker-gh`](../void-docker-gh) template.
 ```
 void-minimal/
   .paraspace/
-    Parafile               # identity, the base image to build from, no routes
+    Parafile               # the contract version and an empty PARA_ROUTES; the rest defaults
     hooks/image-build      # user + writable /tmp; the pkgs="" install block is EMPTY
     hooks/provision        # seed + link the shell rc; comments mark where a clone goes
     hooks/boot             # no-op: nothing to boot (returns 0 immediately)
@@ -47,9 +47,10 @@ The scaffold tells you where each piece goes:
   is this same hook fully written out (git-key auth included).
 - **`hooks/boot`.** Put your app's start command here (e.g. `docker compose up
   -d --wait`) and return 0 only once the routed service is listening.
-- **`Parafile`.** Set `PARA_ORIGIN`/`PARA_CLONE_DIR`, and list your service's
-  port in `PARA_ROUTES` (it ships as `PARA_ROUTES=""`, the explicit "serves no
-  HTTP", because this box boots nothing).
+- **`Parafile`.** List your service's port in `PARA_ROUTES` (it ships as
+  `PARA_ROUTES=""`, the explicit "serves no HTTP", because this box boots
+  nothing). Your clone step gets `PARA_ORIGIN`, which defaults to the origin of
+  the checkout the `Parafile` sits in, and `PARA_CLONE_DIR`.
 
 For a fuller starting point, see [`void-docker-gh`](../void-docker-gh), a
 runnable docker demo. For a full personal dev environment on top of either, add

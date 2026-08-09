@@ -11,7 +11,7 @@ of containers can run inside one, but no project has to have one. **It is a
 standalone, self-contained, MIT-licensed npm package (`paraspace`)**, published
 from a `v*` tag by `.github/workflows/publish.yml`.
 
-The README is the funnel (install, quick start, pointers). `docs/` is the
+The README is the funnel (what it is, pointers into the docs). `docs/` is the
 authoritative spec, and it owns the `Parafile` schema (`docs/parafile.md`), the
 hook and image contracts (`docs/hooks.md`, `docs/hook-points.md`,
 `docs/image.md`), the vendoring model (`docs/mods.md`), the command surface
@@ -205,8 +205,8 @@ one was a mess that a full rewrite had to clean up.
 Each piece of information lives in one place. If another doc references it,
 link to the doc that owns that information.
 
-- **root `README.md`** is the npm/GitHub funnel. What it is, install, one quick
-  start, pointers.
+- **root `README.md`** is the npm/GitHub funnel. What it is and pointers into
+  the docs; it duplicates no doc content.
 - **`index.md`** is the VitePress lander (hero + feature cards).
 - **`docs/README.md`** routes into the reading paths and does not summarize
   them.

@@ -15,18 +15,17 @@ without colliding.
 
 📖 **[Documentation](https://paraspace.dev/docs/)**
 
-- [Install ParaSpace](https://paraspace.dev/docs/install)
-- [Why ParaSpace](https://paraspace.dev/docs/why) ·
-  [Prior art](https://paraspace.dev/docs/prior-art)
-- [Use a ParaSpace project](https://paraspace.dev/docs/using-a-project)
-- [How it works](https://paraspace.dev/docs/how-it-works) ·
-  [Running coding agents](https://paraspace.dev/docs/agents)
-- [Project setup](https://paraspace.dev/docs/project-setup) ·
-  [Cookbook](https://paraspace.dev/docs/cookbook)
-- [Commands](https://paraspace.dev/docs/commands) · [The Parafile](https://paraspace.dev/docs/parafile) ·
-  [Hooks](https://paraspace.dev/docs/hooks) · [Mods](https://paraspace.dev/docs/mods) · [The image
-  contract](https://paraspace.dev/docs/image) · [Contract versioning](https://paraspace.dev/docs/versioning)
-- [Troubleshooting](https://paraspace.dev/docs/troubleshooting)
+- [Install ParaSpace](./docs/install.md)
+- [Why ParaSpace](./docs/why.md) · [Prior art](./docs/prior-art.md)
+- [Use a ParaSpace project](./docs/using-a-project.md)
+- [How it works](./docs/how-it-works.md) ·
+  [Running coding agents](./docs/agents.md)
+- [Project setup](./docs/project-setup.md) · [Cookbook](./docs/cookbook.md)
+- [Commands](./docs/commands.md) · [The Parafile](./docs/parafile.md) ·
+  [Hooks](./docs/hooks.md) · [Mods](./docs/mods.md) ·
+  [The image contract](./docs/image.md) ·
+  [Contract versioning](./docs/versioning.md)
+- [Troubleshooting](./docs/troubleshooting.md)
 
 ## Contributing
 

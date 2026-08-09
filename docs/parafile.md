@@ -9,16 +9,17 @@ Every value is a **scalar**. An array is not forwarded to your hooks (it
 arrives as its first element), so write a list as a delimited string. See
 [Hooks](./hooks.md#the-environment-para-injects).
 
-## Required vars
+## A minimal Parafile
 
-ParaSpace doesn't pick your distro, your app's dev port, or your repo URL, so
-typically three vars are required:
+ParaSpace can't guess which port your app listens on, so a project that serves
+HTTP declares `PARA_ROUTES`. Everything else has a default, and `PARA_ORIGIN`
+and `PARA_IMAGE_BOOTSTRAP` derive theirs from your project rather than pinning
+one, so a whole `Parafile` can be two lines:
 
-| Var | Why it's needed |
-|---|---|
-| `PARA_IMAGE_BASE` | `para image build` has no default |
-| `PARA_ROUTES` | determines which port(s) your workspace URLs point to |
-| `PARA_ORIGIN` | tells your provision hook which repo to clone |
+```sh
+: "${PARA_CONTRACT:=1}"
+PARA_ROUTES="${PARA_ROUTES-8080}"
+```
 
 ## Every var para reads
 
@@ -27,14 +28,16 @@ typically three vars are required:
 | `PARA_CONTRACT` | none | the [contract](./versioning.md) your `.paraspace/` targets. para refuses on a mismatch |
 | `PARA_PROJECT` | the directory name, slugified (`My.App` → `my-app`) | project identity: workspace ownership, `para ls` scoping, the shared-volume name |
 | `PARA_IMAGE` | `$PARA_PROJECT` | the image `para up` launches and `para image build` publishes |
-| `PARA_IMAGE_BASE` | none | the Incus image `para image build` builds *from* |
-| `PARA_IMAGE_BOOTSTRAP` | none | one `sh -c` line run in the builder before your `image-build` hook |
+| `PARA_IMAGE_BASE` | `images:voidlinux` | the Incus image `para image build` builds *from* |
+| `PARA_IMAGE_BOOTSTRAP` | [derived from the base](#para_image_base-and-para_image_bootstrap) | one `sh -c` line run in the builder before your `image-build` hook |
+| `PARA_ORIGIN` | [the project checkout's git origin](#para_origin) | the repo your provision hook clones |
 | `PARA_ROUTES` | empty | `[sub:]port` entries, one Caddy site each |
 | `PARA_DOMAIN` | `paraspace.dev` | wildcard domain workspaces are served under |
 | `PARA_VOLUME` | `para-home-$PARA_PROJECT` | the shared home volume's name |
 | `PARA_CLONE_DIR` | `app` | directory under `~` to clone into; also where `para sh` starts |
+| `PARA_CLONE_BRANCH` | empty | the branch your provision hook clones, if it reads this |
 | `PARA_HOST_ENV` | `$PARA_PROJECT_DIR/.env` | a base `.env` pushed to `~/.paraspace/host.env` **if the file exists** |
-| `PARA_READY_HOST` | none | a hostname the guest must resolve before hooks run |
+| `PARA_READY_HOST` | `paraspace.dev` | a hostname the guest must resolve before hooks run |
 | `PARA_USER` / `PARA_UID` / `PARA_GID` | `app` / `1000` / `1000` | the workspace user para runs everything as |
 | `PARA_WORKCOPY_PORT` | none | proxy `https://localhost` to a stack you run on the **host** |
 | `PARA_WORKCOPY_HOST` | `localhost` | matters only if that host stack terminates TLS with SNI |
@@ -78,15 +81,36 @@ image share it, and `para image build` in either republishes it for both.
 
 ### `PARA_IMAGE_BASE` and `PARA_IMAGE_BOOTSTRAP`
 
-The base is **required to build**, and any Incus image works
-(`images:debian/13`, `images:voidlinux`, `images:alpine/edge`, …). para pins no
-default, so your distro can't change under you when para updates.
+Any Incus image works as a base (`images:debian/13`, `images:voidlinux`,
+`images:alpine/edge`, …), and para defaults to `images:voidlinux`, which is what
+the bundled templates' `hooks/image-build` are written against.
 
 The bootstrap is one `sh -c` line run in the builder before your
-`.paraspace/hooks/image-build`. Its job is to leave **bash** in the image (para
-runs it with `bash`) and refresh the package index if the base needs it:
-`xbps-install -Syu xbps bash` on Void, `apk add --no-cache bash` on Alpine,
-`apt-get update` on Debian. Leave it unset if your base needs nothing.
+`.paraspace/hooks/image-build`. Its job is to leave **bash** in the image, since
+para runs that hook with `bash`. para fills it in from the base you name:
+
+| Base contains | Bootstrap |
+|---|---|
+| `voidlinux` | `xbps-install -Syu xbps bash` (Void's bundled xbps is a snapshot too stale to install against, so it refreshes itself first) |
+| `alpine` | `apk add --no-cache bash` |
+| anything else | empty, so declare your own. Debian and Ubuntu ship bash but no package index, so a hook that installs anything wants `apt-get update` |
+
+A base that needs nothing declares `PARA_IMAGE_BOOTSTRAP=""`, and that survives:
+para fills in an **unset** value, never an empty one. `para image build` prints
+the line it runs.
+
+### `PARA_ORIGIN`
+
+The repo each workspace clones. para never acts on it, but it defaults it to
+`git remote get-url origin` in your project checkout, so a `.paraspace/` living
+in the repo it describes doesn't declare it at all. The lookup walks up from
+`$PARA_PROJECT_DIR` the way git does, so a `.paraspace/` in a monorepo
+subdirectory resolves to the monorepo's origin.
+
+Declare it to clone a different repo, and expect the
+[provision hook](./hooks.md#provision) to refuse when there's neither a
+declaration nor an origin to derive one from. `para doctor` reports which repo
+it resolved to.
 
 ### `PARA_USER` / `PARA_UID` / `PARA_GID`
 
@@ -105,8 +129,8 @@ reads). See
 [One workspace, a custom env var](./cookbook.md#one-workspace-a-custom-env-var)
 for varying one per workspace.
 
-> 💡 `PARA_ORIGIN` and `PARA_CLONE_BRANCH` are actually custom project vars that
-> are never acted on by `para` itself.
+> 💡 `para` never clones anything, so `PARA_ORIGIN` and `PARA_CLONE_BRANCH` are
+> resolved and forwarded, and your provision hook is what acts on them.
 
 ## Precedence
 

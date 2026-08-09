@@ -18,7 +18,7 @@ environment (zsh, tmux, Neovim, Claude Code) on top of this one, add the
 ```
 void-docker-gh/
   .paraspace/                # all the para plumbing, hidden and set-up-once
-    Parafile               # the few knobs para reads (version, identity, base image, origin, routes)
+    Parafile               # the few knobs para reads (version and routes; the rest have defaults)
     hooks/provision        # seed+link the shared volume, clone, copy .env
     hooks/boot             # docker compose up -d --wait
     hooks/helpers          # colored output + small guards, sourced by the hooks
@@ -39,6 +39,10 @@ para up demo                            # clone + provision + boot a workspace
 para web demo                           # open https://demo.<your PARA_DOMAIN>
 ```
 
+Each workspace clones the origin of the checkout you ran `para` in. To try it
+against an app that isn't yours, uncomment `PARA_ORIGIN` in the `Parafile`, which
+names a one-container demo that serves :8080, the port this template routes.
+
 On the **first** `up`, para prints this machine's para ssh key and pauses. Add it
 to your git host, press Enter, and the clone proceeds. (For a private repo, set
 `PARA_GH_AUTH=1` in the `Parafile` and `gh` uploads the key for you instead.)
@@ -49,9 +53,11 @@ Drop this `.paraspace/` into your own repo. `para init` copies it in and sets th
 project's identity (`PARA_PROJECT`) to your directory name, which the base image
 name derives from. Then edit `.paraspace/`:
 
-- **`Parafile`.** Point `PARA_ORIGIN` at your repo and list your `PARA_ROUTES`
-  (`"[sub:]port"` each, comma/space/newline separated). To clone somewhere other
-  than `~/app`, uncomment `PARA_CLONE_DIR` in the optional block.
+- **`Parafile`.** List your `PARA_ROUTES` (`"[sub:]port"` each,
+  comma/space/newline separated). Each workspace clones the origin of the
+  checkout the `Parafile` sits in, so set `PARA_ORIGIN` only to clone something
+  else. To clone somewhere other than `~/app`, uncomment `PARA_CLONE_DIR` in the
+  optional block.
 - **`hooks/provision`.** Grow the shared-volume seeding and `.env` handling for
   your stack. It's yours; make it as robust as you like.
 - **`hooks/boot`.** The readiness contract is to return 0 only once every routed

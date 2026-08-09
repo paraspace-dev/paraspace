@@ -195,6 +195,51 @@ test_config_init_refuses_to_clobber() {
   assert_eq "# mine" "$kept" "the existing file was left alone"
 }
 
+test_the_origin_comes_from_the_project_checkout() {
+  # A .paraspace/ that lives in the repo it describes shouldn't have to repeat
+  # that repo's URL, so para reads it off the checkout. Nowhere to read one from
+  # is a real answer (empty), and doctor is where you hear about it, because the
+  # next thing that would is a provision hook, minutes later, inside a container.
+  local p; p="$(a_project)"
+  git -C "$p" init -q
+  git -C "$p" remote add origin git@github.com:acme/acme.git
+  # shellcheck disable=SC2016  # the command's $vars are literal here
+  a_project_command "$p" resolved '#!/bin/sh
+echo "origin=[$PARA_ORIGIN]"'
+  para_in "$p" resolved
+  assert_contains "$PARA_OUT" "origin=[git@github.com:acme/acme.git]" "derived from the checkout" || return 1
+
+  git -C "$p" remote remove origin
+  para_in "$p" resolved
+  assert_contains "$PARA_OUT" "origin=[]"      "a repo with no origin resolves to none" || return 1
+  para_in "$p" doctor
+  assert_contains "$PARA_OUT" "no PARA_ORIGIN" "doctor reports it rather than guessing"
+}
+
+test_a_declared_origin_beats_the_one_in_the_checkout() {
+  # The derivation is a DEFAULT, so it changes no precedence: a project that
+  # declares PARA_ORIGIN is cloning something other than itself on purpose.
+  local p; p="$(a_project 'PARA_ORIGIN=git@github.com:acme/other.git')"
+  git -C "$p" init -q
+  git -C "$p" remote add origin git@github.com:acme/acme.git
+  # shellcheck disable=SC2016  # the command's $vars are literal here
+  a_project_command "$p" resolved '#!/bin/sh
+echo "origin=[$PARA_ORIGIN]"'
+  para_in "$p" resolved
+  assert_contains "$PARA_OUT" "origin=[git@github.com:acme/other.git]" "the Parafile won"
+}
+
+test_the_ready_host_defaults_to_paras_own_domain() {
+  # Every workspace waits on guest DNS before a hook runs, so the gate needs a
+  # name para can pick for itself. Its own, so the default presumes no git host.
+  local p; p="$(a_project)"
+  # shellcheck disable=SC2016  # the command's $vars are literal here
+  a_project_command "$p" resolved '#!/bin/sh
+echo "ready=[$PARA_READY_HOST]"'
+  para_in "$p" resolved
+  assert_contains "$PARA_OUT" "ready=[paraspace.dev]" "the gate defaults to paraspace.dev"
+}
+
 test_routes_are_canonicalized() {
   # Commas, spaces, tabs and newlines all separate entries, so a project can lay
   # several routes out to be read. Whatever the spelling, para resolves ONE
@@ -245,6 +290,36 @@ test_doctor_checks_incus_can_do_what_para_needs() {
   assert_not_contains "$out" "6.30 is older than"          "a current incus does not warn" || return 1
   assert_not_contains "$out" "cannot select device columns" "…nor fail"
 }
+test_init_resolves_the_project_into_the_scaffolded_parafile() {
+  # The scaffolded Parafile's commented defaults are meant to READ as what para
+  # already resolved here, so ${PARA_PROJECT} is substituted on the way in. It
+  # cannot be left for bash: para resolves PARA_PROJECT after sourcing the
+  # Parafile, so an unsubstituted one is an unbound variable, not a default.
+  local d out; d="$(scratch)"
+  mkdir -p "$d/Acme.Web"
+  git -C "$d/Acme.Web" init -q
+  git -C "$d/Acme.Web" remote add origin git@github.com:acme/acme.git
+  ( cd "$d/Acme.Web" && env -u PARA_PROJECT_DIR -u PARA_PROJECT "$PARA" init void-docker-gh >/dev/null 2>&1 )
+  out="$(cat "$d/Acme.Web/.paraspace/Parafile")"
+  assert_contains "$out" 'PARA_VOLUME:=para-home-acme-web'       "the volume default names this project" || return 1
+  assert_contains "$out" 'PARA_IMAGE:=acme-web'                  "so does the image default"             || return 1
+  assert_contains "$out" 'PARA_ORIGIN:=git@github.com:acme/acme' "and the origin is this checkout's"     || return 1
+  # $PARA_PROJECT_DIR is a different variable, and para DOES set it before
+  # sourcing, so the substitution must not eat its prefix.
+  # shellcheck disable=SC2016  # literal Parafile text, not an expansion
+  assert_contains     "$out" 'PARA_HOST_ENV:=$PARA_PROJECT_DIR/.env' "PARA_PROJECT_DIR survived intact" || return 1
+  # shellcheck disable=SC2016  # ditto
+  assert_not_contains "$out" '${PARA_PROJECT}'                       "no placeholder was left behind"  || return 1
+
+  # With nowhere to read an origin from, the line names an app you can clone.
+  mkdir -p "$d/no-repo"
+  ( cd "$d/no-repo" && env -u PARA_PROJECT_DIR -u PARA_PROJECT "$PARA" init void-docker-gh >/dev/null 2>&1 )
+  out="$(cat "$d/no-repo/.paraspace/Parafile")"
+  assert_contains     "$out" 'PARA_ORIGIN:=https://github.com/paraspace-dev' "it falls back to the example app" || return 1
+  # shellcheck disable=SC2016  # ditto
+  assert_not_contains "$out" '${PARA_ORIGIN}'                                "and resolves that placeholder too"
+}
+
 test_init_refuses_to_clobber_an_existing_project() {
   # The guard between `para init` and a user's own Parafile and hooks. Untested,
   # it can be deleted outright and the whole tier stays green, while the first
@@ -312,15 +387,41 @@ test_image_defaults_to_the_project_slug() {
   assert_contains "$PARA_OUT" "PARA_IMAGE    derived-slug" "PARA_IMAGE derived from PARA_PROJECT"
 }
 
-test_image_build_refuses_without_a_base_image() {
-  # para never picks your distro, and a para update must not change it under
-  # you. Checked before the daemon, so an incomplete Parafile is what you hear
-  # about, which `assert_backend_untouched` is here to pin.
+test_the_image_base_and_its_bootstrap_default_together() {
+  # A Parafile that names no distro gets Void, and the one `sh -c` line that
+  # leaves bash in the builder follows from whatever the base is. The oracle is a
+  # project command, since para exports every resolved PARA_* to one.
   local p; p="$(a_project)"
-  mkdir -p "$p/.paraspace/hooks"
-  printf 'true\n' > "$p/.paraspace/hooks/image-build"
-  assert_refuses "$p" "PARA_IMAGE_BASE" image build || return 1
-  assert_backend_untouched
+  # shellcheck disable=SC2016  # the command's $vars are literal here
+  a_project_command "$p" resolved '#!/bin/sh
+echo "base=[$PARA_IMAGE_BASE] bootstrap=[$PARA_IMAGE_BOOTSTRAP]"'
+  para_in "$p" resolved
+  assert_contains "$PARA_OUT" "base=[images:voidlinux]"                  "the base defaults to Void" || return 1
+  assert_contains "$PARA_OUT" "bootstrap=[xbps-install -Syu xbps bash]"  "the bootstrap followed it"
+}
+
+test_the_bootstrap_follows_the_base_it_is_given() {
+  # Derived per base, and assigned only when UNSET: a base that needs nothing
+  # says so with PARA_IMAGE_BOOTSTRAP="", and that empty value has to survive,
+  # or para would run someone else's package manager in their builder.
+  # shellcheck disable=SC2016  # the command's $vars are literal here
+  local p oracle='#!/bin/sh
+echo "bootstrap=[$PARA_IMAGE_BOOTSTRAP]"'
+
+  p="$(a_project PARA_IMAGE_BASE=images:alpine/edge)"
+  a_project_command "$p" resolved "$oracle"
+  para_in "$p" resolved
+  assert_contains "$PARA_OUT" "bootstrap=[apk add --no-cache bash]" "Alpine gets apk" || return 1
+
+  p="$(a_project PARA_IMAGE_BASE=images:debian/13)"
+  a_project_command "$p" resolved "$oracle"
+  para_in "$p" resolved
+  assert_contains "$PARA_OUT" "bootstrap=[]" "a base para has no line for gets none" || return 1
+
+  p="$(a_project PARA_IMAGE_BASE=images:voidlinux 'PARA_IMAGE_BOOTSTRAP=""')"
+  a_project_command "$p" resolved "$oracle"
+  para_in "$p" resolved
+  assert_contains "$PARA_OUT" "bootstrap=[]" "an explicit empty beat the derived default"
 }
 
 test_image_build_refuses_without_an_image_build_hook() {
@@ -384,8 +485,9 @@ test_init_refuses_a_path_as_a_template_name() {
 }
 
 test_a_scaffolded_project_takes_its_identity_from_the_directory() {
-  # No template rewriting at scaffold time: the engine derives PARA_PROJECT from
-  # the directory name, so a template ships without a project name baked in.
+  # A template ships with no project name in its ACTIVE config: the engine
+  # derives PARA_PROJECT from the directory name. (Scaffolding resolves the name
+  # into the Parafile's commented defaults, which is a different test.)
   # PARA_PROJECT is unset for the same reason PARA_PROJECT_DIR is: the e2e
   # sandbox exports one, and an inherited value is exactly what this test must
   # not see. (It passed under `--cli` and failed under `--all` before this.)

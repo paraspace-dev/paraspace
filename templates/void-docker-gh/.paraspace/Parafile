@@ -3,42 +3,13 @@
 # Everything else is a hook (.paraspace/hooks/). A real env var overrides any of these.
 #
 # Active below are only the keys a project actually has to decide. Everything
-# para defaults sensibly is listed commented-out at the bottom, so you can see
-# what's available without this file carrying a stale copy of para's defaults.
+# para works out for itself is listed commented-out at the bottom, so you can see
+# what's available without going to look it up.
 #
 # The full schema is docs/parafile.md in the package.
 
 # para contract version these hooks target. para refuses (clearly) on a mismatch.
 : "${PARA_CONTRACT:=1}"
-
-# Project identity, the key para uses for ownership, `para ls` scoping, and the
-# shared-volume name (para-home-<PARA_PROJECT>). It DEFAULTS to this directory's
-# name, which is usually what you want, so it is left unset here. Declare it to
-# pin an identity that survives renaming the checkout:
-# : "${PARA_PROJECT:=my-project}"
-
-# What `para image build` builds FROM: the incus image its builder launches, and
-# one `sh -c` line run inside it before .paraspace/hooks/image-build. NEITHER has
-# a default, because para never picks your distro, and a para update must not be
-# able to change it under you. Any incus image works (`images:debian/13`,
-# `images:alpine/edge`, …); this template targets Void. The bootstrap must leave
-# BASH in the builder (para runs the image-build hook with bash); here it also
-# refreshes Void's bundled xbps, a rolling-release snapshot that can be too stale
-# to install against. Set it to "" if your base needs nothing.
-: "${PARA_IMAGE_BASE:=images:voidlinux}"
-: "${PARA_IMAGE_BOOTSTRAP:=xbps-install -Syu xbps bash}"
-
-# Git URL para clones into each workspace. Change it to your project's repo.
-# A Parafile sitting at its own repo's toplevel can derive it instead.
-# $PARA_PROJECT_DIR is the project root, the directory holding this
-# .paraspace/, and para sets it before sourcing this file:
-#   : "${PARA_ORIGIN:=$(git -C "$PARA_PROJECT_DIR" remote get-url origin)}"
-: "${PARA_ORIGIN:=git@github.com:jchook/docker-caddy.git}"
-
-# A hostname the guest must resolve before para runs any hook in it. Guest DNS
-# comes up a beat after the container does, and the provision hook clones over
-# the network, so without this the first clone can race it.
-: "${PARA_READY_HOST:=github.com}"
 
 # HTTP routes para publishes through its Caddy, one TLS site per "[sub:]port".
 # A bare port is the workspace apex; sub:port adds a subdomain (left is where
@@ -52,28 +23,50 @@
 #     api:3001
 #     db:8081
 #   "
-# Required, because para pins no default port. For a workspace with no HTTP at all
-# (a worker, a queue consumer), declare it empty: PARA_ROUTES=""
+# Declared here, because para pins no default port. For a workspace with no HTTP at
+# all (a worker, a queue consumer), declare it empty: PARA_ROUTES=""
 PARA_ROUTES="${PARA_ROUTES-8080}"
 
 # ---- optional -----------------------------------------------------------------
-# para's own defaults, spelled out so you don't have to go look them up. Uncomment
-# only what you actually want to change.
+# What para resolves for itself, written out with the values it resolved for THIS
+# project. Every one is already in effect; uncomment a line only to change it.
 
-# Image `para up` launches, published by `para image build`. Defaults to
-# $PARA_PROJECT. Set it only to point several projects at one shared image.
-# : "${PARA_IMAGE:=$PARA_PROJECT}"
+# Git URL each workspace clones, defaulting to the origin of the checkout this
+# Parafile sits in, so a project that lives in its own repo needs no line here.
+# Uncomment to pin that, or to clone a repo other than your own.
+# : "${PARA_ORIGIN:=${PARA_ORIGIN}}"
+
+# What `para image build` builds FROM, plus one `sh -c` line run in the builder
+# before hooks/image-build, whose job is to leave bash there (para runs the hook
+# with bash) and which para derives from the base for the two it knows, Void and
+# Alpine. Plain assignments, because this template's hooks/image-build talks
+# xbps, so a base arriving from the environment would build a broken image.
+# PARA_IMAGE_BASE=images:voidlinux
+# PARA_IMAGE_BOOTSTRAP="xbps-install -Syu xbps bash"
+
+# A hostname the guest must resolve before para runs any hook in it, so the clone
+# in hooks/provision can't race guest DNS coming up.
+# : "${PARA_READY_HOST:=paraspace.dev}"
+
+# Project identity, the key para uses for ownership, `para ls` scoping, and the
+# shared-volume name. It defaults to this directory's name. Declare it to pin an
+# identity that survives renaming the checkout.
+# : "${PARA_PROJECT:=${PARA_PROJECT}}"
+
+# Image `para up` launches, published by `para image build`. Set it only to point
+# several projects at one shared image.
+# : "${PARA_IMAGE:=${PARA_PROJECT}}"
 
 # Wildcard domain the workspaces live under: https://<name>.$PARA_DOMAIN. Its
-# wildcard must resolve to 127.0.0.1, and the default, paraspace.dev, already does.
+# wildcard must resolve to 127.0.0.1, and paraspace.dev already does.
 # : "${PARA_DOMAIN:=paraspace.dev}"
 
-# Directory under ~ to clone into. Default: app
-# : "${PARA_CLONE_DIR:=docker-caddy}"
+# Directory under ~ to clone into.
+# : "${PARA_CLONE_DIR:=app}"
 
-# Shared-volume name, one authenticated home per project by default. Pin several
-# projects to a single name to share dotfiles and auth across them.
-# : "${PARA_VOLUME:=para-home-$PARA_PROJECT}"
+# Shared-volume name, one authenticated home per project. Pin several projects to
+# a single name to share dotfiles and auth across them.
+# : "${PARA_VOLUME:=para-home-${PARA_PROJECT}}"
 
 # If your repository is private, enable this: gh authorizes this machine's para
 # key for you. Otherwise para prints the key and waits for you to add it by hand.

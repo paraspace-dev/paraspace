@@ -23,10 +23,11 @@
 # image build carries no distro or Docker assumptions of its own.
 : "${PARA_IMAGE:=alpine-minimal}"
 
-# What image build builds FROM. Alpine ships no bash and para runs the hook
-# with `bash`, so the bootstrap has exactly one job: put bash there.
+# What image build builds FROM. Alpine ships no bash and para runs the hook with
+# `bash`, so something has to put bash there. PARA_IMAGE_BOOTSTRAP is deliberately
+# NOT declared: para derives `apk add --no-cache bash` from this base, and an e2e
+# run is where that default gets proven against a real Alpine.
 : "${PARA_IMAGE_BASE:=images:alpine/edge}"
-: "${PARA_IMAGE_BOOTSTRAP:=apk add --no-cache bash}"
 
 # A hostname the guest must resolve before para runs anything in it. Guest DNS
 # comes up a beat after the container does, and the bootstrap above installs

@@ -44,7 +44,7 @@ grep -q github.com ~/.ssh/known_hosts 2>/dev/null \
   || ssh-keyscan -t ed25519 github.com >> ~/.ssh/known_hosts 2>/dev/null || true
 
 # ---- 3. clone the repo -----------------------------------------------------
-[ -n "${PARA_ORIGIN:-}" ] || die "set PARA_ORIGIN in .paraspace/Parafile to your repo's git URL"
+[ -n "${PARA_ORIGIN:-}" ] || die "no PARA_ORIGIN, and no git origin in the project checkout for para to derive one from. Set it in .paraspace/Parafile."
 
 clone() {
   [ -d "$HOME/$PARA_CLONE_DIR/.git" ] && return 0

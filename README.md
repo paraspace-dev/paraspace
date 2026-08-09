@@ -13,13 +13,14 @@ without colliding.
 
 ## Documentation
 
-📖 **[Documentation](https://paraspace.dev/docs/)*
+📖 **[Documentation](https://paraspace.dev/docs/)**
 
 - [Install ParaSpace](https://paraspace.dev/docs/install)
 - [Why ParaSpace](https://paraspace.dev/docs/why) ·
   [Prior art](https://paraspace.dev/docs/prior-art)
 - [Use a ParaSpace project](https://paraspace.dev/docs/using-a-project)
-- [How it works](https://paraspace.dev/docs/how-it-works)
+- [How it works](https://paraspace.dev/docs/how-it-works) ·
+  [Running coding agents](https://paraspace.dev/docs/agents)
 - [Project setup](https://paraspace.dev/docs/project-setup) ·
   [Cookbook](https://paraspace.dev/docs/cookbook)
 - [Commands](https://paraspace.dev/docs/commands) · [The Parafile](https://paraspace.dev/docs/parafile) ·
@@ -29,9 +30,10 @@ without colliding.
 
 ## Contributing
 
-PRs are welcome! Please follow the house style.
+PRs are welcome! Please follow the [house style](./CLAUDE.md#house-style).
 
-`bin/lint` and `test/run`  both gate every PR. The e2e tier is Linux-only and not run in CI, so run it locally before merging anything touching `up`, routes or lifecycle. See
+`bin/lint` and `test/run` run in CI. The e2e tier is not run in CI, so run it
+locally before merging anything touching `up`, routes or lifecycle. See
 [`test/README.md`](./test/README.md).
 
 `npm run site` previews the VitePress docs; `npm run site:build` checks for
@@ -39,6 +41,6 @@ dead links.
 
 ## License
 
-MIT
+[MIT](./LICENSE)
 
 [Incus]: https://linuxcontainers.org/incus/

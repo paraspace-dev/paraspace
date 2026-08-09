@@ -4,8 +4,8 @@ set -euo pipefail
 # release - cut a version and hand it to CI.
 #
 # Bumps package.json, commits, tags and pushes. From there
-# .github/workflows/publish.yml publishes the tag to npm; README's Development
-# section covers the one-time trusted-publisher setup.
+# .github/workflows/publish.yml publishes the tag to npm via a trusted
+# publisher (one-time setup under the package's settings on npmjs.com).
 #
 #   Usage: bin/release <patch|minor|major|prerelease|x.y.z>
 #

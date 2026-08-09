@@ -53,9 +53,9 @@ files you already own.
 
 Ship one `void`, clone active, with a Parafile comment beside each of the three
 saying what to change and what it costs if you don't. Around 200 lines of
-near-duplicate content goes away, and the README's setup step goes from one
-command to two, which puts the mod system on the front page instead of three
-pages in.
+near-duplicate content goes away, and the setup step in
+`docs/project-setup.md` goes from one command to two, which puts the mod
+system into the first commands a new project runs.
 
 The clone block in `hooks/provision` is the block. The three `Parafile` keys are
 single lines, and each one fails differently when left alone:
@@ -207,24 +207,24 @@ apply here, since para ships the file and knows where it is on both sides. Point
 it at `$(pkg_root)/libexec/helpers` and `commands/key` and `commands/web` stop
 hand-rolling `echo >&2; exit 1`.
 
-**Every source line carries its own version check**, guest hooks and host
-commands alike. Additive means an existing project keeps working on the new
-para, and it says nothing about the reverse. A project scaffolded by the new
-para runs under a teammate's older global one, because `PARA_CONTRACT` is still
-1 and `require_project` is satisfied. That para injects no `PARA_HELPERS` and
-pushes no `helpers`, so the first hook or command to reach `. "$PARA_HELPERS"`
-dies on `set -u` with `PARA_HELPERS: unbound variable` and no fix named. Nothing
-upstream catches it, since equality on the contract cannot express "needs at
-least". So the source line does its own checking, and it is one line:
+**The source line is bare**, guest hooks and host commands alike. Additive
+means an existing project keeps working on the new para, and it says nothing
+about the reverse. A project scaffolded by the new para under an older global
+one passes `require_project`, gets no `PARA_HELPERS` injected, and dies on
+`set -u` with `PARA_HELPERS: unbound variable` at the first hook or command
+that sources it. That is the whole check. A `:?` message naming the fix was
+considered and dropped, because it would ride verbatim in every template hook,
+every command, every mod and the `docs/mods.md` snippet, and N copies of prose
+rot while `unbound variable` cannot. One consumer today; the message can come
+back the day the error confuses a second one.
 
 ```sh
 # shellcheck source=/dev/null
-. "${PARA_HELPERS:?not set. This .paraspace/ needs a newer paraspace. Upgrade it, then run para doctor}"
+. "$PARA_HELPERS"
 ```
 
-That works before `die` exists, which is the whole difficulty with checking for
-the file that defines `die`. It goes in the bundled templates' hooks and
-`commands/`, in every mod's, and in the snippet `docs/mods.md` shows.
+It goes in the bundled templates' hooks and `commands/`, in every mod's, and
+in the snippet `docs/mods.md` shows.
 
 **What may go in: only things para itself defines.** Output format,
 interactivity, paths para injects. That admits exactly today's file (`stage`,
@@ -247,7 +247,8 @@ either contradict it or pin the npm release number, which is not the interface.
 The decisive problem is retroactivity. **A `para require` shipped in 0.2 is not
 understood by 0.1**, which is the exact para it would be catching. The check has
 to be shell in the mod's own hook no matter what, and that line already exists.
-It is the `${PARA_HELPERS:?…}` in the source line, from
+It is the `. "$PARA_HELPERS"` source line, which dies under `set -u` when an
+older para injected nothing, from
 [para ships the helpers](#para-ships-the-helpers). Once a mod is writing that,
 the engine feature adds nothing.
 
@@ -320,7 +321,7 @@ templates/void/.paraspace/
   hooks/provision     seed the volume, link $HOME, clone:before, clone, .env
   hooks/boot          empty body, the compose line shown in comments
   skel/zshrc          the shared user rc, seeded once
-  commands/{key,web}  sourcing $PARA_HELPERS through the :? version check
+  commands/{key,web}  sourcing $PARA_HELPERS instead of hand-rolled die
 
 mods/docker/
   hooks/image-build   docker + compose, runit, driver refusal, group, prepull,
@@ -387,8 +388,8 @@ entirely. Guard on the shared volume instead, where the key already lives:
 relink "$PARA_SHARED/gh" ~/.config/gh    # every run, it is cheap and local
 
 marker="$PARA_SHARED/gh/.key-authorized"
-if [ -n "${PARA_GH_AUTH:-}" ] && [ ! -f "$marker" ]; then
-  authorize_key && touch "$marker"
+if [ -n "${PARA_GH_AUTH:-}" ] && [ ! -f "$marker" ] && authorize_key; then
+  touch "$marker"
 fi
 ```
 
@@ -399,13 +400,20 @@ duplicate-key write that today's `|| true` swallows in silence. Deleting the
 marker is the retry, and it lives on the shared volume because the key does, so
 one authorization covers every workspace of the project.
 
+That guard rewrites `authorize_key`, whose template version ends `|| true` and
+never fails. The mod's copy treats an already-authorized key as success and
+returns nonzero on real failure (offline, expired token, missing scope), so
+the marker records authorized rather than attempted. A failure leaves the
+marker absent and the hook alive, because the call sits in the `if` condition
+where `set -e` does not apply, and the next `para up` retries.
+
 That also makes `clone:before` real. `docs/mods.md` currently says no bundled
 template opens a point.
 
 ## Landing order
 
 1. **`$PARA_HELPERS`.** Engine only, additive, independent of everything below.
-   Templates and the mod switch to the checked source line above and delete
+   Templates and the mod switch to the source line above and delete
    their copies. `test/fixtures/hello` keeps both of its own `hooks/helpers`,
    the project's and `mods/e2e-mod`'s, so the `$PARA_HOOKS/helpers` path stays
    covered, and `test_bundled_helpers_do_not_drift` goes away with the copies it
@@ -435,8 +443,8 @@ template opens a point.
 3. **The composition change.** `templates/void` replaces both templates,
    `mods/docker` and `mods/gh` come out of it, docs follow in the same change.
    `cmd_init`'s `template="${template:-void-docker-gh}"` becomes `void`, or a
-   bare `para init`, which is the form `README.md` shows, dies on a template
-   that no longer exists.
+   bare `para init`, which is the form `docs/project-setup.md` shows, dies on
+   a template that no longer exists.
 4. **e2e coverage** for a mod-opened hook point and for a mod filling `boot`,
    since the fixture currently exercises neither.
 
@@ -447,7 +455,7 @@ para probing the `PARA_ROUTES` ports once `boot` returns, per option 3 under
 ## Docs impact
 
 Step 3 is mostly prose. Pages naming a template or the mod, all of which need a
-pass: `README.md`, `TODO.md`, `docs/agents.md`, `docs/commands.md`,
+pass: `TODO.md`, `docs/agents.md`, `docs/commands.md`,
 `docs/cookbook.md`, `docs/image.md`, `docs/mods.md`, `docs/parafile.md`,
 `docs/project-setup.md`, `docs/shared-auth.md`, `docs/versioning.md`, plus
 `CLAUDE.md` and the template and mod READMEs.
@@ -466,7 +474,7 @@ Specifics worth not losing:
 - `docs/mods.md` loses the paragraph telling mod authors to ship a
   byte-identical `helpers` and the `helpers` entry in its layout block, drops
   "No bundled template opens any", and gains four things from above: the
-  `zshrc.d` drop-in convention and its no-`compdef` rule, the version-checked
+  `zshrc.d` drop-in convention and its no-`compdef` rule, the
   source line, the dependency posture, and the point-marker a hard requirement
   probes. Its "A link into `$HOME` is not a seed" paragraph stays where it is
   and `mods/gh` is now a second thing pointing at it.

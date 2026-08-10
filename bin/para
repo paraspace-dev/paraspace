@@ -103,10 +103,10 @@ load_config() {
   # nothing keeps the PARA_IMAGE_BOOTSTRAP="" that says so.
   : "${PARA_IMAGE_BASE:=images:voidlinux}"
   : "${PARA_IMAGE_BOOTSTRAP=$(default_bootstrap "$PARA_IMAGE_BASE")}"
-  # A name the guest must resolve before any hook runs, when a project needs
-  # one. No default: it would make every `up` on every box wait on DNS para
-  # picked, and a project whose hooks never leave the machine needs none.
-  : "${PARA_READY_HOST:=}"
+  # Guest DNS comes up a beat after the container, so hooks wait on one name
+  # resolving. para's own, so the default presumes nothing about your git host.
+  # `=` not `:=`, so PARA_READY_HOST="" survives as the off switch.
+  : "${PARA_READY_HOST=paraspace.dev}"
   # Caddy's admin endpoint. Empty means Caddy's own default (localhost:2019),
   # which every Caddy on the box shares. Set this to give para's Caddy an
   # address of its own when something else is already using it.
@@ -328,7 +328,7 @@ attach_volume() { # attach_volume <ct>
 }
 
 # Block until the guest can actually be provisioned: the incus agent answers,
-# and, if the project named a host it depends on, DNS resolves it.
+# and guest DNS resolves $PARA_READY_HOST, unless that is empty.
 wait_ready() { # wait_ready <ct>
   log "Waiting for $1…"
   for _ in $(seq 1 60); do
@@ -789,7 +789,8 @@ config_template() {
 	# doctor` will tell you when a value here looks project-shaped.
 	EOF
   for key in PARA_DOMAIN PARA_HTTPS_PORT PARA_CADDY_ADMIN PARA_POOL PARA_BRIDGE \
-            PARA_IP_LO PARA_IP_HI PARA_WORKCOPY_HOST PARA_WORKCOPY_PORT; do
+            PARA_IP_LO PARA_IP_HI PARA_WORKCOPY_HOST PARA_WORKCOPY_PORT \
+            PARA_READY_HOST; do
     # shellcheck disable=SC2016  # the := idiom is the literal being written
     printf '# : "${%s:=%s}"\n' "$key" "${!key}"
   done

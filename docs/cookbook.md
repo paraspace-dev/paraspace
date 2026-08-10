@@ -30,7 +30,7 @@ one. Prompt when you can, warn when you can't, and never block.
 To have `gh` upload the workspace key for you instead of printing it:
 
 ```sh
-gh ssh-key add ~/.ssh/id_ed25519.pub --title "para $PARA_PROJECT ($PARA_HOSTNAME)"
+gh ssh-key add ~/.ssh/id_ed25519.pub --title "para $PARA_PROJECT_NAME ($PARA_HOSTNAME)"
 ```
 
 That needs the `admin:public_key` scope, so add
@@ -171,7 +171,7 @@ cd apps/docs && para up docs-ws    # apps/docs/.paraspace
 
 ```sh
 # apps/docs/.paraspace/Parafile
-: "${PARA_PROJECT:=acme-docs}"    # "docs" alone is too generic to identify a project
+: "${PARA_PROJECT_NAME:=acme-docs}"    # "docs" alone is too generic to identify a project
 ```
 
 Both clone the whole monorepo, since `PARA_ORIGIN` resolves by walking up to the

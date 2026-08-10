@@ -51,11 +51,11 @@ PARA_ROUTES="${PARA_ROUTES-8080}"
 # Project identity, the key para uses for ownership, `para ls` scoping, and the
 # shared-volume name. It defaults to this directory's name. Declare it to pin an
 # identity that survives renaming the checkout.
-# : "${PARA_PROJECT:=${PARA_PROJECT}}"
+# : "${PARA_PROJECT_NAME:=${PARA_PROJECT_NAME}}"
 
 # Image `para up` launches, published by `para image build`. Set it only to point
 # several projects at one shared image.
-# : "${PARA_IMAGE:=${PARA_PROJECT}}"
+# : "${PARA_IMAGE_NAME:=${PARA_PROJECT_NAME}}"
 
 # Wildcard domain the workspaces live under: https://<name>.$PARA_DOMAIN. Its
 # wildcard must resolve to 127.0.0.1, and paraspace.dev already does.
@@ -66,7 +66,7 @@ PARA_ROUTES="${PARA_ROUTES-8080}"
 
 # Shared-volume name, one authenticated home per project. Pin several projects to
 # a single name to share dotfiles and auth across them.
-# : "${PARA_VOLUME:=para-home-${PARA_PROJECT}}"
+# : "${PARA_VOLUME:=para-home-${PARA_PROJECT_NAME}}"
 
 # If your repository is private, enable this: gh authorizes this machine's para
 # key for you. Otherwise para prints the key and waits for you to add it by hand.

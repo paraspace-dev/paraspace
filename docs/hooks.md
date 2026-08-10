@@ -106,7 +106,7 @@ arrays fare no better. Pass a delimited string and split it in the hook, the way
 | `PARA_URL` | its apex URL, **empty** unless a bare port routes the apex |
 | `PARA_ROUTES` | the routes para publishes, space-separated `[sub:]port` (empty if none) |
 | `PARA_DOMAIN` | the wildcard domain it's served under |
-| `PARA_PROJECT` | the project identity slug |
+| `PARA_PROJECT_NAME` | the project identity slug |
 | `PARA_SHARED` | the shared volume's mount point (`/para/shared`) |
 | `PARA_HOOKS`, `PARA_SKEL` | the `hooks/` and `skel/` of whoever owns the running hook. Guest-side only. On the host these two are unset, and [commands](./commands.md#project-commands) use `$PARA_PROJECT_DIR` or `$PARA_MOD_DIR` |
 | `PARA_RUN_HOOK` | para's hook runner (see [Hook points](./hook-points.md)) |

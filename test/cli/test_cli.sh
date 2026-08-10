@@ -63,7 +63,7 @@ test_project_commands_extend_the_verb_set() {
   # shellcheck disable=SC2016  # the guest script's $vars are literal here
   a_project_command "$p" greet '#!/bin/sh
 # summary: say hello
-echo "greeted $1 for $PARA_PROJECT via $PARA_BIN"'
+echo "greeted $1 for $PARA_PROJECT_NAME via $PARA_BIN"'
 
   para_in "$p" greet world
   [ "$PARA_RC" -eq 0 ] || { echo "  the project command failed:" >&2
@@ -136,6 +136,30 @@ test_a_plain_parafile_assignment_insists() {
   local p out; p="$(a_project 'PARA_DOMAIN=insisted.example')"
   out="$(_para_env "$p" PARA_DOMAIN=from-the-environment doctor)"
   assert_contains "$out" "insisted.example" "the project's plain assignment held"
+}
+
+test_a_renamed_var_is_refused_rather_than_ignored() {
+  # PARA_PROJECT became PARA_PROJECT_NAME. Reading past the old spelling would
+  # hand the project a different identity, so a different shared volume and a
+  # `para ls` that hides its own workspaces. Loud beats subtly wrong.
+  #
+  # Driven through `--help`, which succeeds for every other input. Against a
+  # command that fails anyway (doctor, up) this would pass with the check gone.
+  local p out rc=0; p="$(a_project)"
+  out="$(_para_env "$p" PARA_PROJECT=old-spelling --help)" || rc=$?
+  [ "$rc" -ne 0 ] || { echo "  the old spelling was accepted" >&2; return 1; }
+  assert_contains "$out" "PARA_PROJECT_NAME" "the refusal names the new spelling" || return 1
+
+  # The control: same command, new spelling, and para runs.
+  rc=0
+  _para_env "$p" PARA_PROJECT_NAME=new-spelling --help >/dev/null || rc=$?
+  assert_eq 0 "$rc" "the new spelling is accepted" || return 1
+
+  # And from a Parafile, which is where most of them will be.
+  p="$(a_project PARA_IMAGE=old-spelling)"
+  para_in "$p" --help
+  [ "$PARA_RC" -ne 0 ] || { echo "  an old spelling in a Parafile was accepted" >&2; return 1; }
+  assert_contains "$PARA_OUT" "PARA_IMAGE_NAME" "…and names that one too"
 }
 
 test_config_init_seeds_a_user_config_and_path_finds_it() {
@@ -251,7 +275,7 @@ test_routes_are_canonicalized() {
     api:3001
   "'; do
     out="$(para_in "$(a_project "PARA_ROUTES=$spelling")" doctor; printf '%s' "$PARA_OUT")"
-    assert_contains "$out" "PARA_ROUTES   8080 api:3001" "canonical form from: $spelling" || return 1
+    assert_contains "$out" "PARA_ROUTES        8080 api:3001" "canonical form from: $spelling" || return 1
   done
 }
 
@@ -292,28 +316,28 @@ test_doctor_checks_incus_can_do_what_para_needs() {
 }
 test_init_resolves_the_project_into_the_scaffolded_parafile() {
   # The scaffolded Parafile's commented defaults are meant to READ as what para
-  # already resolved here, so ${PARA_PROJECT} is substituted on the way in. It
-  # cannot be left for bash: para resolves PARA_PROJECT after sourcing the
+  # already resolved here, so ${PARA_PROJECT_NAME} is substituted on the way in. It
+  # cannot be left for bash: para resolves PARA_PROJECT_NAME after sourcing the
   # Parafile, so an unsubstituted one is an unbound variable, not a default.
   local d out; d="$(scratch)"
   mkdir -p "$d/Acme.Web"
   git -C "$d/Acme.Web" init -q
   git -C "$d/Acme.Web" remote add origin git@github.com:acme/acme.git
-  ( cd "$d/Acme.Web" && env -u PARA_PROJECT_DIR -u PARA_PROJECT "$PARA" init void-docker-gh >/dev/null 2>&1 )
+  ( cd "$d/Acme.Web" && env -u PARA_PROJECT_DIR -u PARA_PROJECT_NAME "$PARA" init void-docker-gh >/dev/null 2>&1 )
   out="$(cat "$d/Acme.Web/.paraspace/Parafile")"
   assert_contains "$out" 'PARA_VOLUME:=para-home-acme-web'       "the volume default names this project" || return 1
-  assert_contains "$out" 'PARA_IMAGE:=acme-web'                  "so does the image default"             || return 1
+  assert_contains "$out" 'PARA_IMAGE_NAME:=acme-web'                  "so does the image default"             || return 1
   assert_contains "$out" 'PARA_ORIGIN:=git@github.com:acme/acme' "and the origin is this checkout's"     || return 1
   # $PARA_PROJECT_DIR is a different variable, and para DOES set it before
   # sourcing, so the substitution must not eat its prefix.
   # shellcheck disable=SC2016  # literal Parafile text, not an expansion
   assert_contains     "$out" 'PARA_HOST_ENV:=$PARA_PROJECT_DIR/.env' "PARA_PROJECT_DIR survived intact" || return 1
   # shellcheck disable=SC2016  # ditto
-  assert_not_contains "$out" '${PARA_PROJECT}'                       "no placeholder was left behind"  || return 1
+  assert_not_contains "$out" '${PARA_PROJECT_NAME}'                       "no placeholder was left behind"  || return 1
 
   # With nowhere to read an origin from, the line names an app you can clone.
   mkdir -p "$d/no-repo"
-  ( cd "$d/no-repo" && env -u PARA_PROJECT_DIR -u PARA_PROJECT "$PARA" init void-docker-gh >/dev/null 2>&1 )
+  ( cd "$d/no-repo" && env -u PARA_PROJECT_DIR -u PARA_PROJECT_NAME "$PARA" init void-docker-gh >/dev/null 2>&1 )
   out="$(cat "$d/no-repo/.paraspace/Parafile")"
   assert_contains     "$out" 'PARA_ORIGIN:=https://github.com/paraspace-dev' "it falls back to the example app" || return 1
   # shellcheck disable=SC2016  # ditto
@@ -329,7 +353,7 @@ test_init_refuses_to_clobber_an_existing_project() {
   printf 'MINE=yes\n'  > "$d/.paraspace/Parafile"
   printf '# my hook\n' > "$d/.paraspace/hooks/provision"
 
-  out="$(cd "$d" && env -u PARA_PROJECT_DIR -u PARA_PROJECT "$PARA" init void-minimal 2>&1)"
+  out="$(cd "$d" && env -u PARA_PROJECT_DIR -u PARA_PROJECT_NAME "$PARA" init void-minimal 2>&1)"
   assert_eq "MINE=yes"  "$(cat "$d/.paraspace/Parafile")"        "the Parafile was left alone" || return 1
   assert_eq "# my hook" "$(cat "$d/.paraspace/hooks/provision")" "the hook was left alone"     || return 1
   assert_contains "$out" "skip (exists)" "it says what it skipped" || return 1
@@ -337,7 +361,7 @@ test_init_refuses_to_clobber_an_existing_project() {
   # …and --force is how you say you meant it, for what the template owns. Not
   # the Parafile: refreshing a template's hooks is the whole point of --force,
   # and taking PARA_ROUTES with them would make it unusable for that.
-  ( cd "$d" && env -u PARA_PROJECT_DIR -u PARA_PROJECT "$PARA" init void-minimal --force >/dev/null 2>&1 )
+  ( cd "$d" && env -u PARA_PROJECT_DIR -u PARA_PROJECT_NAME "$PARA" init void-minimal --force >/dev/null 2>&1 )
   assert_not_contains "$(cat "$d/.paraspace/hooks/provision")" "# my hook" "--force refreshed the hook" || return 1
   assert_eq "MINE=yes" "$(cat "$d/.paraspace/Parafile")"                   "…and spared the Parafile"
 }
@@ -385,9 +409,9 @@ test_refuses_a_contract_version_mismatch() {
 test_image_defaults_to_the_project_slug() {
   # Incus image aliases are daemon-global, so a fixed default would put two
   # projects that both left the key unset on ONE image.
-  local p; p="$(a_project PARA_PROJECT=derived-slug)"
+  local p; p="$(a_project PARA_PROJECT_NAME=derived-slug)"
   para_in "$p" doctor
-  assert_contains "$PARA_OUT" "PARA_IMAGE    derived-slug" "PARA_IMAGE derived from PARA_PROJECT"
+  assert_contains "$PARA_OUT" "PARA_IMAGE_NAME    derived-slug" "PARA_IMAGE_NAME derived from PARA_PROJECT_NAME"
 }
 
 test_the_image_base_and_its_bootstrap_default_together() {
@@ -489,15 +513,15 @@ test_init_refuses_a_path_as_a_template_name() {
 
 test_a_scaffolded_project_takes_its_identity_from_the_directory() {
   # A template ships with no project name in its ACTIVE config: the engine
-  # derives PARA_PROJECT from the directory name. (Scaffolding resolves the name
+  # derives PARA_PROJECT_NAME from the directory name. (Scaffolding resolves the name
   # into the Parafile's commented defaults, which is a different test.)
-  # PARA_PROJECT is unset for the same reason PARA_PROJECT_DIR is: the e2e
+  # PARA_PROJECT_NAME is unset for the same reason PARA_PROJECT_DIR is: the e2e
   # sandbox exports one, and an inherited value is exactly what this test must
   # not see. (It passed under `--cli` and failed under `--all` before this.)
   local d out; d="$(scratch)"
   mkdir -p "$d/My.App"
-  ( cd "$d/My.App" && env -u PARA_PROJECT_DIR -u PARA_PROJECT "$PARA" init void-minimal >/dev/null 2>&1 )
-  out="$(cd "$d/My.App" && env -u PARA_PROJECT_DIR -u PARA_PROJECT "$PARA" doctor 2>&1)"
+  ( cd "$d/My.App" && env -u PARA_PROJECT_DIR -u PARA_PROJECT_NAME "$PARA" init void-minimal >/dev/null 2>&1 )
+  out="$(cd "$d/My.App" && env -u PARA_PROJECT_DIR -u PARA_PROJECT_NAME "$PARA" doctor 2>&1)"
   assert_contains "$out" "my-app" "the directory name became the project slug"
 }
 

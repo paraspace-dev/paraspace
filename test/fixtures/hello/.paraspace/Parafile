@@ -5,7 +5,7 @@
 # fixed sentinel over HTTP on :8080, so the tests can assert the whole path,
 # `para up` -> hooks -> boot readiness -> Caddy TLS -> bridge IP -> the app.
 #
-# Sourced as bash. The harness (test/run) overrides PARA_PROJECT, PARA_VOLUME and
+# Sourced as bash. The harness (test/run) overrides PARA_PROJECT_NAME, PARA_VOLUME and
 # PARA_HTTPS_PORT via the environment so a test run is sandboxed from your real
 # workspaces; the defaults here just keep a by-hand `para up` in this dir working.
 
@@ -14,14 +14,14 @@
 
 # Project identity (ownership, `para ls` scoping, shared-volume suffix). The
 # harness overrides this with a throwaway slug per run.
-: "${PARA_PROJECT:=paratest}"
+: "${PARA_PROJECT_NAME:=paratest}"
 
 # The tiny Alpine base image the suite runs on: ~5.5 MB of bash + busybox httpd +
 # a $PARA_USER/$PARA_UID user. Built by `para image build` from the
 # .paraspace/hooks/image-build beside it, which is half the point of the
 # fixture: it's a non-Void, Docker-free consumer, so an e2e run proves
 # image build carries no distro or Docker assumptions of its own.
-: "${PARA_IMAGE:=alpine-minimal}"
+: "${PARA_IMAGE_NAME:=alpine-minimal}"
 
 # What image build builds FROM. Alpine ships no bash and para runs the hook with
 # `bash`, so something has to put bash there. PARA_IMAGE_BOOTSTRAP is deliberately

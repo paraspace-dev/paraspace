@@ -147,7 +147,7 @@ test_project_commands_extend_para() {
   local out
   out="$("$PARA" hello 2>/dev/null)"
   assert_contains "$out" "project-command-ok"      "the project's verb ran"        || return 1
-  assert_contains "$out" "project=$PARA_PROJECT"   "para's context reached it"     || return 1
+  assert_contains "$out" "project=$PARA_PROJECT_NAME"   "para's context reached it"     || return 1
   assert_contains "$out" "contract=1"              "including the contract version" || return 1
 
   # $PARA_BIN is how a command calls back into the same para that ran it.
@@ -207,7 +207,7 @@ test_image_build_reads_skel_after_a_restrictive_umask() {
     printf '%s\n' 'su - "$PARA_USER" -c "cat $PARA_SKEL/marker" >/dev/null'
   } >> "$proj/.paraspace/hooks/image-build"
 
-  env PARA_PROJECT_DIR="$proj" PARA_IMAGE="$img" "$PARA" image build >/dev/null 2>&1 \
+  env PARA_PROJECT_DIR="$proj" PARA_IMAGE_NAME="$img" "$PARA" image build >/dev/null 2>&1 \
     || { echo "  a build hook could not read \$PARA_SKEL as \$PARA_USER" >&2; rc=1; }
   incus image delete "$img" >/dev/null 2>&1 || true
   return "$rc"
@@ -227,13 +227,13 @@ test_image_build_status_and_rm_lifecycle() {
   # builder, and the publish is atomic, so a failed build leaves no '$img' alias.
   # Every step after this uses `|| rc=1` (no early return), so the unconditional
   # cleanup + `para image rm` at the end always run.
-  env PARA_IMAGE="$img" "$PARA" image build >/dev/null 2>&1 \
+  env PARA_IMAGE_NAME="$img" "$PARA" image build >/dev/null 2>&1 \
     || { echo "  'para image build' of throwaway image '$img' failed" >&2; return 1; }
 
   # Read path: status names the image, when it was built, and its base. `built`
   # and `base` are both read back out of incus, and each prints the literal
   # 'unknown' if its read broke, which is what the last assert is for.
-  out="$(env PARA_IMAGE="$img" "$PARA" image status 2>&1)"
+  out="$(env PARA_IMAGE_NAME="$img" "$PARA" image status 2>&1)"
   assert_contains "$out" "$img"               "status names the image"          || rc=1
   assert_contains "$out" "images:alpine/edge" "status reports the stamped base" || rc=1
   assert_not_contains "$out" "unknown"        "status resolved built and base"  || rc=1
@@ -253,7 +253,7 @@ test_image_build_status_and_rm_lifecycle() {
   assert_eq "e2e-mod-was-here" "$marker" "the mod's image-build hook reached the image" || rc=1
 
   # rm deletes it, so verify the image is actually gone afterwards.
-  env PARA_IMAGE="$img" "$PARA" image rm >/dev/null 2>&1 \
+  env PARA_IMAGE_NAME="$img" "$PARA" image rm >/dev/null 2>&1 \
     || { echo "  'para image rm' failed" >&2; rc=1; }
   incus image info "$img" >/dev/null 2>&1 && { echo "  image survived 'para image rm'" >&2; rc=1; }
 

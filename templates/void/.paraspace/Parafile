@@ -1,0 +1,71 @@
+# .paraspace/Parafile, per-project config for para. Sourced as bash, it sets the
+# few PARA_* variables para itself reads (version, image, routes). Everything else
+# is a hook (.paraspace/hooks/).
+#
+# This template builds the Void and zsh base. Mods add capabilities such as Git,
+# Docker, and GitHub integration without changing para's engine contract.
+#
+# Active below are only the keys a project actually has to decide. Everything
+# para works out for itself is listed commented-out at the bottom.
+#
+# The full schema is docs/parafile.md in the package.
+
+# para contract version these hooks target. para refuses (clearly) on a mismatch.
+# Stated flatly, not with the yielding idiom: a pin the environment could move
+# is one that cannot refuse anything.
+PARA_CONTRACT=1
+
+# Caddy routes to ports on the workspace container. Anything may listen there:
+# Docker, a runit service under svdir, or a process a hook starts directly.
+# Change or empty this when your project listens elsewhere or nowhere. A bare
+# port is the workspace apex:
+#   PARA_ROUTES=8080                # -> https://<name>.$PARA_DOMAIN
+#   PARA_ROUTES="3000,api:3001"     # several: commas, spaces, tabs or newlines
+PARA_ROUTES=8080
+
+# ---- optional -----------------------------------------------------------------
+# What para resolves for itself. `para init` fills the ${...} below in with the
+# values it resolved for THIS project, so every one is already in effect and you
+# uncomment a line only to change it. Untouched by para init they are still
+# placeholders, so uncomment them in your scaffolded copy rather than here.
+
+# Git URL each workspace clones, defaulting to the origin of the checkout this
+# Parafile sits in. The base clones nothing; the git mod reads this value.
+# : "${PARA_ORIGIN:=${PARA_ORIGIN}}"
+
+# What `para image build` builds FROM, plus one `sh -c` line run in the builder
+# before hooks/image-build, whose job is to leave bash there (para runs the hook
+# with bash) and which para derives from the base for the two it knows, Void and
+# Alpine. Plain assignments, because this template's hooks/image-build talks
+# xbps, so a base arriving from the environment would build a broken image.
+# PARA_IMAGE_BASE=images:voidlinux
+# PARA_IMAGE_BOOTSTRAP="xbps-install -Syu xbps bash"
+
+# A hostname the guest must resolve before para runs any hook in it, so a hook
+# that reaches the network can't race guest DNS coming up. Declare it empty to
+# skip the wait entirely.
+# : "${PARA_READY_HOST:=paraspace.dev}"
+
+# Project identity, the key para uses for ownership, `para ls` scoping, and the
+# shared-volume name. It defaults to this directory's name. Declare it to pin an
+# identity that survives renaming the checkout.
+# : "${PARA_PROJECT_NAME:=${PARA_PROJECT_NAME}}"
+
+# Directory under ~ where the git mod clones.
+# : "${PARA_CLONE_DIR:=app}"
+
+# para pushes this host file into the workspace when it exists. The git mod
+# copies it into the clone after provisioning.
+# : "${PARA_HOST_ENV:=$PARA_PROJECT_DIR/.env}"
+
+# Image `para up` launches, published by `para image build`. Set it only to point
+# several projects at one shared image.
+# : "${PARA_IMAGE_NAME:=${PARA_PROJECT_NAME}}"
+
+# Wildcard domain the workspaces live under: https://<name>.$PARA_DOMAIN. Its
+# wildcard must resolve to 127.0.0.1, and paraspace.dev already does.
+# : "${PARA_DOMAIN:=paraspace.dev}"
+
+# Shared-volume name, one authenticated home per project. Pin several projects to
+# a single name to share dotfiles and auth across them.
+# : "${PARA_VOLUME:=para-home-${PARA_PROJECT_NAME}}"

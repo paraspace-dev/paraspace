@@ -38,8 +38,9 @@ Two caveats:
   one clean build before relying on the result.
 
 The templates'
-[`hooks/image-build`](https://github.com/paraspace-dev/paraspace/blob/main/templates/void-docker-gh/.paraspace/hooks/image-build)
-is the reference: a package list, a user, and Docker set up for nesting.
+[`hooks/image-build`](https://github.com/paraspace-dev/paraspace/blob/main/templates/void/.paraspace/hooks/image-build)
+is the reference: Void packages, a workspace user, and the zsh extension paths
+bundled mods use. Docker lives in its own mod.
 
 ## Checking it with `para image status`
 

@@ -14,7 +14,7 @@ forking a whole template to get it:
 
 ```sh
 para mod add --list         # the mods this para ships
-para mod add dotfiles-jchook
+para mod add git docker gh  # one or several at once
 para image build            # if the mod fills image-build (its README says)
 para up feat-x
 ```
@@ -26,6 +26,7 @@ up` never goes looking for it.
 Adding the same mod again **replaces** the directory, which is the update path,
 so commit first. There is no `para mod rm`, `ls` or `update`, because
 `rm -rf .paraspace/mods/<name>`, `ls .paraspace/mods/` and `add` already are.
+When you name several mods, para confirms all of them exist before copying any.
 
 > [!NOTE]
 > `para mod add` installs the mods this `para` ships. A git URL is not
@@ -39,9 +40,8 @@ para mod init billing       # or a name of your choosing
 ```
 
 It writes `hooks/{image-build,provision,boot}` carrying para's shape and nothing
-else, plus the `helpers` they source, which a mod needs its own copy of because
-the runner points `$PARA_HOOKS` at the directory the running hook came from.
-Fill them in and they run after the ones the project ships. Unlike `add`, this
+else. Each hook sources the engine-owned `$PARA_HELPERS`. Fill them in and they
+run after the ones the project ships. Unlike `add`, this
 **refuses an existing directory** without `--force`, since what's in it is work
 you did by hand.
 
@@ -54,9 +54,9 @@ alone, and never touches `mods/`.
 A mod is a directory shaped like a `.paraspace/`:
 
 ```
-.paraspace/mods/dotfiles-jchook/
+.paraspace/mods/dotfiles/
   README.md
-  hooks/{provision,image-build,helpers}
+  hooks/{provision,image-build}
   skel/{zshrc,nvim,tmux,claude,claude.json,bin}
   commands/{claude,run}
 ```
@@ -96,12 +96,13 @@ through the project's hook first, then each mod's, in
 [no promised order](./hook-points.md#filling-one).
 
 Any other name is a [hook point](./hook-points.md), and a mod filling one
-**only runs where that point is opened**. No bundled template opens any, so if a
-mod's README says it fills `clone:before`, that line is yours to add:
+**only runs where that point is opened**. The bundled `git` mod opens
+`git:before` while converging its clone on every provision, which `gh` fills.
+For your own operation, open a point wherever the ordering matters:
 
 ```sh
 # .paraspace/hooks/provision, wherever the ordering actually matters
-"$PARA_RUN_HOOK" clone:before
+"$PARA_RUN_HOOK" deploy:before
 ```
 
 ## Writing one
@@ -109,21 +110,35 @@ mod's README says it fills `clone:before`, that line is yours to add:
 The hook environment is [the same one your own hooks
 get](./hooks.md#the-environment-para-injects), with `$PARA_HOOKS` and
 `$PARA_SKEL` pointing at **the mod's** `hooks/` and `skel/`. So a mod's hook is
-written exactly like a project's (`. "$PARA_HOOKS/helpers"`, `cp
+written exactly like a project's (`. "$PARA_HELPERS"`, `cp
 "$PARA_SKEL/zshrc" …`) and needs no idea where it was installed.
 
 What it must not assume:
 
-- **The project's `helpers`.** That's one template's habit, not para's contract,
-  and `$PARA_HOOKS/helpers` resolves to the mod's own copy anyway. Ship one,
-  copied from any bundled mod or template, where they're byte-identical on
-  purpose and a test keeps them that way.
 - **Its position, or that any other mod ran.** Read another mod's artifacts
   defensively, [through a file](./hooks.md#passing-something-to-a-later-hook).
 - **A terminal.** `provision` may prompt when there's a human on both ends;
   `image-build` never can, because there is no stdin at all in the builder.
-- **The distro.** A build hook is package-manager-coupled by nature. Say in the
-  README which base you target.
+- **An unnamed distro.** Every unprefixed mod this package ships targets the
+  bundled Void base. Prefix another implementation, such as `debian-git`, and
+  say which base it targets in its README.
+
+### Extend zsh
+
+The bundled Void base sources `/etc/zsh/zshrc.d/*.zsh`. Put aliases, functions,
+and environment in `/etc/zsh/zshrc.d/<mod>.zsh` during `image-build`. Do not call
+`compdef` there because the user zshrc runs `compinit` later. Put completion
+functions in `/usr/share/zsh/site-functions/_<command>` instead.
+
+### Depend on a capability
+
+Prefer probing the artifact, such as `command -v docker`, over looking for a mod
+directory. That also accepts a project that installed the capability itself.
+When integration must run after a provider, the provider opens a hook point.
+For a hard requirement, have the provider write a marker such as
+`/etc/paraspace/points/docker` beside the point and check that marker during
+`provision`, where every image-build hook has already run. Name the fix in the
+error. para does not resolve dependencies or install them transitively.
 
 ### Own your files
 
@@ -141,8 +156,8 @@ name on the shared volume only when it's yours**; where a template already owns
 one, seed under your own directory and point the symlink there instead:
 
 ```sh
-seed "$PARA_SKEL/zshrc" "$PARA_SHARED/dotfiles-jchook/zshrc"
-ln -sfn "$PARA_SHARED/dotfiles-jchook/zshrc" ~/.zshrc
+seed "$PARA_SKEL/zshrc" "$PARA_SHARED/dotfiles/zshrc"
+ln -sfn "$PARA_SHARED/dotfiles/zshrc" ~/.zshrc
 ```
 
 Now nothing has to arbitrate. `~/.zshrc` is a link, mods run after the project,

@@ -40,12 +40,14 @@ test_routes_reach_the_provision_hook() {
 test_guest_paths_are_injected() {
   # PARA_HOOKS/PARA_SKEL are guest-only, so para appends them to ~/.paraspace/env
   # so a hook names what it reads instead of rebuilding the layout out of $HOME.
-  # Assert the value AND that it resolves: an export pointing at nothing would
-  # still read as "set", and every template's `. "$PARA_HOOKS/helpers"` rides on it.
+  # Assert each value AND that para's shared helpers resolve: an export pointing
+  # at nothing would still read as "set".
   local hooks; hooks="$("$PARA" sh "$PARA_WS" -c 'echo "$PARA_HOOKS"' 2>/dev/null)"
   assert_eq "/home/$PARA_USER/.paraspace/hooks" "$hooks" "PARA_HOOKS names the guest hooks dir" || return 1
-  local found; found="$("$PARA" sh "$PARA_WS" -c '[ -f "$PARA_HOOKS/helpers" ] && echo ok' 2>/dev/null)"
-  assert_eq "ok" "$found" "the helpers every hook sources is reachable through it" || return 1
+  local helpers; helpers="$("$PARA" sh "$PARA_WS" -c 'echo "$PARA_HELPERS"' 2>/dev/null)"
+  assert_eq "/home/$PARA_USER/.paraspace/helpers" "$helpers" "PARA_HELPERS names para's guest library" || return 1
+  local found; found="$("$PARA" sh "$PARA_WS" -c '[ -f "$PARA_HELPERS" ] && echo ok' 2>/dev/null)"
+  assert_eq "ok" "$found" "the helpers every hook sources is reachable" || return 1
 
   # Exported even though the hello fixture ships no skel/, because the variable names
   # the path either way, which is what lets a hook guard with a plain [ -f ].
@@ -99,7 +101,7 @@ test_a_mod_fills_the_same_hooks_the_project_does() {
 
   # And a point the PROJECT opened, which para never learns the name of. It runs
   # mid-provision, so it lands between the two lines above.
-  assert_contains "$seen" "mod-clone-before" "the mod filled the fixture's own hook point"
+  assert_contains "$seen" "mod-point-before" "the mod opened and filled its own hook point"
 }
 
 test_workspace_is_listed_and_running() {

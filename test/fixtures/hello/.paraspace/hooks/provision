@@ -25,11 +25,6 @@ mkdir -p "$HOME/$PARA_CLONE_DIR"
 : > "$HOME/owners-seen"
 printf 'project-provision\n' >> "$HOME/owners-seen"
 
-# A hook point of the fixture's own, a name para has never heard. A real
-# template opens one where it has an ordering constraint; this one exists so the
-# e2e tier covers a point a project opens, not just the three para invokes.
-"$PARA_RUN_HOOK" clone:before
-
 # Seed the shared volume once. Whatever lands here is visible to EVERY workspace
 # of this project (para attaches para-home-<project> at /para/shared to all of
 # them), which is exactly what test_shared asserts.

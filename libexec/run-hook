@@ -5,26 +5,31 @@ name="${1:?usage: run-hook <name>}"
 root="$(cd "$(dirname "$0")" && pwd)"
 stack="${PARA_HOOK_STACK:-}"
 export PARA_RUN_HOOK="$root/run-hook"
+export PARA_HELPERS="${PARA_HELPERS:-$root/helpers}"
+# shellcheck source=/dev/null
+. "$PARA_HELPERS"
 ran=0
 
 case " $stack " in
-  *" $name "*) printf "\033[31merror:\033[0m hook cycle: %s\n" "$stack > $name" >&2; exit 1 ;;
+  *" $name "*) die "hook cycle: $stack > $name" ;;
 esac
 export PARA_HOOK_STACK="${stack:+$stack > }$name"
 
 for pdir in "$root" "$root"/mods/*; do
   hook="$pdir/hooks/$name"
   [ -f "$hook" ] || continue
-  printf '\033[36m==>\033[0m hook: %s\n' "${hook#"$root"/}" >&2
+  stage "hook: ${hook#"$root"/}"
   PARA_HOOKS="$pdir/hooks" PARA_SKEL="$pdir/skel" bash "$hook"
   status=$?  # its own line, NOT `if ! …; then`, which reports the status of `!`.
   if [ "$status" -ne 0 ]; then
-    printf "\033[31merror:\033[0m hook failed (exit %s): %s\n" "$status" "${hook#"$root"/}" >&2
+    # shellcheck disable=SC2154  # helpers initializes its private color codes
+    printf '%serror:%s hook failed (exit %s): %s\n' \
+      "$_er" "$_off" "$status" "${hook#"$root"/}" >&2
     if [ -n "$stack" ]; then printf '  stack: %s\n' "$PARA_HOOK_STACK" >&2; fi
     exit "$status"
   fi
   ran=1
 done
 if [ "$ran" -eq 0 ]; then
-  printf "\033[36m==>\033[0m no '%s' hook\n" "$name" >&2
+  stage "no '$name' hook"
 fi

@@ -57,6 +57,10 @@ PARA_ROUTES="3000,api:3001"
 # https://api.<name>.$PARA_DOMAIN  -> :3001
 ```
 
+Caddy proxies each site to that port on the workspace container. The listener
+can be a Docker container, a runit service under `svdir`, a process started by
+your boot hook, or anything else bound there. Routing has no Docker dependency.
+
 The order is **`sub:port`**, so left is where you arrive and right is where it
 goes, the same direction as `docker -p` and `ssh -L`.
 
@@ -83,7 +87,7 @@ image share it, and `para image build` in either republishes it for both.
 
 Any Incus image works as a base (`images:debian/13`, `images:voidlinux`,
 `images:alpine/edge`, …), and para defaults to `images:voidlinux`, which is what
-the bundled templates' `hooks/image-build` are written against.
+the bundled `void` template and unprefixed mods are written against.
 
 The bootstrap is one `sh -c` line run in the builder before your
 `.paraspace/hooks/image-build`. Its job is to leave **bash** in the image, since
@@ -123,14 +127,14 @@ uid with no passwd entry and the shared volume becomes unwritable.
 
 Any `PARA_FOO` you set reaches your hooks, project commands and image build
 untouched, which is how a project declares its own knobs (`PARA_GH_AUTH` in the
-default template, the `PARA_PREPULL_IMAGES` the templates' `hooks/image-build`
-reads). See
+`gh` mod, or `PARA_PREPULL_IMAGES` in the `docker` mod). See
 [Hooks](./hooks.md#the-environment-para-injects), and
 [One workspace, a custom env var](./cookbook.md#one-workspace-a-custom-env-var)
 for varying one per workspace.
 
-> 💡 `para` never clones anything, so `PARA_ORIGIN` and `PARA_CLONE_BRANCH` are
-> resolved and forwarded, and your provision hook is what acts on them.
+> 💡 `para` never clones anything. It resolves and forwards `PARA_ORIGIN` and
+> `PARA_CLONE_BRANCH`; the bundled `git` mod is one provision hook that acts on
+> them.
 
 ## Precedence
 

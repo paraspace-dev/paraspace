@@ -9,6 +9,9 @@ set -euo pipefail
 
 . "$PARA_HOOKS/helpers"
 
+# A provider-owned point. The engine has never heard of this name.
+"$PARA_RUN_HOOK" fixture:before
+
 # Appended, not overwritten: the e2e suite reads this back to prove both owners
 # ran, and in which order.
 printf 'mod-provision %s\n' "$(basename "$(dirname "$PARA_HOOKS")")" >> "$HOME/owners-seen"

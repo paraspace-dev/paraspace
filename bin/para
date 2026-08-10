@@ -327,7 +327,8 @@ attach_volume() { # attach_volume <ct>
 }
 
 # Block until the guest can actually be provisioned: the incus agent answers,
-# and, if the project named a host it depends on, DNS resolves it.
+# and guest DNS resolves $PARA_READY_HOST. An empty one skips the DNS half, for
+# a project whose hooks never reach the network.
 wait_ready() { # wait_ready <ct>
   log "Waiting for $1…"
   for _ in $(seq 1 60); do
@@ -952,7 +953,7 @@ cmd_init() {
   [ "$full" -eq 0 ] || root="$src"
 
   log "Scaffolding '$template' into ${PWD}…"
-  local file rel dest added=0 skipped=0
+  local file rel dest added=0 skipped=0 wrote_parafile=0
   while IFS= read -r file; do
     rel="${file#"$src"/}"
     [ "$rel" != README.md ] || continue    # the template's own README, not yours
@@ -972,7 +973,7 @@ cmd_init() {
     fi
     mkdir -p "$(dirname "$dest")"
     case "$rel" in
-      .paraspace/Parafile) init_parafile "$file" > "$dest" ;;
+      .paraspace/Parafile) init_parafile "$file" > "$dest"; wrote_parafile=1 ;;
       *)                   cp "$file" "$dest" ;;
     esac
     case "$rel" in .paraspace/commands/*|*.sh) chmod +x "$dest" ;; esac
@@ -983,8 +984,9 @@ cmd_init() {
   if [ "$added" -eq 0 ]; then return; fi
   # PARA_ORIGIN defaults to this checkout's origin, so it is one less thing to
   # edit here. Nowhere to read one from is worth saying, since the first thing
-  # that notices is a provision hook, minutes later, inside a container.
-  if [ -z "$(git_origin "$PWD")" ]; then
+  # that notices is a provision hook, minutes later, inside a container. Only
+  # when this run wrote the Parafile, or the warning names a file it kept.
+  if [ "$wrote_parafile" -eq 1 ] && [ -z "$(git_origin "$PWD")" ]; then
     warn "no git origin here to clone, so .paraspace/Parafile names an example app instead. Uncomment its PARA_ORIGIN, or point that at your repo."
   fi
   log "Next: set PARA_ROUTES in .paraspace/Parafile, then 'para image build' and 'para up <name>'."
@@ -998,7 +1000,9 @@ cmd_init() {
 init_parafile() { # init_parafile <template-parafile>
   local body project origin
   body="$(cat "$1")"
-  project="${PARA_PROJECT_NAME:-$(slug "${PWD##*/}")}"
+  # Both read off $PWD, which is what this scaffold becomes the project for.
+  # $PARA_PROJECT_NAME would be an enclosing project's, or a stray export.
+  project="$(slug "${PWD##*/}")"
   # Nowhere to read an origin from leaves the line naming an app you can
   # actually clone, rather than a placeholder you have to notice and replace.
   origin="$(git_origin "$PWD")"
@@ -1109,7 +1113,7 @@ mod_stub() { # mod_stub <hook>
     provision)   when='in the workspace before boot, on every up, so keep it idempotent' ;;
     boot)        when='once the stack is up. Return zero only when yours is listening' ;;
   esac
-  printf '#!/usr/bin/env bash\nset -euo pipefail\n'
+  printf '#!/usr/bin/env bash\nset -euo pipefail\n\n'
   printf '# Runs %s.\n# After the hook the project ships, and yours to edit.\n\n' "$when"
   # shellcheck disable=SC2016  # the generated hook expands this, para does not
   printf '. "$PARA_HOOKS/helpers"\n'

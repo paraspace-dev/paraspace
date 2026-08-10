@@ -28,8 +28,10 @@
 PARA_ROUTES="${PARA_ROUTES-8080}"
 
 # ---- optional -----------------------------------------------------------------
-# What para resolves for itself, written out with the values it resolved for THIS
-# project. Every one is already in effect; uncomment a line only to change it.
+# What para resolves for itself. `para init` fills the ${...} below in with the
+# values it resolved for THIS project, so every one is already in effect and you
+# uncomment a line only to change it. Untouched by para init they are still
+# placeholders, so uncomment them in your scaffolded copy rather than here.
 
 # Git URL each workspace clones, defaulting to the origin of the checkout this
 # Parafile sits in, so a project that lives in its own repo needs no line here.

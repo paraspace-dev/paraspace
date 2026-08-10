@@ -93,8 +93,7 @@ Every run is sandboxed so it never touches your real para state:
   and its own Caddy **admin** endpoint (`PARA_CADDY_ADMIN`, `:19443`) so a
   `caddy reload` from the run can never land on your real para Caddy;
 - a throwaway `PARA_PROJECT_NAME`/volume, and fixed pre-tracked workspace names
-  so
-  teardown reclaims everything even if a test aborts;
+  so teardown reclaims everything even if a test aborts;
 - **the para identity and image keys inherited from your shell are unset**
   (`PARA_VOLUME`, `PARA_PROJECT_NAME`, `PARA_PROJECT_DIR`, `PARA_IMAGE_NAME`,
   `PARA_IMAGE_BASE`, `PARA_IMAGE_BOOTSTRAP`). Both halves matter: teardown

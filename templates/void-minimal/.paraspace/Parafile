@@ -25,12 +25,6 @@
 #   PARA_ROUTES="3000,api:3001"     # several: commas, spaces, tabs or newlines
 PARA_ROUTES="${PARA_ROUTES-}"
 
-# A hostname the guest must resolve before para runs any hook in it. Guest DNS
-# comes up a beat after the container does, and this template's image build
-# installs over the network, so without it a build can start too early. para
-# pins no default, since a project whose hooks stay on the box needs none.
-: "${PARA_READY_HOST:=paraspace.dev}"
-
 # ---- optional -----------------------------------------------------------------
 # What para resolves for itself. `para init` fills the ${...} below in with the
 # values it resolved for THIS project, so every one is already in effect and you
@@ -50,6 +44,11 @@ PARA_ROUTES="${PARA_ROUTES-}"
 # xbps, so a base arriving from the environment would build a broken image.
 # PARA_IMAGE_BASE=images:voidlinux
 # PARA_IMAGE_BOOTSTRAP="xbps-install -Syu xbps bash"
+
+# A hostname the guest must resolve before para runs any hook in it, so a hook
+# that reaches the network can't race guest DNS coming up. Declare it empty to
+# skip the wait entirely.
+# : "${PARA_READY_HOST:=paraspace.dev}"
 
 # Project identity, the key para uses for ownership, `para ls` scoping, and the
 # shared-volume name. It defaults to this directory's name. Declare it to pin an

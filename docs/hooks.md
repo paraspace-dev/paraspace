@@ -20,9 +20,9 @@ it a tty when there's a human on both ends, which is where the ssh-key and `gh`
 flows live.
 
 Guest DNS comes up a beat after the container, so a hook that clones can race
-it. [`PARA_READY_HOST`](./parafile.md#every-var-para-reads) in your Parafile
-makes `para up` block until the guest resolves the host you name. Both templates
-declare `paraspace.dev` for it.
+it. `para up` blocks until the guest resolves
+[`PARA_READY_HOST`](./parafile.md#every-var-para-reads), which is `paraspace.dev`
+unless you name a host you'd rather gate on.
 
 ### `boot`
 
@@ -34,8 +34,8 @@ docker compose up -d --wait                    # if you use Compose
 until nc -z localhost 3000; do sleep 1; done   # or wait on the port yourself
 ```
 
-`para` gates on the container agent (and `$PARA_READY_HOST`, if you set one)
-before hooks run, then trusts your boot hook's exit code.
+`para` gates on the container agent and on `$PARA_READY_HOST` resolving before
+hooks run, then trusts your boot hook's exit code.
 
 ### `image-build`
 

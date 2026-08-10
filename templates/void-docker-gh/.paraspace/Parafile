@@ -1,6 +1,6 @@
 # .paraspace/Parafile, per-project config for para. Sourced as bash, it sets the
 # few PARA_* variables para itself reads (version, image, what to clone, routes).
-# Everything else is a hook (.paraspace/hooks/). A real env var overrides any of these.
+# Everything else is a hook (.paraspace/hooks/).
 #
 # Active below are only the keys a project actually has to decide. Everything
 # para works out for itself is listed commented-out at the bottom, so you can see
@@ -9,7 +9,9 @@
 # The full schema is docs/parafile.md in the package.
 
 # para contract version these hooks target. para refuses (clearly) on a mismatch.
-: "${PARA_CONTRACT:=1}"
+# Stated flatly, not with the yielding idiom: a pin the environment could move
+# is one that cannot refuse anything.
+PARA_CONTRACT=1
 
 # HTTP routes para publishes through its Caddy, one TLS site per "[sub:]port".
 # A bare port is the workspace apex; sub:port adds a subdomain (left is where
@@ -25,7 +27,7 @@
 #   "
 # Declared here, because para pins no default port. For a workspace with no HTTP at
 # all (a worker, a queue consumer), declare it empty: PARA_ROUTES=""
-PARA_ROUTES="${PARA_ROUTES-8080}"
+PARA_ROUTES=8080
 
 # ---- optional -----------------------------------------------------------------
 # What para resolves for itself. `para init` fills the ${...} below in with the

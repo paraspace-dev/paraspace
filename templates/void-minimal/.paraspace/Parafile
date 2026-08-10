@@ -1,6 +1,6 @@
 # .paraspace/Parafile, per-project config for para. Sourced as bash, it sets the
 # few PARA_* variables para itself reads (version, image, routes). Everything else
-# is a hook (.paraspace/hooks/). A real env var overrides any of these.
+# is a hook (.paraspace/hooks/).
 #
 # This is the BAREST template. It installs nothing and boots nothing. It stands a
 # Void Linux box up, gives you a shell (`para sh <name>`), and marks in comments
@@ -13,7 +13,9 @@
 # The full schema is docs/parafile.md in the package.
 
 # para contract version these hooks target. para refuses (clearly) on a mismatch.
-: "${PARA_CONTRACT:=1}"
+# Stated flatly, not with the yielding idiom: a pin the environment could move
+# is one that cannot refuse anything.
+PARA_CONTRACT=1
 
 # HTTP routes para publishes through its Caddy, one TLS site per "[sub:]port",
 # comma-separated. This box boots nothing, so it declares NO routes, spelled
@@ -21,9 +23,9 @@
 # you a full box and `para sh <name>`; it just publishes no site, and `para ls`
 # shows no URL. Once you run something, list its port here, where a bare port is
 # the workspace apex:
-#   PARA_ROUTES="8080"              # -> https://<name>.$PARA_DOMAIN
+#   PARA_ROUTES=8080                # -> https://<name>.$PARA_DOMAIN
 #   PARA_ROUTES="3000,api:3001"     # several: commas, spaces, tabs or newlines
-PARA_ROUTES="${PARA_ROUTES-}"
+PARA_ROUTES=""
 
 # ---- optional -----------------------------------------------------------------
 # What para resolves for itself. `para init` fills the ${...} below in with the

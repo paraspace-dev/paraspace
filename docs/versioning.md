@@ -17,7 +17,7 @@ Every bundled template already declares the one it was written against, so
 `para init` pins it for you:
 
 ```sh
-: "${PARA_CONTRACT:=1}"
+PARA_CONTRACT=1
 ```
 
 It is an ordinary `Parafile` key, so it reaches your hooks like any other. You

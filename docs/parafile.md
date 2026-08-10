@@ -17,8 +17,8 @@ and `PARA_IMAGE_BOOTSTRAP` derive theirs from your project rather than pinning
 one, so a whole `Parafile` can be two lines:
 
 ```sh
-: "${PARA_CONTRACT:=1}"
-PARA_ROUTES="${PARA_ROUTES-8080}"
+PARA_CONTRACT=1
+PARA_ROUTES=8080
 ```
 
 ## Every var para reads
@@ -143,12 +143,14 @@ environment  >  user config  >  Parafile  >  para's defaults
 Write your vars with these idioms and the environment can still win:
 
 ```sh
+PARA_CLONE_DIR=src                 # "I insist", what the templates state plainly
 : "${PARA_DOMAIN:=myapp.dev}"      # a value, unless the environment has one
 PARA_ROUTES="${PARA_ROUTES-3000}"  # same, but the environment can set it empty
-PARA_CLONE_DIR=src                 # "I insist", legitimate for a project to say
 ```
 
-So `PARA_ROUTES="3000" para up ws` works for a one-off.
+Write a key the second way and `PARA_DOMAIN=other.test para up ws` wins for
+that one run. The templates state their own two flatly, since a contract pin
+the environment can move cannot refuse a mismatch.
 
 ## User config, not Parafile
 

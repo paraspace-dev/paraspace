@@ -69,11 +69,11 @@ hooks need), `.paraspace/commands/` (your own `para` verbs), `para doctor`, and
 `PARA_HOOKS`/`PARA_SKEL` (name the guest dirs instead of rebuilding them out of
 `$HOME`). All additive, so contract 1 covers them.
 
-So are the defaults that landed on four keys that used to have none, all listed
+So are the defaults that landed on three keys that used to have none, all listed
 in the [Parafile reference](./parafile.md#every-var-para-reads). `PARA_ORIGIN`
 now takes your checkout's git origin, `PARA_IMAGE_BASE` is `images:voidlinux`,
-`PARA_IMAGE_BOOTSTRAP` is derived from that base, and `PARA_READY_HOST` is
-`paraspace.dev`. A `Parafile` that declares any of them is unaffected, and
+and `PARA_IMAGE_BOOTSTRAP` is derived from that base. A `Parafile` that
+declares any of them is unaffected, and
 `para image build` no longer refuses an unset `PARA_IMAGE_BASE`, because there
 is no longer such a thing.
 

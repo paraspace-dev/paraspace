@@ -334,9 +334,12 @@ test_init_refuses_to_clobber_an_existing_project() {
   assert_eq "# my hook" "$(cat "$d/.paraspace/hooks/provision")" "the hook was left alone"     || return 1
   assert_contains "$out" "skip (exists)" "it says what it skipped" || return 1
 
-  # …and --force is how you say you meant it.
+  # …and --force is how you say you meant it, for what the template owns. Not
+  # the Parafile: refreshing a template's hooks is the whole point of --force,
+  # and taking PARA_ROUTES with them would make it unusable for that.
   ( cd "$d" && env -u PARA_PROJECT_DIR -u PARA_PROJECT "$PARA" init void-minimal --force >/dev/null 2>&1 )
-  assert_not_contains "$(cat "$d/.paraspace/Parafile")" "MINE=yes" "--force overwrites"
+  assert_not_contains "$(cat "$d/.paraspace/hooks/provision")" "# my hook" "--force refreshed the hook" || return 1
+  assert_eq "MINE=yes" "$(cat "$d/.paraspace/Parafile")"                   "…and spared the Parafile"
 }
 
 test_up_allocates_an_ip_that_is_not_already_taken() {
@@ -499,15 +502,16 @@ test_a_scaffolded_project_takes_its_identity_from_the_directory() {
 }
 
 test_bundled_helpers_do_not_drift() {
-  # hooks/helpers is byte-identical across everything this package ships (the
-  # templates and the mods) on purpose, and cannot be factored into a shared
+  # helpers is byte-identical across everything this package ships (the
+  # templates, the mods, and the libexec/ copy `para mod init` scaffolds from)
+  # on purpose, and cannot be factored into a shared
   # overlay: it has to sit BESIDE the hooks that source it (shellcheck follows
   # `. "$PARA_HOOKS/helpers"` by basename, through .shellcheckrc's
   # source-path=SCRIPTDIR), para pushes .paraspace/ into a workspace whole, and
   # a mod resolves $PARA_HOOKS to its OWN directory, so it must ship one.
   local repo ref="" f rc=0 n=0
   repo="$(cd "$(dirname "$PARA")/.." && pwd)"
-  for f in "$repo"/templates/*/.paraspace/hooks/helpers "$repo"/mods/*/hooks/helpers; do
+  for f in "$repo"/libexec/helpers "$repo"/templates/*/.paraspace/hooks/helpers "$repo"/mods/*/hooks/helpers; do
     [ -f "$f" ] || continue
     n=$((n + 1))
     if [ -z "$ref" ]; then ref="$f"; continue; fi

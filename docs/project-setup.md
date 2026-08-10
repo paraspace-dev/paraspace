@@ -29,47 +29,55 @@ that already has application code or an earlier ParaSpace setup. The generated
 The scaffold runs as-is, but it still describes the template's project rather
 than yours. Four files carry almost everything you need to change.
 
-### 1. Set the routes
+### 1. Create a project mod
+
+You can directly modify the hooks under `.paraspace/hooks`, however it is
+recommended to store your customizations in a [mod](./mods.md) so that you can
+easily update your template with `para init -f <template>`.
+
+```sh
+para mod init project
+```
+
+### 2. Set-up the base image
+
+Edit `.paraspace/mods/project/hooks/image-build` to add any customizations to
+your base image. This might include installing custom software, prefetching
+resources from the Web to save time on each provision, etc.
+
+> [!TIP]
+> The hooks are just bash.
+
+
+### 3. Set-up the provisioner
+
+Edit `.paraspace/mods/project/hooks/provision` if needed, which runs before the
+project boots. It usually prepares the shared home volume, configures
+authentication, copies files out of `skel/`, renders `.env`, clones the repo,
+and does any one-time setup. The default template handles the common case.
+
+### 4. Set-up the stack
+
+Edit `.paraspace/mods/project/hooks/boot`, which starts the application stack.
+It must return zero only once every routed service is listening. See
+[Hooks](./hooks.md).
+
+
+### 5. Set the routes
 
 Edit `.paraspace/Parafile`. Usually one line: give `PARA_ROUTES` one entry per
 service port that should get a URL.
 
 ```sh
-PARA_ROUTES="${PARA_ROUTES-3000,db:8081}"
+# Caddy will proxy:
+#   <ws>.paraspace.dev    --> :3000
+#   db.<ws>.paraspace.dev --> :8081
+PARA_ROUTES="3000, db:8081"
 ```
 
-That serves the workspace apex from port 3000 and `db.<name>.<domain>` from
-port 8081. Write your values with the idioms the template uses, so a one-off
-`PARA_ROUTES="3000" para up ws` still wins.
+Any `PARA_*` env vars defined here will be forwarded to all of your hooks. See
+the [Parafile reference](./parafile.md) for every pre-defined setting.
 
-Each workspace clones this repository, because
-[`PARA_ORIGIN`](./parafile.md#para_origin) defaults to its `origin` remote. Set
-it only if you want workspaces cloning something else.
-
-See the [Parafile reference](./parafile.md) for every setting.
-
-### 2. Build the base image
-
-Edit `.paraspace/hooks/image-build`, which names the packages, tools, and
-workspace user baked into the project's image. Stable dependencies belong here
-rather than in a hook that reruns on every start. The bundled hooks install with
-`xbps`, matching para's default
-[`PARA_IMAGE_BASE`](./parafile.md#para_image_base-and-para_image_bootstrap), so
-another distro means changing both together. See
-[The image contract](./image.md).
-
-### 3. Provision each workspace
-
-Edit `.paraspace/hooks/provision`, which runs before the project boots. It
-usually prepares the shared home volume, configures authentication, copies
-files out of `skel/`, renders `.env`, and does any one-time setup. The default
-template handles the common case and expects you to edit it in place.
-
-### 4. Start the stack
-
-Edit `.paraspace/hooks/boot`, which starts the application stack. It must
-return zero only once every routed service is listening. See
-[Hooks](./hooks.md).
 
 ## Build and launch
 
@@ -77,7 +85,7 @@ return zero only once every routed service is listening. See
 para image build
 ```
 
-The first build usually takes several minutes. Images are per project and per
+The first build usually takes a couple minutes. Images are per project and per
 architecture, then reused until their source changes.
 
 ```sh
@@ -85,19 +93,16 @@ para up my-feature
 ```
 
 `para up` creates the workspace, runs your hooks, and configures its routes.
-Cloning the repository is one of the things `hooks/provision` does, which is
-why `void-minimal` produces a workspace with no clone at all.
 
-Enter it and list its URLs:
+To list the URL mapping and get a shell inside the workspace:
 
 ```sh
-para sh my-feature
 para ls
+para sh my-feature
 ```
 
-On a fresh machine the first launch may pause after printing an SSH public
-key. Add it to your Git host, then run `para up my-feature` again. See
-[Shared authentication](./shared-auth.md).
+If you use a github-aware template, the first launch may pause after printing
+an SSH public key. See [Shared authentication](./shared-auth.md).
 
 ## Iterate on the setup
 
@@ -116,7 +121,7 @@ agent gets the same environment. It is setup-once project infrastructure like
 
 ## What is in `.paraspace/`
 
-| Entry       | Read by                                | Purpose                                                            |
+| Entry       | Used by                                | Purpose                                                            |
 | ----------- | -------------------------------------- | ------------------------------------------------------------------ |
 | `Parafile`  | `para` on the host                     | Project settings and the [contract version](./versioning.md)       |
 | `hooks/`    | The workspace and image builder        | Image creation, provisioning, boot, and supporting scripts         |

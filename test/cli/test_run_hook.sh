@@ -270,7 +270,10 @@ test_run_hook_is_packaged() {
   local repo out; repo="$(cd "$(dirname "$PARA")/.." && pwd)"
   out="$(cd "$repo" && npm pack --dry-run --json 2>/dev/null)" \
     || { echo "  npm pack --dry-run failed" >&2; return 1; }
-  assert_contains "$out" "libexec/run-hook" "libexec/run-hook is in the published tarball"
+  assert_contains "$out" "libexec/run-hook" "libexec/run-hook is in the published tarball" || return 1
+  # Same exposure, one verb over: without it `para mod init` scaffolds a mod
+  # whose hooks source a helpers that was never shipped.
+  assert_contains "$out" "libexec/helpers"  "libexec/helpers is too"
 }
 
 test_templates_are_packaged() {

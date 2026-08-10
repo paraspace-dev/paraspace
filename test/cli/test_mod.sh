@@ -152,7 +152,61 @@ test_mod_names_an_unknown_mod_and_an_unknown_subcommand() {
   assert_contains "$PARA_OUT" "--list"         "and the command that lists them" || return 1
   para_in "$p" mod rm dotfiles-jchook
   [ "$PARA_RC" -ne 0 ] || { echo "  'para mod rm' was accepted" >&2; return 1; }
-  assert_contains "$PARA_OUT" "usage: para mod add" "the dispatcher named the problem"
+  assert_contains "$PARA_OUT" "usage: para mod" "the dispatcher named the problem" || return 1
+  assert_contains "$PARA_OUT" "add"  "and offers the subcommand that vendors one" || return 1
+  assert_contains "$PARA_OUT" "init" "and the one that stubs your own"
+}
+
+# ------------------------------------------------------------------ your own
+
+test_mod_init_stubs_a_mod_you_own() {
+  # The other kind of mod: not vendored, yours. It gets the shape para resolves,
+  # including a helpers BESIDE the hooks, since run-hook points $PARA_HOOKS at
+  # the directory the running hook came from and a mod cannot source another's.
+  local p m; p="$(a_project)"
+  para_in "$p" mod init
+  assert_eq 0 "$PARA_RC" "mod init succeeded" || return 1
+  m="$p/.paraspace/mods/project"
+  assert test -f "$m/hooks/helpers"     || return 1
+  assert test -f "$m/hooks/image-build" || return 1
+  assert test -f "$m/hooks/provision"   || return 1
+  assert test -f "$m/hooks/boot"        || return 1
+  # And the stub has to RUN. A hook sourcing a helpers that isn't there fails on
+  # the first `para up`, minutes in, inside a container.
+  assert env PARA_HOOKS="$m/hooks" bash "$m/hooks/provision"
+}
+
+test_mod_init_stubs_hooks_the_runner_resolves() {
+  # The payoff, and the half a file-existence check misses: what it wrote is a
+  # hook para actually runs. A stub under the wrong name, or a directory level
+  # out, is invisible until an `up` that doesn't do what you told it to.
+  local p out repo; p="$(a_project)"
+  repo="$(cd "$(dirname "$PARA")/.." && pwd)"
+  para_in "$p" mod init
+  cp "$repo/libexec/run-hook" "$p/.paraspace/run-hook"
+  chmod +x "$p/.paraspace/run-hook"
+  out="$("$p/.paraspace/run-hook" provision 2>&1)" \
+    || { echo "  run-hook failed on the stub:" >&2; printf '    %s\n' "$out" >&2; return 1; }
+  assert_contains "$out" "mods/project/hooks/provision" "the runner found it and ran it"
+}
+
+test_mod_init_takes_a_name_and_refuses_to_clobber() {
+  # `add` replaces, because replacing IS how you update a vendored mod. This one
+  # holds work you did by hand, so the same move would eat it.
+  local p; p="$(a_project)"
+  para_in "$p" mod init billing
+  assert_eq 0 "$PARA_RC" "a named mod was stubbed" || return 1
+  printf 'MINE\n' > "$p/.paraspace/mods/billing/hooks/provision"
+
+  para_in "$p" mod init billing
+  [ "$PARA_RC" -ne 0 ] || { echo "  mod init overwrote an existing mod" >&2; return 1; }
+  assert_contains "$PARA_OUT" "already exists" "the refusal says why" || return 1
+  assert_eq "MINE" "$(cat "$p/.paraspace/mods/billing/hooks/provision")" "the edit survived" || return 1
+
+  # …and --force is how you say you meant it.
+  para_in "$p" mod init billing --force
+  assert_eq 0 "$PARA_RC" "--force succeeded" || return 1
+  assert_not_contains "$(cat "$p/.paraspace/mods/billing/hooks/provision")" "MINE" "--force replaced it"
 }
 
 # --------------------------------------------------------------- registration
@@ -198,13 +252,18 @@ test_mod_completes_one_level_at_a_time() {
   # passes either way.
   local reply
   reply="$(_completions_after para mod)"
-  assert_eq "add" "$reply" "para mod <TAB> offers the subcommand alone" || return 1
+  assert_eq "add init" "$reply" "para mod <TAB> offers the subcommands alone" || return 1
 
   reply="$(_completions_after para mod add)"
   assert_contains "$reply" "dotfiles-jchook" "para mod add <TAB> names what para ships" || return 1
   assert_contains "$reply" "--list"          "and the flag that lists them"             || return 1
   # Word-exact: a mod whose name merely contains "add" is not this bug.
   case " $reply " in *" add "*) echo "  'add' is offered again where a name goes" >&2; return 1 ;; esac
+
+  # `init` takes a name you are inventing, so there is nothing to offer, and the
+  # bundled names in particular would be wrong: adding one later replaces it.
+  reply="$(_completions_after para mod init)"
+  assert_eq "" "$reply" "para mod init <TAB> offers nothing"
 }
 
 # -------------------------------------------------------------- a mod's verbs

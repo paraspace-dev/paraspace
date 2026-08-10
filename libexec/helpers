@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+# Shared helpers for the para hooks. Sourced, not executed, so each hook does:
+#   . "$PARA_HOOKS/helpers"
+# so the hook bodies read as WHAT they do, not how they print it.
+
+# Color, but only on a terminal, because para captures hook output to logs.
+if [ -t 2 ]; then
+  _hd=$'\033[36;1m'; _wn=$'\033[33m'; _er=$'\033[31m'; _off=$'\033[0m'
+else
+  _hd='' _wn='' _er='' _off=''
+fi
+
+stage() { printf '%s==> %s%s\n'   "$_hd" "$*" "$_off" >&2; }  # section header
+info()  { printf '    %s\n'        "$*"               >&2; }  # indented detail
+warn()  { printf '%swarn:%s %s\n'  "$_wn" "$_off" "$*" >&2; }
+die()   { printf '%serror:%s %s\n' "$_er" "$_off" "$*" >&2; exit 1; }
+
+# Is there a human to prompt? (Set PARA_NONINTERACTIVE=1 in CI/cron; para
+# reads it too, and gives a hook no tty when it is set.)
+interactive() { [ -z "${PARA_NONINTERACTIVE:-}" ] && [ -t 0 ]; }
+
+# Print a prompt and wait for Enter, only when someone can answer.
+pause() { if interactive; then printf '%s ' "$*" >&2; read -r _ || true; fi; }
+
+# No route helpers here on purpose: para injects $PARA_ROUTES space-separated,
+# so a hook that wants them writes `for r in $PARA_ROUTES` and one that wants
+# ports writes `${r##*:}`.

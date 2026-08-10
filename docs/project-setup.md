@@ -70,13 +70,11 @@ service port that should get a URL.
 # Caddy will proxy:
 #   <ws>.paraspace.dev    --> :3000
 #   db.<ws>.paraspace.dev --> :8081
-PARA_ROUTES="${PARA_ROUTES-3000, db:8081}"
+PARA_ROUTES="3000, db:8081"
 ```
 
-Write it with the idiom the template uses, as above, so a one-off
-`PARA_ROUTES="3000" para up ws` still wins. Any `PARA_*` you define here reaches
-every hook. See the [Parafile reference](./parafile.md) for the rest, and note
-that `para init -f` keeps this file rather than replacing it.
+Any `PARA_*` env vars defined here will be forwarded to all of your hooks. See
+the [Parafile reference](./parafile.md) for every pre-defined setting.
 
 
 ## Build and launch

@@ -253,15 +253,36 @@ echo "origin=[$PARA_ORIGIN]"'
   assert_contains "$PARA_OUT" "origin=[git@github.com:acme/other.git]" "the Parafile won"
 }
 
-test_the_ready_host_defaults_to_paras_own_domain() {
-  # Every workspace waits on guest DNS before a hook runs, so the gate needs a
-  # name para can pick for itself. Its own, so the default presumes no git host.
+test_the_ready_host_is_the_projects_to_name() {
+  # para pins no DNS gate. A default would make every `up` on every box wait on
+  # a name para picked, including projects whose hooks never leave the machine,
+  # and the failure is a 120s hang. The templates declare one; the engine doesn't.
   local p; p="$(a_project)"
   # shellcheck disable=SC2016  # the command's $vars are literal here
-  a_project_command "$p" resolved '#!/bin/sh
+  local oracle='#!/bin/sh
 echo "ready=[$PARA_READY_HOST]"'
+  a_project_command "$p" resolved "$oracle"
   para_in "$p" resolved
-  assert_contains "$PARA_OUT" "ready=[paraspace.dev]" "the gate defaults to paraspace.dev"
+  assert_contains "$PARA_OUT" "ready=[]" "no gate unless the project names one" || return 1
+
+  p="$(a_project 'PARA_READY_HOST=github.com')"
+  a_project_command "$p" resolved "$oracle"
+  para_in "$p" resolved
+  assert_contains "$PARA_OUT" "ready=[github.com]" "and the project's name reaches the hooks"
+}
+
+test_the_templates_name_a_ready_host() {
+  # Both reach the network before a workspace is usable (an xbps image build,
+  # and void-docker-gh's clone), so the gate they need is theirs to declare now
+  # that the engine pins none. Scaffolded, not read off the template, since
+  # that is the file a user actually gets.
+  local d tpl; d="$(scratch)"
+  for tpl in void-docker-gh void-minimal; do
+    mkdir -p "$d/$tpl"
+    ( cd "$d/$tpl" && env -u PARA_PROJECT_DIR -u PARA_PROJECT_NAME "$PARA" init "$tpl" >/dev/null 2>&1 )
+    assert_contains "$(grep -v '^[[:space:]]*#' "$d/$tpl/.paraspace/Parafile")" \
+      "PARA_READY_HOST:=paraspace.dev" "$tpl declares the gate" || return 1
+  done
 }
 
 test_routes_are_canonicalized() {

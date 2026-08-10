@@ -103,9 +103,10 @@ load_config() {
   # nothing keeps the PARA_IMAGE_BOOTSTRAP="" that says so.
   : "${PARA_IMAGE_BASE:=images:voidlinux}"
   : "${PARA_IMAGE_BOOTSTRAP=$(default_bootstrap "$PARA_IMAGE_BASE")}"
-  # Guest DNS comes up a beat after the container, so hooks wait on one name
-  # resolving. para's own, so the default presumes nothing about your git host.
-  : "${PARA_READY_HOST:=paraspace.dev}"
+  # A name the guest must resolve before any hook runs, when a project needs
+  # one. No default: it would make every `up` on every box wait on DNS para
+  # picked, and a project whose hooks never leave the machine needs none.
+  : "${PARA_READY_HOST:=}"
   # Caddy's admin endpoint. Empty means Caddy's own default (localhost:2019),
   # which every Caddy on the box shares. Set this to give para's Caddy an
   # address of its own when something else is already using it.
@@ -327,8 +328,7 @@ attach_volume() { # attach_volume <ct>
 }
 
 # Block until the guest can actually be provisioned: the incus agent answers,
-# and guest DNS resolves $PARA_READY_HOST. An empty one skips the DNS half, for
-# a project whose hooks never reach the network.
+# and, if the project named a host it depends on, DNS resolves it.
 wait_ready() { # wait_ready <ct>
   log "Waiting for $1…"
   for _ in $(seq 1 60); do

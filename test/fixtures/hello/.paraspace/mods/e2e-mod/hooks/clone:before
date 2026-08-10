@@ -1,7 +1,0 @@
-#!/usr/bin/env bash
-set -euo pipefail
-# Fills a point the PROJECT opened, a name para has never heard of. A mod that
-# must act before the project clones has nowhere else to go: a mod's `provision`
-# runs after the project's entire provision, clone included.
-
-printf 'mod-clone-before\n' >> "$HOME/owners-seen"

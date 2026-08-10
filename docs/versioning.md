@@ -60,7 +60,7 @@ into a scratch directory to diff against a current template. Otherwise:
 | image stamped uid/user/contract/incremental | only `user.para.base`, and `para image status` reports when it was built and from what |
 | `para start` / `para stop` | `para caddy start\|stop\|status` |
 | `para config-set KEY VALUE` | `para config edit`, since the file is hand-edited now |
-| `para web`, `key` | project commands in `.paraspace/commands/`, shipped by `void-docker-gh` |
+| `para web`, `key` | project commands in `.paraspace/commands/`; `void` ships `web` and the `git` mod ships `key` |
 | `para run`, `claude` | gone from the engine and from every template, so write your own, or see [Running coding agents](./agents.md#driving-one) |
 | `para reconcile`, `install`, `image-build`, `config-import`, `config-sync` | deleted, since `up` now re-pushes `.paraspace/` every time |
 
@@ -111,6 +111,11 @@ is listed here, and each is a hand edit to a `.paraspace/` scaffolded before it.
 - **`.paraspace/run-hook` is a name para owns**, alongside `env` and `host.env`.
   para writes its runner there on every push, so a file of yours at that path is
   overwritten.
+- **`.paraspace/helpers` is a name para owns.** para replaces it on every push
+  and injects its location as `$PARA_HELPERS` in guests and host commands. It
+  provides `stage`, `info`, `warn`, `die`, `interactive`, and `pause`. A project
+  file at that path is overwritten. Source the injected path instead of keeping
+  a copy under each `hooks/` directory.
 - **The exec bit no longer matters in `hooks/`**, and para no longer sets it
   there. A hook runs as `bash <the file>` whatever its mode, so a
   `core.fileMode=false` checkout stops breaking a workspace, but a helper *you*

@@ -14,8 +14,9 @@
 # test can put things in mods/ that the real package must never ship.
 a_para_pkg() {
   local d entry; d="$(scratch)"
-  mkdir -p "$d/bin" "$d/mods"
+  mkdir -p "$d/bin" "$d/libexec" "$d/mods"
   cp "$PARA" "$d/bin/para"
+  cp "$(cd "$(dirname "$PARA")/.." && pwd)/libexec/helpers" "$d/libexec/helpers"
   for entry in "$@"; do
     case "$entry" in
       */) mkdir -p "$d/mods/$entry" ;;
@@ -34,21 +35,21 @@ test_mod_add_vendors_a_bundled_mod() {
   # it, so without it the FIRST mod add in any project dies in raw cp.
   local p; p="$(a_project)"
   assert test ! -d "$p/.paraspace/mods" || return 1
-  para_in "$p" mod add dotfiles-jchook
+  para_in "$p" mod add dotfiles
   assert_eq 0 "$PARA_RC" "mod add succeeded" || return 1
-  assert test -f "$p/.paraspace/mods/dotfiles-jchook/hooks/provision" || return 1
-  assert test -f "$p/.paraspace/mods/dotfiles-jchook/hooks/image-build" || return 1
-  assert test -f "$p/.paraspace/mods/dotfiles-jchook/skel/zshrc" || return 1
+  assert test -f "$p/.paraspace/mods/dotfiles/hooks/provision" || return 1
+  assert test -f "$p/.paraspace/mods/dotfiles/hooks/image-build" || return 1
+  assert test -f "$p/.paraspace/mods/dotfiles/skel/zshrc" || return 1
   # The README travels with it: the copy in your repo documents the copy in
   # your repo, which is the whole reason a mod is vendored rather than fetched.
-  assert test -f "$p/.paraspace/mods/dotfiles-jchook/README.md"
+  assert test -f "$p/.paraspace/mods/dotfiles/README.md"
 }
 
 test_mod_add_says_which_verbs_a_mod_brought() {
   # The reader is told, because these run on the HOST with their privileges,
   # the one thing about a mod that isn't confined to a throwaway container.
   local p; p="$(a_project)"
-  para_in "$p" mod add dotfiles-jchook
+  para_in "$p" mod add dotfiles
   assert_contains "$PARA_OUT" "YOUR machine" "the warning names where they run" || return 1
   assert_contains "$PARA_OUT" "claude, run"  "and which verbs landed"
 }
@@ -75,17 +76,42 @@ test_mod_add_is_quiet_about_a_mod_with_no_commands() {
   assert_not_contains "$out" "YOUR machine" "no verbs, no warning"
 }
 
+test_mod_add_vendors_several_mods() {
+  local pkg p
+  pkg="$(a_para_pkg alpha/hooks/ beta/hooks/ gamma/hooks/)"
+  p="$(a_project)"
+  env PARA_PROJECT_DIR="$p" "$pkg" mod add alpha beta gamma >/dev/null 2>&1
+  assert test -d "$p/.paraspace/mods/alpha" || return 1
+  assert test -d "$p/.paraspace/mods/beta"  || return 1
+  assert test -d "$p/.paraspace/mods/gamma"
+}
+
+test_mod_add_preflights_every_name() {
+  local pkg p out rc names
+  pkg="$(a_para_pkg alpha/hooks/ gamma/hooks/)"
+  for names in "missing alpha gamma" "alpha missing gamma" "alpha gamma missing"; do
+    p="$(a_project)"
+    rc=0
+    # shellcheck disable=SC2086  # each case is the argv this test exercises
+    out="$(env PARA_PROJECT_DIR="$p" "$pkg" mod add $names 2>&1)" || rc=$?
+    [ "$rc" -ne 0 ] || { echo "  mod add accepted a missing name in: $names" >&2; return 1; }
+    assert_contains "$out" "no such mod 'missing'" "the missing mod is named" || return 1
+    assert test ! -e "$p/.paraspace/mods/alpha" || return 1
+    assert test ! -e "$p/.paraspace/mods/gamma" || return 1
+  done
+}
+
 test_mod_add_replaces_rather_than_merging() {
   # Adding again is the update path, so it must be a REPLACE. `cp -R` alone
   # merges into what is already there, which would leave a file the new version
   # of the mod deleted sitting in the tree forever.
   local p; p="$(a_project)"
-  para_in "$p" mod add dotfiles-jchook
-  printf 'stale\n' > "$p/.paraspace/mods/dotfiles-jchook/GONE-IN-THE-NEXT-VERSION"
-  para_in "$p" mod add dotfiles-jchook
+  para_in "$p" mod add dotfiles
+  printf 'stale\n' > "$p/.paraspace/mods/dotfiles/GONE-IN-THE-NEXT-VERSION"
+  para_in "$p" mod add dotfiles
   assert_eq 0 "$PARA_RC" "adding it twice is fine" || return 1
-  assert test ! -e "$p/.paraspace/mods/dotfiles-jchook/GONE-IN-THE-NEXT-VERSION" || return 1
-  assert test -f "$p/.paraspace/mods/dotfiles-jchook/hooks/provision"
+  assert test ! -e "$p/.paraspace/mods/dotfiles/GONE-IN-THE-NEXT-VERSION" || return 1
+  assert test -f "$p/.paraspace/mods/dotfiles/hooks/provision"
 }
 
 # ----------------------------------------------------------------------- --list
@@ -95,7 +121,10 @@ test_mod_add_list_names_what_this_para_ships() {
   # require_project, because "what can I install" comes before having somewhere
   # to put it. Without the cd it would pass from anywhere inside this repo.
   local out; out="$(cd "$(scratch)" && env -u PARA_PROJECT_DIR "$PARA" mod add --list 2>&1)"
-  assert_contains "$out" "dotfiles-jchook" "the bundled mod is listed"
+  assert_contains "$out" "git"      "the git mod is listed" || return 1
+  assert_contains "$out" "docker"   "the docker mod is listed" || return 1
+  assert_contains "$out" "gh"       "the gh mod is listed" || return 1
+  assert_contains "$out" "dotfiles" "the dotfiles mod is listed"
 }
 
 test_mod_add_list_skips_a_stray_file() {
@@ -123,7 +152,7 @@ test_mod_add_outside_a_project_fails_with_paras_own_error() {
   # Without require_project the destination is /.paraspace/mods/<name> and the
   # failure is raw cp's, which names a path the reader never typed.
   local d out rc=0; d="$(scratch)"
-  out="$(cd "$d" && env -u PARA_PROJECT_DIR "$PARA" mod add dotfiles-jchook 2>&1)" || rc=$?
+  out="$(cd "$d" && env -u PARA_PROJECT_DIR "$PARA" mod add dotfiles 2>&1)" || rc=$?
   [ "$rc" -ne 0 ] || { echo "  mod add succeeded outside a project" >&2; return 1; }
   assert_contains "$out" "not inside a para project" "para's own error, not cp's"
 }
@@ -143,6 +172,14 @@ test_mod_add_refuses_a_path_as_a_mod_name() {
   assert test ! -e "$p/.paraspace/mods"
 }
 
+test_mod_add_refuses_an_empty_name() {
+  local p; p="$(a_project)"
+  para_in "$p" mod add ""
+  [ "$PARA_RC" -ne 0 ] || { echo "  mod add accepted an empty name" >&2; return 1; }
+  assert_contains "$PARA_OUT" "usage: para mod add" "the empty name gets usage" || return 1
+  assert test ! -e "$p/.paraspace/mods"
+}
+
 test_mod_names_an_unknown_mod_and_an_unknown_subcommand() {
   # Two different mistakes, two different messages, both pointing somewhere.
   local p; p="$(a_project)"
@@ -150,7 +187,7 @@ test_mod_names_an_unknown_mod_and_an_unknown_subcommand() {
   [ "$PARA_RC" -ne 0 ] || { echo "  an unknown mod was accepted" >&2; return 1; }
   assert_contains "$PARA_OUT" "no such mod"    "an unknown mod names --list" || return 1
   assert_contains "$PARA_OUT" "--list"         "and the command that lists them" || return 1
-  para_in "$p" mod rm dotfiles-jchook
+  para_in "$p" mod rm dotfiles
   [ "$PARA_RC" -ne 0 ] || { echo "  'para mod rm' was accepted" >&2; return 1; }
   assert_contains "$PARA_OUT" "usage: para mod" "the dispatcher named the problem" || return 1
   assert_contains "$PARA_OUT" "add"  "and offers the subcommand that vendors one" || return 1
@@ -161,19 +198,19 @@ test_mod_names_an_unknown_mod_and_an_unknown_subcommand() {
 
 test_mod_init_stubs_a_mod_you_own() {
   # The other kind of mod: not vendored, yours. It gets the shape para resolves,
-  # including a helpers BESIDE the hooks, since run-hook points $PARA_HOOKS at
-  # the directory the running hook came from and a mod cannot source another's.
+  # and sources the helpers para injects for every hook owner.
   local p m; p="$(a_project)"
   para_in "$p" mod init
   assert_eq 0 "$PARA_RC" "mod init succeeded" || return 1
   m="$p/.paraspace/mods/project"
-  assert test -f "$m/hooks/helpers"     || return 1
+  assert test ! -e "$m/hooks/helpers"    || return 1
   assert test -f "$m/hooks/image-build" || return 1
   assert test -f "$m/hooks/provision"   || return 1
   assert test -f "$m/hooks/boot"        || return 1
-  # And the stub has to RUN. A hook sourcing a helpers that isn't there fails on
-  # the first `para up`, minutes in, inside a container.
-  assert env PARA_HOOKS="$m/hooks" bash "$m/hooks/provision"
+  # And the stub has to RUN. A missing injected helper fails on the first
+  # `para up`, minutes in, inside a container.
+  assert env PARA_HELPERS="$(cd "$(dirname "$PARA")/.." && pwd)/libexec/helpers" \
+    bash "$m/hooks/provision"
 }
 
 test_mod_init_stubs_hooks_the_runner_resolves() {
@@ -184,6 +221,7 @@ test_mod_init_stubs_hooks_the_runner_resolves() {
   repo="$(cd "$(dirname "$PARA")/.." && pwd)"
   para_in "$p" mod init
   cp "$repo/libexec/run-hook" "$p/.paraspace/run-hook"
+  cp "$repo/libexec/helpers" "$p/.paraspace/helpers"
   chmod +x "$p/.paraspace/run-hook"
   out="$("$p/.paraspace/run-hook" provision 2>&1)" \
     || { echo "  run-hook failed on the stub:" >&2; printf '    %s\n' "$out" >&2; return 1; }
@@ -217,7 +255,7 @@ test_mod_is_registered_everywhere() {
   # command". Each site is a separate assert so a red test names which one.
   local p out; p="$(a_project)"
   para_in "$p" --help
-  assert_contains "$PARA_OUT" "mod add <name>" "usage lists it under PROJECT" || return 1
+  assert_contains "$PARA_OUT" "mod add <name>..." "usage lists its repeated arity under PROJECT" || return 1
 
   out="$("$PARA" completions bash 2>&1)"
   assert_contains "$out" "config image init mod" "completion knows the verb" || return 1
@@ -255,7 +293,7 @@ test_mod_completes_one_level_at_a_time() {
   assert_eq "add init" "$reply" "para mod <TAB> offers the subcommands alone" || return 1
 
   reply="$(_completions_after para mod add)"
-  assert_contains "$reply" "dotfiles-jchook" "para mod add <TAB> names what para ships" || return 1
+  assert_contains "$reply" "dotfiles" "para mod add <TAB> names what para ships" || return 1
   assert_contains "$reply" "--list"          "and the flag that lists them"             || return 1
   # Word-exact: a mod whose name merely contains "add" is not this bug.
   case " $reply " in *" add "*) echo "  'add' is offered again where a name goes" >&2; return 1 ;; esac
@@ -406,10 +444,12 @@ test_a_command_never_sees_guest_paths() {
   # don't exist, and docs/hooks.md promises they are unset here.
   local p; p="$(a_project)"
   a_project_command "$p" probe '#!/bin/sh
-echo "hooks=[${PARA_HOOKS-unset}] skel=[${PARA_SKEL-unset}]"'
+echo "hooks=[${PARA_HOOKS-unset}] skel=[${PARA_SKEL-unset}] helpers=[$PARA_HELPERS]"
+[ -f "$PARA_HELPERS" ]'
   PARA_OUT="$(env PARA_PROJECT_DIR="$p" PARA_HOOKS=/host/evil PARA_SKEL=/host/evil2 "$PARA" probe 2>&1)"
   assert_contains "$PARA_OUT" "hooks=[unset]" "PARA_HOOKS does not reach a host command" || return 1
-  assert_contains "$PARA_OUT" "skel=[unset]"  "nor does PARA_SKEL"
+  assert_contains "$PARA_OUT" "skel=[unset]"  "nor does PARA_SKEL" || return 1
+  assert_contains "$PARA_OUT" "libexec/helpers" "PARA_HELPERS does reach it"
 }
 
 # ------------------------------------------------------------------ packaging
@@ -421,6 +461,6 @@ test_mods_are_packaged() {
   local repo out; repo="$(cd "$(dirname "$PARA")/.." && pwd)"
   out="$(cd "$repo" && npm pack --dry-run --json 2>/dev/null)" \
     || { echo "  npm pack --dry-run failed" >&2; return 1; }
-  assert_contains "$out" "mods/dotfiles-jchook/hooks/provision" \
+  assert_contains "$out" "mods/dotfiles/hooks/provision" \
     "the bundled mod is in the published tarball"
 }

@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
-# Shared helpers for the para hooks. Sourced, not executed, so each hook does:
-#   . "$PARA_HOOKS/helpers"
-# so the hook bodies read as WHAT they do, not how they print it.
+# Shared helpers for para hooks and project commands. Sourced, not executed:
+#   . "$PARA_HELPERS"
 
 # Color, but only on a terminal, because para captures hook output to logs.
 if [ -t 2 ]; then
@@ -17,7 +16,7 @@ die()   { printf '%serror:%s %s\n' "$_er" "$_off" "$*" >&2; exit 1; }
 
 # Is there a human to prompt? (Set PARA_NONINTERACTIVE=1 in CI/cron; para
 # reads it too, and gives a hook no tty when it is set.)
-interactive() { [ -z "${PARA_NONINTERACTIVE:-}" ] && [ -t 0 ]; }
+interactive() { [ -z "${PARA_NONINTERACTIVE:-}" ] && [ -t 0 ] && [ -t 1 ]; }
 
 # Print a prompt and wait for Enter, only when someone can answer.
 pause() { if interactive; then printf '%s ' "$*" >&2; read -r _ || true; fi; }

@@ -276,15 +276,13 @@ test_a_scaffolded_parafile_is_two_lines() {
   # The whole point of the defaults: what a project has to decide is the
   # contract it targets and the port it serves. A third active line here means
   # something grew a default it should have had, or lost one.
-  local d tpl active; d="$(scratch)"
-  for tpl in void-docker-gh void-minimal; do
-    mkdir -p "$d/$tpl"
-    ( cd "$d/$tpl" && env -u PARA_PROJECT_DIR -u PARA_PROJECT_NAME "$PARA" init "$tpl" >/dev/null 2>&1 )
-    active="$(grep -vE '^[[:space:]]*(#|$)' "$d/$tpl/.paraspace/Parafile")"
-    assert_eq 2 "$(printf '%s\n' "$active" | wc -l | tr -d ' ')" "$tpl is two lines: $active" || return 1
-    assert_contains "$active" "PARA_CONTRACT" "…the contract" || return 1
-    assert_contains "$active" "PARA_ROUTES"   "…and the routes" || return 1
-  done
+  local d active; d="$(scratch)"
+  mkdir -p "$d/void"
+  ( cd "$d/void" && env -u PARA_PROJECT_DIR -u PARA_PROJECT_NAME "$PARA" init void >/dev/null 2>&1 )
+  active="$(grep -vE '^[[:space:]]*(#|$)' "$d/void/.paraspace/Parafile")"
+  assert_eq 2 "$(printf '%s\n' "$active" | wc -l | tr -d ' ')" "void is two lines: $active" || return 1
+  assert_contains "$active" "PARA_CONTRACT" "…the contract" || return 1
+  assert_contains "$active" "PARA_ROUTES"   "…and the routes"
 }
 
 test_routes_are_canonicalized() {
@@ -349,7 +347,7 @@ test_init_resolves_the_project_into_the_scaffolded_parafile() {
   mkdir -p "$d/Acme.Web"
   git -C "$d/Acme.Web" init -q
   git -C "$d/Acme.Web" remote add origin git@github.com:acme/acme.git
-  ( cd "$d/Acme.Web" && env -u PARA_PROJECT_DIR PARA_PROJECT_NAME=inherited "$PARA" init void-docker-gh >/dev/null 2>&1 )
+  ( cd "$d/Acme.Web" && env -u PARA_PROJECT_DIR PARA_PROJECT_NAME=inherited "$PARA" init void >/dev/null 2>&1 )
   out="$(cat "$d/Acme.Web/.paraspace/Parafile")"
   assert_contains     "$out" 'PARA_VOLUME:=para-home-acme-web'  "the volume default names this project" || return 1
   assert_contains     "$out" 'PARA_IMAGE_NAME:=acme-web'        "so does the image default"             || return 1
@@ -364,7 +362,7 @@ test_init_resolves_the_project_into_the_scaffolded_parafile() {
 
   # With nowhere to read an origin from, the line names an app you can clone.
   mkdir -p "$d/no-repo"
-  ( cd "$d/no-repo" && env -u PARA_PROJECT_DIR -u PARA_PROJECT_NAME "$PARA" init void-docker-gh >/dev/null 2>&1 )
+  ( cd "$d/no-repo" && env -u PARA_PROJECT_DIR -u PARA_PROJECT_NAME "$PARA" init void >/dev/null 2>&1 )
   out="$(cat "$d/no-repo/.paraspace/Parafile")"
   assert_contains     "$out" 'PARA_ORIGIN:=https://github.com/paraspace-dev' "it falls back to the example app" || return 1
   # shellcheck disable=SC2016  # ditto
@@ -380,7 +378,7 @@ test_init_refuses_to_clobber_an_existing_project() {
   printf 'MINE=yes\n'  > "$d/.paraspace/Parafile"
   printf '# my hook\n' > "$d/.paraspace/hooks/provision"
 
-  out="$(cd "$d" && env -u PARA_PROJECT_DIR -u PARA_PROJECT_NAME "$PARA" init void-minimal 2>&1)"
+  out="$(cd "$d" && env -u PARA_PROJECT_DIR -u PARA_PROJECT_NAME "$PARA" init void 2>&1)"
   assert_eq "MINE=yes"  "$(cat "$d/.paraspace/Parafile")"        "the Parafile was left alone" || return 1
   assert_eq "# my hook" "$(cat "$d/.paraspace/hooks/provision")" "the hook was left alone"     || return 1
   assert_contains "$out" "skip (exists)" "it says what it skipped" || return 1
@@ -388,7 +386,7 @@ test_init_refuses_to_clobber_an_existing_project() {
   # …and --force is how you say you meant it, for what the template owns. Not
   # the Parafile: refreshing a template's hooks is the whole point of --force,
   # and taking PARA_ROUTES with them would make it unusable for that.
-  out="$(cd "$d" && env -u PARA_PROJECT_DIR -u PARA_PROJECT_NAME "$PARA" init void-minimal --force 2>&1)"
+  out="$(cd "$d" && env -u PARA_PROJECT_DIR -u PARA_PROJECT_NAME "$PARA" init void --force 2>&1)"
   assert_not_contains "$(cat "$d/.paraspace/hooks/provision")" "# my hook" "--force refreshed the hook" || return 1
   assert_eq "MINE=yes" "$(cat "$d/.paraspace/Parafile")"                   "…and spared the Parafile"   || return 1
   # A scratch dir has no git origin, but the Parafile it kept is the user's, so
@@ -517,7 +515,7 @@ test_image_rejects_an_unknown_subcommand() {
 # --------------------------------------------------------------------- init
 
 test_init_scaffolds_a_paraspace_dir() {
-  local d; d="$(a_scaffolded_project void-minimal)"
+  local d; d="$(a_scaffolded_project void)"
   assert test -f "$d/.paraspace/Parafile"        || return 1
   assert test -f "$d/.paraspace/hooks/provision" || return 1
   assert test -f "$d/.paraspace/hooks/boot"      || return 1
@@ -526,8 +524,17 @@ test_init_scaffolds_a_paraspace_dir() {
 
 test_init_lists_bundled_templates() {
   local out; out="$(env -u PARA_PROJECT_DIR "$PARA" init --list 2>&1)"
-  assert_contains "$out" "void-minimal"   "template listed" || return 1
-  assert_contains "$out" "void-docker-gh" "default listed"
+  assert_eq "void" "$out" "void is the one bundled template"
+}
+
+test_void_template_establishes_zsh_extension_paths() {
+  local repo hook
+  repo="$(cd "$(dirname "$PARA")/.." && pwd)"
+  hook="$repo/templates/void/.paraspace/hooks/image-build"
+  assert_contains "$(cat "$hook")" "pkgs=\"zsh" "the base installs zsh" || return 1
+  assert_contains "$(cat "$hook")" "/etc/zsh/zshrc.d" "the base creates zsh drop-ins" || return 1
+  assert_contains "$(cat "$hook")" "/usr/share/zsh/site-functions" \
+    "the base creates the completion path"
 }
 
 test_init_refuses_a_path_as_a_template_name() {
@@ -550,29 +557,9 @@ test_a_scaffolded_project_takes_its_identity_from_the_directory() {
   # not see. (It passed under `--cli` and failed under `--all` before this.)
   local d out; d="$(scratch)"
   mkdir -p "$d/My.App"
-  ( cd "$d/My.App" && env -u PARA_PROJECT_DIR -u PARA_PROJECT_NAME "$PARA" init void-minimal >/dev/null 2>&1 )
+  ( cd "$d/My.App" && env -u PARA_PROJECT_DIR -u PARA_PROJECT_NAME "$PARA" init void >/dev/null 2>&1 )
   out="$(cd "$d/My.App" && env -u PARA_PROJECT_DIR -u PARA_PROJECT_NAME "$PARA" doctor 2>&1)"
   assert_contains "$out" "my-app" "the directory name became the project slug"
-}
-
-test_bundled_helpers_do_not_drift() {
-  # helpers is byte-identical across everything this package ships (the
-  # templates, the mods, and the libexec/ copy `para mod init` scaffolds from)
-  # on purpose, and cannot be factored into a shared
-  # overlay: it has to sit BESIDE the hooks that source it (shellcheck follows
-  # `. "$PARA_HOOKS/helpers"` by basename, through .shellcheckrc's
-  # source-path=SCRIPTDIR), para pushes .paraspace/ into a workspace whole, and
-  # a mod resolves $PARA_HOOKS to its OWN directory, so it must ship one.
-  local repo ref="" f rc=0 n=0
-  repo="$(cd "$(dirname "$PARA")/.." && pwd)"
-  for f in "$repo"/libexec/helpers "$repo"/templates/*/.paraspace/hooks/helpers "$repo"/mods/*/hooks/helpers; do
-    [ -f "$f" ] || continue
-    n=$((n + 1))
-    if [ -z "$ref" ]; then ref="$f"; continue; fi
-    cmp -s "$ref" "$f" || { echo "  drift: ${f#"$repo"/} differs from ${ref#"$repo"/}" >&2; rc=1; }
-  done
-  [ "$n" -ge 3 ] || { echo "  expected at least three bundled helpers, found $n" >&2; return 1; }
-  return "$rc"
 }
 
 # Run para against <project> with one extra environment variable, backend

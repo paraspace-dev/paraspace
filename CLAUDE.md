@@ -187,7 +187,7 @@ one was a mess that a full rewrite had to clean up.
   `para image build` takes minutes.
 - **Never document template or mod policy as engine behavior.** The
   generic-mechanism boundary applies to prose. `para claude` is a file the
-  `dotfiles-jchook` mod ships (no bundled *template* does), not something the
+  `dotfiles` mod ships (no bundled *template* does), not something the
   engine knows about, and every page that shows it says so. Blurring it teaches
   people to file engine bugs about their own hooks.
 - **Show the command.** A page earns its keep with the line the reader can

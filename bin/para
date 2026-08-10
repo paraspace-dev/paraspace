@@ -47,13 +47,9 @@ GUEST_PRELUDE='
 '
 
 # ---- output ----------------------------------------------------------------
-log()  { printf '\033[36m==>\033[0m %s\n' "$*" >&2; }
-warn() { printf '\033[33mwarn:\033[0m %s\n' "$*" >&2; }
-die()  { printf '\033[31merror:\033[0m %s\n' "$*" >&2; exit 1; }
+# stage, warn, die and interactive come from $PARA_HELPERS, sourced by main.
+log()  { stage "$@"; }
 need() { command -v "$1" >/dev/null 2>&1 || die "missing required command: $1"; }
-
-# A human on both ends? PARA_NONINTERACTIVE=1 forces the scripted path.
-interactive() { [ -z "${PARA_NONINTERACTIVE:-}" ] && [ -t 0 ] && [ -t 1 ]; }
 
 # ---- configuration ---------------------------------------------------------
 # Two sourced bash files, one idiom:
@@ -83,6 +79,10 @@ load_config() {
   # shellcheck source=/dev/null
   if [ -f "$PARA_PROJECT_DIR/.paraspace/Parafile" ]; then . "$PARA_PROJECT_DIR/.paraspace/Parafile"; fi
   refuse_renamed_vars
+
+  # Engine-owned on both host and guest. A config cannot point commands at a
+  # project-controlled replacement for para's contract helpers.
+  PARA_HELPERS="$(pkg_root)/libexec/helpers"
 
   : "${PARA_DOMAIN:=paraspace.dev}"
   : "${PARA_HTTPS_PORT:=8443}"
@@ -476,7 +476,8 @@ guest_env() { # guest_env <dest>
   # shellcheck disable=SC2034  # all three are read by para_env's ${!PARA_@}
   local PARA_HOOKS="$1/.paraspace/hooks" \
         PARA_SKEL="$1/.paraspace/skel" \
-        PARA_HOST_ENV="$1/.paraspace/host.env"
+        PARA_HOST_ENV="$1/.paraspace/host.env" \
+        PARA_HELPERS="$1/.paraspace/helpers"
   para_env
   # para_env forwards every PARA_* in scope, including whatever the caller
   # happened to export. PARA_HOOK_STACK is the runner's to build from empty:
@@ -497,8 +498,10 @@ push_paraspace() { # push_paraspace <instance> <dest>
   incus exec "$1" -- chmod -R a+rX "$2/.paraspace"
   guest_env "$2" | incus_q file push --mode 0600 - "$1$2/.paraspace/env"
   # After the tree, so a project shipping its own .paraspace/run-hook can't
-  # shadow para's. Both the workspace and the builder run hooks through it.
+  # shadow para's. The helpers follow for the same reason. Both the workspace
+  # and the builder run hooks through these files.
   incus_q file push --mode 0755 "$(pkg_root)/libexec/run-hook" "$1$2/.paraspace/run-hook"
+  incus_q file push --mode 0644 "$(pkg_root)/libexec/helpers" "$1$2/.paraspace/helpers"
 }
 
 # The workspace's copy: the tree, plus the project's base .env and the user's
@@ -942,7 +945,7 @@ cmd_init() {
     esac
   done
   local src
-  template="${template:-void-docker-gh}"
+  template="${template:-void}"
   # A bundled template is a plain directory name. Without this, `para init ../..`
   # would scaffold an arbitrary tree into the current directory.
   case "$template" in
@@ -990,7 +993,7 @@ cmd_init() {
   if [ "$wrote_parafile" -eq 1 ] && [ -z "$(git_origin "$PWD")" ]; then
     warn "no git origin here to clone, so .paraspace/Parafile names an example app instead. Uncomment its PARA_ORIGIN, or point that at your repo."
   fi
-  log "Next: set PARA_ROUTES in .paraspace/Parafile, then 'para image build' and 'para up <name>'."
+  log "Next: review .paraspace/Parafile, add the mods you need, then run 'para image build' and 'para up <name>'."
 }
 
 # The template's Parafile with its placeholders resolved to what para resolves
@@ -1029,27 +1032,39 @@ cmd_mod() {
   case "$sub" in
     add)  cmd_mod_add "$@" ;;
     init) cmd_mod_init "$@" ;;
-    *) die "usage: para mod <add <name>|init [<name>]>  ('para mod add --list' names what this para ships)" ;;
+    *) die "usage: para mod <add <name>...|init [<name>]>  ('para mod add --list' names what this para ships)" ;;
   esac
 }
 
 # Copied from what this para ships, never fetched, so a mod lands in the
 # project's own git history and `para up` stays offline.
 cmd_mod_add() {
-  local usage="usage: para mod add <name>  ('para mod add --list' names what this para ships)"
-  local name="${1:-}"
-  case "$name" in
-    --list) bundled_names mods; return ;;
-    "")     die "$usage" ;;
+  local usage="usage: para mod add <name>...  ('para mod add --list' names what this para ships)"
+  [ "$#" -gt 0 ] || die "$usage"
+  if [ "$1" = --list ]; then
+    [ "$#" -eq 1 ] || die "$usage"
+    bundled_names mods
+    return
+  fi
+  require_project
+  local name src
+  for name in "$@"; do
     # Same reason as a template's: without it, `para mod add ../..` copies an
     # arbitrary tree in, and the destination is one your project commits.
-    */*|.|..) die "a mod is a plain directory name (see: para mod add --list); got '$name'." ;;
-  esac
-  require_project
-  local src dest
+    case "$name" in
+      "") die "$usage" ;;
+      */*|.|..|--*) die "a mod is a plain directory name (see: para mod add --list); got '$name'." ;;
+    esac
+    src="$(pkg_root)/mods/$name"
+    [ -d "$src" ] || die "no such mod '$name' (see: para mod add --list)."
+  done
+  for name in "$@"; do vendor_mod "$name"; done
+}
+
+vendor_mod() { # vendor_mod <name>
+  local name="$1" src dest f verbs=""
   src="$(pkg_root)/mods/$name"
   dest="$PARA_PROJECT_DIR/.paraspace/mods/$name"
-  [ -d "$src" ] || die "no such mod '$name' (see: para mod add --list)."
   # Replace, so adding it again is how you update. The mkdir is not optional: cp
   # creates the last component but not the mods/ above it.
   rm -rf "$dest"
@@ -1058,7 +1073,6 @@ cmd_mod_add() {
   log "Vendored '$name' into .paraspace/mods/$name. Read it, commit it, then: para up <name>"
   # A command honours its shebang, so unlike a hook it needs the exec bit, and a
   # checkout with core.fileMode=false has none to copy. Same repair cmd_init makes.
-  local f verbs=""
   for f in "$dest"/commands/*; do
     if [ -f "$f" ]; then chmod +x "$f"; verbs="${verbs:+$verbs, }${f##*/}"; fi
   done
@@ -1092,10 +1106,6 @@ cmd_mod_init() {
   fi
   rm -rf "$dest"
   mkdir -p "$dest/hooks"
-  # Its own copy, because run-hook points $PARA_HOOKS at the dir the running
-  # hook came from, so a mod cannot source the project's.
-  cp "$(pkg_root)/libexec/helpers" "$dest/hooks/helpers"
-  printf '  add: %s\n' "mods/$name/hooks/helpers" >&2
   local hook
   for hook in image-build provision boot; do
     mod_stub "$hook" > "$dest/hooks/$hook"
@@ -1117,7 +1127,7 @@ mod_stub() { # mod_stub <hook>
   printf '#!/usr/bin/env bash\nset -euo pipefail\n\n'
   printf '# Runs %s.\n# After the hook the project ships, and yours to edit.\n\n' "$when"
   # shellcheck disable=SC2016  # the generated hook expands this, para does not
-  printf '. "$PARA_HOOKS/helpers"\n'
+  printf '# shellcheck source=/dev/null\n. "$PARA_HELPERS"\n'
 }
 
 # ---- project commands ------------------------------------------------------
@@ -1402,7 +1412,7 @@ usage() {
 
 	PROJECT
 	  init [<template>]         scaffold .paraspace/ into the current directory
-	  mod add <name>            vendor a bundled mod into .paraspace/mods/
+	  mod add <name>...         vendor bundled mods into .paraspace/mods/
 	  mod init [<name>]         stub a mod of your own there (default: project)
 	  image <build|status|rm>   the base image workspaces launch from
 	  commands                  the verbs this project adds, its mods' included
@@ -1487,6 +1497,10 @@ cmd_version() {
 
 # ---- dispatch --------------------------------------------------------------
 main() {
+  PARA_HELPERS="$(pkg_root)/libexec/helpers"
+  export PARA_HELPERS
+  # shellcheck source=/dev/null
+  . "$PARA_HELPERS"
   load_config
   local cmd="${1:-}"
   shift || true

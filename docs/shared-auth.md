@@ -15,11 +15,11 @@ hook's job, and it's usually a handful of symlinks:
 
 ```sh
 # .paraspace/hooks/provision
-mkdir -p "$PARA_SHARED/ssh" "$PARA_SHARED/gh" && chmod 700 "$PARA_SHARED/ssh"
+mkdir -p "$PARA_SHARED/git/ssh" "$PARA_SHARED/gh"
 ln -sfn "$PARA_SHARED/gh"             ~/.config/gh     # gh login
 ln -sfn "$PARA_SHARED/claude"         ~/.claude        # agent session
-ln -sfn "$PARA_SHARED/gitconfig"      ~/.gitconfig
-ln -sfn "$PARA_SHARED/ssh/id_ed25519" ~/.ssh/id_ed25519
+ln -sfn "$PARA_SHARED/git/gitconfig"  ~/.gitconfig
+ln -sfn "$PARA_SHARED/git/ssh/id_ed25519" ~/.ssh/id_ed25519
 ```
 
 Link the directory a tool keeps its state in, and that tool is authenticated in
@@ -32,8 +32,8 @@ Recipes for the common ones are in the [Cookbook](./cookbook.md).
 ## Version control over SSH
 
 Workspaces clone and push over the network, so your host has to trust a key.
-The bundled templates' provision hook generates **one key per project**, on
-that project's shared volume and labelled `para-<hostname>`. It is individually
+The bundled `git` mod generates **one key per project**, on that project's
+shared volume and labelled `para-<hostname>`. It is individually
 revocable, and it is never one of your host keys.
 
 Nothing about this is git-specific. A Mercurial, Fossil or Subversion project
@@ -42,7 +42,7 @@ tool reads linked into `$HOME`.
 
 ### First run
 
-On the first `up` of a project's shared volume, the templates' hook generates
+On the first `up` of a project's shared volume, the `git` hook generates
 the key, prints it, and **pauses** so you can authorize it:
 
 1. Copy the printed key and add it at your host (e.g.
@@ -52,9 +52,9 @@ the key, prints it, and **pauses** so you can authorize it:
 `para up` is idempotent, so if a first clone fails with
 `Permission denied (publickey)`, authorize the key and re-run.
 
-`void-docker-gh` also ships a
-[project command](./commands.md#project-commands) that re-prints it, a file in
-its `.paraspace/commands/` rather than a `para` built-in:
+The `git` mod also ships a [project command](./commands.md#project-commands)
+that re-prints it, a file in the mod's `commands/` rather than a `para`
+built-in:
 
 ```sh
 para key
@@ -62,10 +62,11 @@ para key
 
 ### Letting `gh` do it
 
-Set `PARA_GH_AUTH=1` in that template's `Parafile` and the hook takes a
-`gh auth login` path instead, uploading the key for you, which is useful for
-private repos. The [Cookbook](./cookbook.md#authenticate-gh-during-provisioning)
-shows how that hook is written.
+Vendor `git` and `gh`, then set `PARA_GH_AUTH=1` in the project's `Parafile`.
+The `gh` mod uploads the shared key before `git` clones, which is useful for
+private repositories. It records success on the shared volume, so later
+provisions make no GitHub request. The [Cookbook](./cookbook.md#authenticate-gh-during-provisioning)
+shows the underlying commands.
 
 ## What sharing costs
 

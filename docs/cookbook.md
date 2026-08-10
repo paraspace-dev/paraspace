@@ -34,9 +34,9 @@ gh ssh-key add ~/.ssh/id_ed25519.pub --title "para $PARA_PROJECT_NAME ($PARA_HOS
 ```
 
 That needs the `admin:public_key` scope, so add
-`--scopes admin:public_key` to the `gh auth login` above. The `void-docker-gh`
-template does all of this behind `PARA_GH_AUTH=1`; read its `provision` hook
-for the version with the error handling filled in.
+`--scopes admin:public_key` to the `gh auth login` above. The bundled `gh` mod
+does this behind `PARA_GH_AUTH=1` at the `git` mod's `git:before` point. Read
+its hook for the version with the retry marker and error handling filled in.
 
 ## Share an agent's session
 
@@ -66,7 +66,7 @@ ln -sfn "$PARA_SHARED/nvim" ~/.config/nvim       # shared across workspaces
 re-running `para up` is the whole update loop, with no image rebuild.
 
 If someone has already packaged the set you want, vendor it instead of writing
-this by hand. `para mod add dotfiles-jchook` brings a zsh/tmux/Neovim/Claude
+this by hand. `para mod add dotfiles` brings a zsh/tmux/Neovim/Claude
 Code environment and the hooks that install it. See [Mods](./mods.md).
 
 ## Pre-pull images so the first boot is fast
@@ -87,7 +87,7 @@ for img in $PARA_PREPULL_IMAGES; do
 done
 ```
 
-Both Docker templates ship that loop already.
+The bundled `docker` mod ships that loop already.
 
 ## Seed a database
 
@@ -183,7 +183,7 @@ Keep a single `.paraspace/` and let a variable decide which services `boot`
 starts. The hooks store it in the workspace, so you pass it once:
 
 ```sh
-# .paraspace/hooks/helpers, sourced by provision and boot
+# .paraspace/hooks/provision
 STACK_FILE="$HOME/.para-stack"
 if [ -n "${PARA_STACK:-}" ]; then printf '%s\n' "$PARA_STACK" > "$STACK_FILE"; fi
 if [ -f "$STACK_FILE" ]; then PARA_STACK="$(cat "$STACK_FILE")"; fi

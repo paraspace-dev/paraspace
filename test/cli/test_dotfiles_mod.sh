@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# CLI-tier tests for the bundled mods/dotfiles-jchook hook, content rather than
+# CLI-tier tests for the bundled mods/dotfiles hook, content rather than
 # engine, and here for one reason: this hook once deleted a user's Claude Code
 # login and history, their editor config and their own scripts, on the migration
 # it exists to serve. Nothing in the suite caught it, because `para mod add`
@@ -28,10 +28,11 @@ run_mod_provision() {
   local repo home; repo="$(cd "$(dirname "$PARA")/.." && pwd)"
   home="$(scratch)/home"; mkdir -p "$home"
   env HOME="$home" \
-      PARA_HOOKS="$repo/mods/dotfiles-jchook/hooks" \
-      PARA_SKEL="$repo/mods/dotfiles-jchook/skel" \
+      PARA_HELPERS="$repo/libexec/helpers" \
+      PARA_HOOKS="$repo/mods/dotfiles/hooks" \
+      PARA_SKEL="$repo/mods/dotfiles/skel" \
       PARA_SHARED="$1" \
-      bash "$repo/mods/dotfiles-jchook/hooks/provision" 2>&1
+      bash "$repo/mods/dotfiles/hooks/provision" 2>&1
 }
 
 test_the_dotfiles_mod_keeps_what_is_already_on_the_volume() {
@@ -47,7 +48,7 @@ test_the_dotfiles_mod_keeps_what_is_already_on_the_volume() {
   # Including the flat zshrc the base template owns: this mod seeds into its own
   # directory instead of contending for that name, so there is nothing to replace.
   assert_eq "MY EDITED ZSHRC"  "$(cat "$v/zshrc")"                         "even the contended zshrc"   || return 1
-  assert_contains "$(cat "$v/dotfiles-jchook/zshrc")" "para shared zshrc" "and the mod's own is beside it"
+  assert_contains "$(cat "$v/dotfiles/zshrc")" "para shared zshrc" "and the mod's own is beside it"
 }
 
 test_the_dotfiles_mod_seeds_a_volume_that_has_nothing() {
@@ -55,7 +56,7 @@ test_the_dotfiles_mod_seeds_a_volume_that_has_nothing() {
   # the test above would pass on a hook that did nothing at all.
   local v out; v="$(scratch)/fresh"; mkdir -p "$v"
   out="$(run_mod_provision "$v")" || { printf '    | %s\n' "$out" >&2; return 1; }
-  assert test -f "$v/dotfiles-jchook/zshrc" || return 1
+  assert test -f "$v/dotfiles/zshrc" || return 1
   assert test -d "$v/nvim"           || return 1
   assert test -d "$v/claude"         || return 1
   assert test -x "$v/bin/open-url"   || return 1
@@ -69,10 +70,10 @@ test_the_dotfiles_mod_provision_is_idempotent() {
   # seeding once.
   local v; v="$(a_used_shared_volume)"
   run_mod_provision "$v" >/dev/null || return 1
-  printf 'I EDITED THIS\n' > "$v/dotfiles-jchook/zshrc"
+  printf 'I EDITED THIS\n' > "$v/dotfiles/zshrc"
   run_mod_provision "$v" >/dev/null || return 1
   run_mod_provision "$v" >/dev/null || return 1
-  assert_eq "I EDITED THIS" "$(cat "$v/dotfiles-jchook/zshrc")"      "your edits survive every up" || return 1
+  assert_eq "I EDITED THIS" "$(cat "$v/dotfiles/zshrc")"      "your edits survive every up" || return 1
   assert_eq "OAUTH TOKEN"   "$(cat "$v/claude/.credentials.json")"   "and nothing else moved"
 }
 
@@ -82,8 +83,8 @@ test_the_dotfiles_mod_reseeds_what_you_delete() {
   # step with the file, which is what makes "rm and re-up" a reliable gesture.
   local v; v="$(a_used_shared_volume)"
   run_mod_provision "$v" >/dev/null || return 1
-  rm -rf "$v/dotfiles-jchook/zshrc" "$v/nvim"
+  rm -rf "$v/dotfiles/zshrc" "$v/nvim"
   run_mod_provision "$v" >/dev/null || return 1
-  assert_contains "$(cat "$v/dotfiles-jchook/zshrc")" "para shared zshrc" "the zshrc came back" || return 1
+  assert_contains "$(cat "$v/dotfiles/zshrc")" "para shared zshrc" "the zshrc came back" || return 1
   assert test -d "$v/nvim"
 }

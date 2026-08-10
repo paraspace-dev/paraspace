@@ -12,12 +12,12 @@ From the repository root, run:
 para init
 ```
 
-That copies the default `void-docker-gh` template into a new `.paraspace/`
-directory. To pick another one:
+That copies the default `void` template into a new `.paraspace/`
+directory. See what this installation ships with:
 
 ```sh
 para init --list
-para init <template>
+para mod add --list
 ```
 
 `para init` skips files that already exist, so you can run it in a repository
@@ -26,11 +26,18 @@ that already has application code or an earlier ParaSpace setup. The generated
 
 ## Configure the project
 
-The scaffold runs as-is, but it still describes the template's project rather
-than yours. Three hook files and one line of the `Parafile` carry almost
-everything you need to change.
+The scaffold builds a Void workspace with zsh and starts nothing. Add the
+capabilities this project needs. A typical Git and Compose project uses:
 
-### 1. Create a project mod
+```sh
+para mod add git docker gh
+```
+
+The command checks every name before copying any. `git` owns cloning, `docker`
+boots a Compose file when present, and `gh` provides optional GitHub key
+authorization. Read each vendored README before building.
+
+### 1. Create a project mod when needed
 
 You can edit the hooks under `.paraspace/hooks` directly, but keeping your
 customizations in a [mod](./mods.md) of your own means `para init -f <template>`
@@ -52,8 +59,8 @@ such as a toolchain or resources prefetched once instead of on every provision.
 
 Edit `.paraspace/mods/project/hooks/provision` if needed, which runs before the
 project boots. It usually prepares the shared home volume, configures
-authentication, copies files out of `skel/`, renders `.env`, clones the repo,
-and does any one-time setup. The default template handles the common case.
+authentication, copies files out of `skel/`, renders `.env`, or does one-time
+setup. The `git` mod handles the common clone and `.env` flow.
 
 ### 4. Set up the stack
 
@@ -75,7 +82,6 @@ PARA_ROUTES="3000, db:8081"
 
 Any `PARA_*` env vars defined here will be forwarded to all of your hooks. See
 the [Parafile reference](./parafile.md) for every pre-defined setting.
-
 
 ## Build and launch
 
@@ -99,8 +105,8 @@ para ls
 para sh my-feature
 ```
 
-If you use a github-aware template, the first launch may pause after printing
-an SSH public key. See [Shared authentication](./shared-auth.md).
+With the `git` mod, the first SSH clone may pause after printing a public key.
+See [Shared authentication](./shared-auth.md).
 
 ## Iterate on the setup
 
@@ -138,12 +144,10 @@ To go further with any of them:
 
 ## Templates
 
-`para init` copies one of two runnable starting points, and you own the copy
-afterward. `void-docker-gh` is the default, a small Docker-based project
-demonstrating routes, GitHub authentication, and the `key` and `web` project
-commands. `void-minimal` installs and runs nothing, for when you would rather
-assemble the environment yourself. Each has its own README in the repository's
-[`templates/` directory](https://github.com/paraspace-dev/paraspace/tree/main/templates).
+`para init` copies the `void` starting point, and you own the copy afterward.
+It provides the Void user and zsh base while mods add Git, Docker, GitHub, or
+personal tooling. Its README lives in the repository's [`templates/`
+directory](https://github.com/paraspace-dev/paraspace/tree/main/templates).
 
 ## Next
 

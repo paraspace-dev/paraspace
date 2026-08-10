@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# shellcheck source=/dev/null
+. "$PARA_HELPERS"
+
+clone="$HOME/$PARA_CLONE_DIR"
+if [ ! -d "$clone" ]; then exit 0; fi
+if [ ! -f "$clone/compose.yaml" ] && [ ! -f "$clone/compose.yml" ] \
+   && [ ! -f "$clone/docker-compose.yaml" ] && [ ! -f "$clone/docker-compose.yml" ]; then
+  exit 0
+fi
+
+command -v docker >/dev/null 2>&1 \
+  || die "docker is not in the workspace image. Run: para image build"
+cd "$clone"
+stage "docker compose up"
+docker compose up -d --wait --wait-timeout 300

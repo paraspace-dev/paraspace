@@ -1,7 +1,6 @@
 # Resolve `source`d files relative to each script's own directory (SCRIPTDIR is
-# a shellcheck magic token for the dir of the file being checked). The hooks'
-# `. "$PARA_HOOKS/helpers"` resolves through it by basename, since shellcheck
-# cannot expand the variable, and so do test/run's relative `source=` directives.
+# a shellcheck magic token for the dir of the file being checked). Test/run's
+# relative `source=` directives resolve through it.
 # Drop this line and each becomes an SC1091 that fails lint.
 # (bin/lint passes -x to enable following at all.)
 source-path=SCRIPTDIR

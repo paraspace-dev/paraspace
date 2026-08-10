@@ -77,10 +77,10 @@ the existence check.
 The fixture also ships **one mod**, `.paraspace/mods/e2e-mod/`, committed rather
 than installed at test time, because `PARA_PROJECT_DIR` points at the tracked fixture,
 so a test that vendored one would dirty the working tree and fail on a second
-run. It fills `provision`, `image-build`, a `clone:before` point, and a `commands/` verb the
-fixture's own provision hook opens, which is what gives the tier its only
-coverage of a hook name resolving to more than one script. Its `image-build`
-half is baked into the cached image, so it is one more reason
+run. It fills `provision`, `image-build`, and `boot`, opens and fills a
+`fixture:before` point, and adds a `commands/` verb. That gives the tier coverage
+of a provider-owned point and a mod-owned boot hook. Its `image-build` half is
+baked into the cached image, so it is one more reason
 `PARA_TEST_REBUILD=1` matters.
 
 ## Isolation

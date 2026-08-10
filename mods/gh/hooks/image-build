@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# shellcheck source=/dev/null
+. "$PARA_HELPERS"
+
+stage "GitHub CLI"
+if ! xbps-query github-cli >/dev/null 2>&1; then
+  xbps-install -Sy github-cli >/dev/null
+fi
+mkdir -p /usr/share/zsh/site-functions
+gh completion -s zsh > /usr/share/zsh/site-functions/_gh

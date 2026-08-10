@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+# summary: run Claude Code in the workspace clone
+set -euo pipefail
+# shellcheck source=/dev/null
+. "$PARA_HELPERS"
+# `para sh` owns the terminal handling, with a pty only when both ends are
+# terminals, su --pty so SIGWINCH reaches the child, and a TERM the container
+# has terminfo for, so a command like this stays a one-liner.
+[ "$#" -ge 1 ] || die "usage: para claude <workspace> [claude args…]"
+ws="$1"; shift
+
+# The command crosses into the container as ONE string a shell there re-parses,
+# so the arguments are the only thing that has to survive a second parse, and a
+# bare "$*" would turn `-p 'write a test'` into four of them.
+args=""
+if [ "$#" -gt 0 ]; then args="$(printf '%q ' "$@")"; fi
+
+# The name crosses out of band, as the $PARA_NAME para exports into every
+# workspace. --name labels the session, which Claude Code puts in the terminal
+# title, so a full-screen claude stays identifiable as this workspace.
+# shellcheck disable=SC2016  # the guest expands this, not us
+guest='exec claude --name "$PARA_NAME" '
+
+exec "$PARA_BIN" sh "$ws" -c "$guest$args"

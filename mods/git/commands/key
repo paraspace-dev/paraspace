@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+# summary: print this project's shared SSH key
+set -euo pipefail
+
+# shellcheck source=/dev/null
+. "$PARA_HELPERS"
+
+ws="${1:-$("$PARA_BIN" ls | awk '$2 == "RUNNING" { print $1; exit }')}"
+[ -n "$ws" ] || die "no running workspace. Run: para up <name>"
+exec "$PARA_BIN" sh "$ws" -c "cat $PARA_SHARED/git/ssh/id_ed25519.pub"

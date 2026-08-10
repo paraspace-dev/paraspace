@@ -59,8 +59,13 @@ para runs each hook as its own `bash` process, and a name can resolve to
 
 - **The shebang and the exec bit are ignored**, and a checkout with
   `core.fileMode=false`, a tarball or a zip all still work.
-- **`$0` is the hook.** `. "$PARA_HOOKS/helpers"` is the spelling to reach for,
-  because it keeps resolving when the hook belongs to someone else.
+- **`$0` is the hook.** Source para's helpers with the same two lines in every
+  project and mod hook:
+
+  ```sh
+  # shellcheck source=/dev/null
+  . "$PARA_HELPERS"
+  ```
 - **There are no arguments.** A hook fills in behavior; it never takes input.
 - **`exit` ends that hook alone**, including a `die` out of a sourced `helpers`.
   A non-zero one stops the run, and its status is what `para up` reports.
@@ -80,6 +85,7 @@ para's to change and the variable is what it promises.
 | `~/.paraspace/env` | none | para's context as export lines. Every `PARA_*` except the handful that name paths on the *host* (`PARA_BIN`, `PARA_PROJECT_DIR`, `PARA_CONFIG`, `PARA_CONFIG_DIR`, `PARA_STATE_DIR`, `PARA_MOD_DIR`), which are unset here rather than pointing at files that don't exist |
 | `~/.paraspace/commands/` | none | synced along, but these run on the *host* (see [Commands](./commands.md#project-commands)) |
 | `~/.paraspace/run-hook` | `$PARA_RUN_HOOK` | para's hook runner, which you call to open a [hook point](./hook-points.md) |
+| `~/.paraspace/helpers` | `$PARA_HELPERS` | para's output and interactivity helpers, replaced by para on every push |
 
 `para` reads the `Parafile` on the host. Like `commands/`, it is synced into the
 guest as well but nothing there runs it, so don't put a host-only secret in one.
@@ -110,6 +116,7 @@ arrays fare no better. Pass a delimited string and split it in the hook, the way
 | `PARA_SHARED` | the shared volume's mount point (`/para/shared`) |
 | `PARA_HOOKS`, `PARA_SKEL` | the `hooks/` and `skel/` of whoever owns the running hook. Guest-side only. On the host these two are unset, and [commands](./commands.md#project-commands) use `$PARA_PROJECT_DIR` or `$PARA_MOD_DIR` |
 | `PARA_RUN_HOOK` | para's hook runner (see [Hook points](./hook-points.md)) |
+| `PARA_HELPERS` | para's helper library. Guest hooks and host commands both receive a path valid on their side |
 | `PARA_HOOK_STACK` | the points para is currently inside, for the failure trace. para rewrites it at every level, so it is yours to read, never to set |
 | `PARA_CLONE_DIR`, `PARA_CLONE_BRANCH`, `PARA_ORIGIN` | what to clone, and where |
 | `PARA_USER`, `PARA_UID`, `PARA_GID` | the workspace user's identity |

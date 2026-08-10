@@ -49,7 +49,7 @@ para sh fix-login -c 'npm test'        # one command, exits with its status
 ```
 
 A one-line project command turns that into a verb. `para mod add
-dotfiles-jchook` brings both of the ones below with it; no bundled *template*
+dotfiles` brings both of the ones below with it; no bundled *template*
 ships them, so write them into your own `.paraspace/commands/` if you'd rather
 not take the [mod](./mods.md):
 
@@ -75,7 +75,7 @@ test'` reaches Claude Code as one argument instead of four.
 
 For the agent to feel like home, put your dotfiles in `.paraspace/skel/` and
 have your provision hook link them in, or vendor a mod that brings its own
-(`para mod add dotfiles-jchook` installs Claude Code, an editor and a shell in
+(`para mod add dotfiles` installs Claude Code, an editor and a shell in
 one step). The agent's own config (`CLAUDE.md`, `AGENTS.md`) travels with the
 repo, so it's already in the clone.
 

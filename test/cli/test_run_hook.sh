@@ -17,6 +17,7 @@ a_paraspace() {
   mkdir -p "$root/hooks"
   for mod in "$@"; do mkdir -p "$root/mods/$mod/hooks"; done
   cp "$(cd "$(dirname "$PARA")/.." && pwd)/libexec/run-hook" "$root/run-hook"
+  cp "$(cd "$(dirname "$PARA")/.." && pwd)/libexec/helpers" "$root/helpers"
   chmod +x "$root/run-hook"
   printf '%s\n' "$root"
 }
@@ -174,8 +175,8 @@ test_run_hook_passes_a_hook_no_arguments() {
 }
 
 test_run_hook_never_runs_helpers_as_a_hook() {
-  # hooks/helpers is a library every template's hooks source. It sits in the
-  # same directory, and only an exact name match may run.
+  # A project may keep support code under hooks/. It sits in the same directory,
+  # and only an exact name match may run.
   local root; root="$(a_paraspace)"
   printf 'echo helpers-ran-as-a-hook\n' > "$root/hooks/helpers"
   a_hook "$root" provision "$(printf '%s\n' 'true')"
@@ -271,9 +272,13 @@ test_run_hook_is_packaged() {
   out="$(cd "$repo" && npm pack --dry-run --json 2>/dev/null)" \
     || { echo "  npm pack --dry-run failed" >&2; return 1; }
   assert_contains "$out" "libexec/run-hook" "libexec/run-hook is in the published tarball" || return 1
-  # Same exposure, one verb over: without it `para mod init` scaffolds a mod
-  # whose hooks source a helpers that was never shipped.
-  assert_contains "$out" "libexec/helpers"  "libexec/helpers is too"
+}
+
+test_helpers_are_packaged() {
+  local repo out; repo="$(cd "$(dirname "$PARA")/.." && pwd)"
+  out="$(cd "$repo" && npm pack --dry-run --json 2>/dev/null)" \
+    || { echo "  npm pack --dry-run failed" >&2; return 1; }
+  assert_contains "$out" "libexec/helpers" "libexec/helpers is in the published tarball"
 }
 
 test_templates_are_packaged() {
@@ -282,6 +287,6 @@ test_templates_are_packaged() {
   local repo out; repo="$(cd "$(dirname "$PARA")/.." && pwd)"
   out="$(cd "$repo" && npm pack --dry-run --json 2>/dev/null)" \
     || { echo "  npm pack --dry-run failed" >&2; return 1; }
-  assert_contains "$out" "templates/void-docker-gh/.paraspace/Parafile" \
+  assert_contains "$out" "templates/void/.paraspace/Parafile" \
     "the default template is in the published tarball"
 }

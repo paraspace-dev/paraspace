@@ -39,13 +39,17 @@ sandbox_base() {
   #     and get their real volume deleted by a `--cli` run;
   #   - the image keys are just as destructive one step over. The fixture's
   #     Parafile declares them with `: "${X:=…}"`, which yields to the
-  #     environment, so an exported PARA_IMAGE (say, a real project's alias)
+  #     environment, so an exported PARA_IMAGE_NAME (say, a real project's alias)
   #     means a PARA_TEST_REBUILD=1 run PUBLISHES the Alpine fixture payload over
   #     that real alias. Without the rebuild it's merely confusing: workspaces
   #     launch from the wrong image and fail with no /usr/sbin/httpd.
   # sandbox_e2e sets its own run-unique values after this.
-  unset PARA_VOLUME PARA_PROJECT PARA_PROJECT_DIR
-  unset PARA_IMAGE PARA_IMAGE_BASE PARA_IMAGE_BOOTSTRAP
+  unset PARA_VOLUME PARA_PROJECT_NAME PARA_PROJECT_DIR
+  unset PARA_IMAGE_NAME PARA_IMAGE_BASE PARA_IMAGE_BOOTSTRAP
+  # The pre-rename spellings too. para refuses outright when it sees one, so a
+  # developer with an old export in their shell would fail the whole run rather
+  # than one test, and the failure would name their environment, not the suite.
+  unset PARA_PROJECT PARA_IMAGE
   # PARA_POOL is deliberately NOT in that list, so the run shares the real pools.
   # That is safe because isolation here is by NAME: everything the run creates is
   # run-unique, teardown is guarded to those names, and para has no pool-level
@@ -74,8 +78,8 @@ sandbox_base() {
 sandbox_e2e() {
   sandbox_base
   export PARA_PROJECT_DIR="$FIXTURE_DIR"
-  export PARA_PROJECT="paratest-$$"
-  export PARA_VOLUME="para-home-$PARA_PROJECT"
+  export PARA_PROJECT_NAME="paratest-$$"
+  export PARA_VOLUME="para-home-$PARA_PROJECT_NAME"
   # The fixture's base image, built through para itself, so `para image build`
   # reads the fixture's Parafile (PARA_PROJECT_DIR above) for the Alpine base,
   # the bash bootstrap, and the payload. Doing it this way means an e2e run also
@@ -86,9 +90,9 @@ sandbox_e2e() {
   # if you touched hooks/image-build, the Parafile's base/bootstrap, or
   # cmd_image_build itself, rebuild explicitly with PARA_TEST_REBUILD=1.
   # --no-build skips even the existence check.
-  # Hardcoded, not "${PARA_IMAGE:-…}": sandbox_base unset PARA_IMAGE precisely so
+  # Hardcoded, not "${PARA_IMAGE_NAME:-…}": sandbox_base unset PARA_IMAGE_NAME precisely so
   # the caller's environment can't redirect the build, which leaves the fixture
-  # Parafile's own `: "${PARA_IMAGE:=alpine-minimal}"` as the single source of the
+  # Parafile's own `: "${PARA_IMAGE_NAME:=alpine-minimal}"` as the single source of the
   # alias. Keep this string in step with that line.
   local img=alpine-minimal
   if [ "${PARA_TEST_NO_BUILD:-0}" != 1 ]; then

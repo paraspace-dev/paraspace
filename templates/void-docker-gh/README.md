@@ -50,8 +50,8 @@ to your git host, press Enter, and the clone proceeds. (For a private repo, set
 ## Make it yours
 
 Drop this `.paraspace/` into your own repo. `para init` copies it in and sets the
-project's identity (`PARA_PROJECT`) to your directory name, which the base image
-name derives from. Then edit `.paraspace/`:
+project's identity (`PARA_PROJECT_NAME`) to your directory name, which the
+base image name derives from. Then edit `.paraspace/`:
 
 - **`Parafile`.** List your `PARA_ROUTES` (`"[sub:]port"` each,
   comma/space/newline separated). Each workspace clones the origin of the

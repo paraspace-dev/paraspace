@@ -84,6 +84,14 @@ than bumping it. para has one consumer, and publishing a new contract for a
 migration nobody has made would be a version number describing nothing. Each one
 is listed here, and each is a hand edit to a `.paraspace/` scaffolded before it.
 
+- **`PARA_PROJECT` → `PARA_PROJECT_NAME`, `PARA_IMAGE` → `PARA_IMAGE_NAME`.**
+  Each old name was a prefix of a different key (`PARA_PROJECT_DIR`,
+  `PARA_IMAGE_BASE`, `PARA_IMAGE_BOOTSTRAP`), which read as one setting and its
+  options rather than two settings. Rename them in your `Parafile`, your user
+  config, your hooks and your commands. `para` refuses to run while it can see
+  an old name, rather than reading past it and giving the project a different
+  identity, which would mean a different shared volume and a `para ls` that
+  hides its own workspaces. That refusal goes away at 1.0.
 - **`.paraspace/image-build.sh` → `.paraspace/hooks/image-build`.** One rule for
   every hook, `para` runs it by name out of `hooks/`. `git mv` it. The old name
   is not recognized, and nothing reads it. `para image build` says

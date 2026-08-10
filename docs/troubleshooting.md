@@ -9,16 +9,16 @@ command, so the commands you use every day don't carry it:
 $ para doctor
 
 config
-    user config   /home/you/.config/para/config
-    state         /home/you/.local/state/para
-    project dir   /home/you/src/myapp
-    PARA_PROJECT  myapp
-    PARA_IMAGE    myapp
-    PARA_DOMAIN   paraspace.dev
-    PARA_ROUTES   8080
-    PARA_POOL     default
-    PARA_VOLUME   para-home-myapp
-    Caddy port    8443
+    user config        /home/you/.config/para/config
+    state              /home/you/.local/state/para
+    project dir        /home/you/src/myapp
+    PARA_PROJECT_NAME  myapp
+    PARA_IMAGE_NAME    myapp
+    PARA_DOMAIN        paraspace.dev
+    PARA_ROUTES        8080
+    PARA_POOL          default
+    PARA_VOLUME        para-home-myapp
+    Caddy port         8443
 
 host
   ✓ caddy present

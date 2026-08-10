@@ -38,7 +38,7 @@ names the owner.
 ## Project discovery
 
 [Finding the `.paraspace/` directory](./project-setup.md) is only a file
-lookup. A project's *identity* is `PARA_PROJECT`, so moving or renaming the
+lookup. A project's *identity* is `PARA_PROJECT_NAME`, so moving or renaming the
 checkout never orphans its workspaces.
 
 ## Where state lives

@@ -26,13 +26,14 @@ The command is base-agnostic plumbing:
 3. pushes your whole **`.paraspace/`** to `/opt/.paraspace` in the builder;
 4. runs **`hooks/image-build`** as root, with no tty and no stdin: yours first,
    then any mods under `.paraspace/mods/*/hooks/image-build`;
-5. removes `/opt/.paraspace` and publishes the result as **`$PARA_IMAGE`**.
+5. removes `/opt/.paraspace` and publishes the result as **`$PARA_IMAGE_NAME`**.
 
 Two caveats:
 
 - Images are **per-arch**, so build on the machine that runs them (arm64 on
   Apple Silicon).
-- `-i` / `--from-current` layers onto the existing `$PARA_IMAGE` instead of a
+- `-i` / `--from-current` layers onto the existing `$PARA_IMAGE_NAME` instead
+  of a
   pristine base, and skips the bootstrap. A fast iterative rebuild while you're
   tuning the hook; it assumes your hook is idempotent, and you should do
   one clean build before relying on the result.
@@ -54,5 +55,5 @@ $ para image status
 
 Rebuild when you've edited your `hooks/image-build`.
 
-`para image rm` deletes `$PARA_IMAGE`, to reclaim space or force a fully clean
-next build. Workspaces already `up` are clones and keep running.
+`para image rm` deletes `$PARA_IMAGE_NAME`, to reclaim space or force a
+fully clean next build. Workspaces already `up` are clones and keep running.

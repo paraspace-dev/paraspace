@@ -1,12 +1,12 @@
 # void-docker-gh, the runnable paraspace starter
 
 A small, complete [para](../../README.md) template on Void Linux, just a
-`.paraspace/` config with no app of its own. Out of the box it points at a tiny public
-demo repo ([`jchook/docker-caddy`](https://github.com/jchook/docker-caddy), one
-Caddy service on `:8080`), so you can watch para clone, provision, route, and
-boot before pointing it at your own project. The **`gh`** in the name is the git
-auth on offer: para prints its ssh key for you to add by hand, or (`PARA_GH_AUTH=1`)
-lets the GitHub CLI upload it for you, the path a private repo needs.
+`.paraspace/` config with no app of its own. Each workspace clones whatever
+`PARA_ORIGIN` names, which defaults to the git origin of the checkout you ran
+`para init` in, so the scaffold runs against your own repo without an edit. The
+**`gh`** in the name is the git auth on offer. para prints its ssh key for you
+to add by hand, or (`PARA_GH_AUTH=1`) lets the GitHub CLI upload it for you,
+the path a private repo needs.
 
 This is what `para init` scaffolds by default. Its sibling is
 [`void-minimal`](../void-minimal), the barest box, installing and running
@@ -32,16 +32,23 @@ void-docker-gh/
 # install para once, if you haven't
 npm i -g paraspace                      # or run it from a checkout: bin/para
 
-# from a copy of this .paraspace/ (or after `para init`). Needs incus + caddy;
-# see the ParaSpace README for one-time host setup
+# in an empty directory, so PARA_ORIGIN lands on the demo app rather than on
+# whatever repo you're standing in. Needs incus + caddy; see the ParaSpace
+# README for one-time host setup
+mkdir para-demo && cd para-demo
+para init void-docker-gh                # scaffold this .paraspace/
+                                        # then uncomment PARA_ORIGIN in it
 para image build                        # build the base image
 para up demo                            # clone + provision + boot a workspace
 para web demo                           # open https://demo.<your PARA_DOMAIN>
 ```
 
-Each workspace clones the origin of the checkout you ran `para` in. To try it
-against an app that isn't yours, uncomment `PARA_ORIGIN` in the `Parafile`, which
-names a one-container demo that serves :8080, the port this template routes.
+With no git origin to read, `para init` writes
+[`paraspace-dev/example-docker-app`](https://github.com/paraspace-dev/example-docker-app)
+into the scaffolded `Parafile`'s commented `PARA_ORIGIN`, one Caddy service on
+`:8080`, the port this template routes. Uncomment it and the demo clones. In a
+repo of your own there is nothing to uncomment, since `PARA_ORIGIN` already
+resolves to that repo's origin.
 
 On the **first** `up`, para prints this machine's para ssh key and pauses. Add it
 to your git host, press Enter, and the clone proceeds. (For a private repo, set

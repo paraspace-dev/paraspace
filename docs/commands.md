@@ -75,9 +75,9 @@ it (`--force` overwrites); `path` prints its location. Both are for scripting.
 
 | Command | What it does |
 |---|---|
-| `para init [<template>] [--list] [-f\|--force] [--full]` | scaffold `.paraspace/` from a bundled template (default `void-docker-gh`), skipping files that already exist; `--full` copies the whole template tree, not just `.paraspace/` |
+| `para init [<template>] [--list] [-f\|--force] [--full]` | scaffold `.paraspace/` from a bundled template (default `void-docker-gh`), skipping files that already exist; `-f` overwrites them instead, except your `Parafile`, which it always keeps; `--full` copies the whole template tree, not just `.paraspace/` |
 | `para mod add <name>` | vendor a bundled [mod](./mods.md) into `.paraspace/mods/<name>/`, replacing it if it's already there. `--list` in place of a name prints what this `para` ships |
-| `para mod init [<name>]` | initialize an empty [mod](./mods.md) into `.paraspace/mods/<name>/`, defaults to `project` |
+| `para mod init [<name>]` | stub a [mod](./mods.md) of your own at `.paraspace/mods/<name>/` (default `project`), refusing an existing one without `-f\|--force` |
 | `para image build [-i\|--from-current]` | build and publish the project's base image; `-i` layers onto the current one for fast iteration (see [The image contract](./image.md)) |
 | `para image status` | when `$PARA_IMAGE_NAME` was built, and from what base |
 | `para image rm` | delete `$PARA_IMAGE_NAME`. Running workspaces are clones and keep running |

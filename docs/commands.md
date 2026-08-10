@@ -79,8 +79,8 @@ it (`--force` overwrites); `path` prints its location. Both are for scripting.
 | `para mod add <name>` | vendor a bundled [mod](./mods.md) into `.paraspace/mods/<name>/`, replacing it if it's already there. `--list` in place of a name prints what this `para` ships |
 | `para mod init [<name>]` | initialize an empty [mod](./mods.md) into `.paraspace/mods/<name>/`, defaults to `project` |
 | `para image build [-i\|--from-current]` | build and publish the project's base image; `-i` layers onto the current one for fast iteration (see [The image contract](./image.md)) |
-| `para image status` | when `$PARA_IMAGE` was built, and from what base |
-| `para image rm` | delete `$PARA_IMAGE`. Running workspaces are clones and keep running |
+| `para image status` | when `$PARA_IMAGE_NAME` was built, and from what base |
+| `para image rm` | delete `$PARA_IMAGE_NAME`. Running workspaces are clones and keep running |
 | `para commands` | list the verbs this project adds, its mods' included, one per line |
 | `para completions <bash\|zsh>` | print a completion script |
 

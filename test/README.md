@@ -92,12 +92,13 @@ Every run is sandboxed so it never touches your real para state:
 - a non-default Caddy port (`9443`), so its Caddy can't collide with a real one,
   and its own Caddy **admin** endpoint (`PARA_CADDY_ADMIN`, `:19443`) so a
   `caddy reload` from the run can never land on your real para Caddy;
-- a throwaway `PARA_PROJECT`/volume, and fixed pre-tracked workspace names so
+- a throwaway `PARA_PROJECT_NAME`/volume, and fixed pre-tracked workspace names
+  so
   teardown reclaims everything even if a test aborts;
 - **the para identity and image keys inherited from your shell are unset**
-  (`PARA_VOLUME`, `PARA_PROJECT`, `PARA_PROJECT_DIR`, `PARA_IMAGE`,
+  (`PARA_VOLUME`, `PARA_PROJECT_NAME`, `PARA_PROJECT_DIR`, `PARA_IMAGE_NAME`,
   `PARA_IMAGE_BASE`, `PARA_IMAGE_BOOTSTRAP`). Both halves matter: teardown
-  deletes `PARA_VOLUME`, and an inherited `PARA_IMAGE` would make a
+  deletes `PARA_VOLUME`, and an inherited `PARA_IMAGE_NAME` would make a
   `PARA_TEST_REBUILD=1` run publish the fixture payload over *your* image alias.
 
 Teardown removes the run's workspaces (via `para rm`, backstopped by a direct

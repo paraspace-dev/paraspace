@@ -26,14 +26,14 @@ PARA_ROUTES="${PARA_ROUTES-8080}"
 | Var | Default | What it does |
 |---|---|---|
 | `PARA_CONTRACT` | none | the [contract](./versioning.md) your `.paraspace/` targets. para refuses on a mismatch |
-| `PARA_PROJECT` | the directory name, slugified (`My.App` → `my-app`) | project identity: workspace ownership, `para ls` scoping, the shared-volume name |
-| `PARA_IMAGE` | `$PARA_PROJECT` | the image `para up` launches and `para image build` publishes |
+| `PARA_PROJECT_NAME` | the directory name, slugified (`My.App` → `my-app`) | project identity: workspace ownership, `para ls` scoping, the shared-volume name |
+| `PARA_IMAGE_NAME` | `$PARA_PROJECT_NAME` | the image `para up` launches and `para image build` publishes |
 | `PARA_IMAGE_BASE` | `images:voidlinux` | the Incus image `para image build` builds *from* |
 | `PARA_IMAGE_BOOTSTRAP` | [derived from the base](#para_image_base-and-para_image_bootstrap) | one `sh -c` line run in the builder before your `image-build` hook |
 | `PARA_ORIGIN` | [the project checkout's git origin](#para_origin) | the repo your provision hook clones |
 | `PARA_ROUTES` | empty | `[sub:]port` entries, one Caddy site each |
 | `PARA_DOMAIN` | `paraspace.dev` | wildcard domain workspaces are served under |
-| `PARA_VOLUME` | `para-home-$PARA_PROJECT` | the shared home volume's name |
+| `PARA_VOLUME` | `para-home-$PARA_PROJECT_NAME` | the shared home volume's name |
 | `PARA_CLONE_DIR` | `app` | directory under `~` to clone into; also where `para sh` starts |
 | `PARA_CLONE_BRANCH` | empty | the branch your provision hook clones, if it reads this |
 | `PARA_HOST_ENV` | `$PARA_PROJECT_DIR/.env` | a base `.env` pushed to `~/.paraspace/host.env` **if the file exists** |
@@ -73,7 +73,7 @@ shows no URL, `$PARA_URL` is empty in your hooks, and `para doctor` mentions it
 in case you didn't mean it. Note that only a **bare port** creates
 `https://<name>.$PARA_DOMAIN`; a subdomain-only list has no apex site.
 
-### `PARA_IMAGE`
+### `PARA_IMAGE_NAME`
 
 Set it only to point several projects at one image, or to name an image built
 elsewhere. Aliases are Incus-daemon-global, so two projects naming the same
@@ -165,6 +165,6 @@ idioms.
 | `PARA_IP_LO` / `PARA_IP_HI` | `200` / `249` | the band static IPs are allocated from |
 | `PARA_CADDY_ADMIN` | Caddy's default | give para's Caddy its own admin address when something else has `localhost:2019` |
 
-Nothing stops you putting a project var here, but a box-wide `PARA_PROJECT` or
-`PARA_ROUTES` applies to *every* project on the machine, which is rarely what
-you want. `para doctor` says so when it sees one.
+Nothing stops you putting a project var here, but a box-wide
+`PARA_PROJECT_NAME` or `PARA_ROUTES` applies to *every* project on the machine,
+which is rarely what you want. `para doctor` says so when it sees one.

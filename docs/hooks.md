@@ -20,9 +20,10 @@ it a tty when there's a human on both ends, which is where the ssh-key and `gh`
 flows live.
 
 Guest DNS comes up a beat after the container, so a hook that clones can race
-it. `para up` blocks until the guest resolves `PARA_READY_HOST`, which is
-`paraspace.dev` unless your [Parafile](./parafile.md) names a host you'd rather
-gate on.
+it. `para up` blocks until the guest resolves
+[`PARA_READY_HOST`](./parafile.md#every-var-para-reads), which is `paraspace.dev`
+unless your Parafile names a host you'd rather gate on, or declares it empty to
+skip the wait.
 
 ### `boot`
 

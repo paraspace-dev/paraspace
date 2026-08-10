@@ -1,23 +1,22 @@
 # Mods
 
 A template is a **starting point** you copy once and own forever. A mod is a
-**dependency** you copy, update, and don't edit.
+second `.paraspace/`-shaped directory para resolves alongside your own, and the
+verb that made it says which kind you have. `para mod add` vendors one this para
+ships, a **dependency** you update by replacing and don't edit. `para mod init`
+stubs an empty one that is **yours** to fill in.
 
-So when you want your dotfiles, or a credential helper, or a language runtime in
-a project that already has a `.paraspace/`, you vendor the piece instead of
+## Adding one this para ships
+
+When you want your dotfiles, or a credential helper, or a language runtime in a
+project that already has a `.paraspace/`, you vendor the piece instead of
 forking a whole template to get it:
 
 ```sh
+para mod add --list         # the mods this para ships
 para mod add dotfiles-jchook
 para image build            # if the mod fills image-build (its README says)
 para up feat-x
-```
-
-## Adding one
-
-```sh
-para mod add --list         # the mods this para ships
-para mod add <name>         # copy one into .paraspace/mods/<name>/
 ```
 
 That is a **copy**, not a fetch. The mod lands in your repo, you read it before
@@ -31,6 +30,24 @@ so commit first. There is no `para mod rm`, `ls` or `update`, because
 > [!NOTE]
 > `para mod add` installs the mods this `para` ships. A git URL is not
 > supported yet.
+
+## Stubbing one of your own
+
+```sh
+para mod init               # .paraspace/mods/project/
+para mod init billing       # or a name of your choosing
+```
+
+It writes `hooks/{image-build,provision,boot}` carrying para's shape and nothing
+else, plus the `helpers` they source, which a mod needs its own copy of because
+the runner points `$PARA_HOOKS` at the directory the running hook came from.
+Fill them in and they run after the ones the project ships. Unlike `add`, this
+**refuses an existing directory** without `--force`, since what's in it is work
+you did by hand.
+
+Keeping your customizations here is what makes `para init -f <template>` a
+template refresh. It rewrites the template's `hooks/`, leaves your `Parafile`
+alone, and never touches `mods/`.
 
 ## What's in one
 

@@ -314,26 +314,30 @@ test_doctor_checks_incus_can_do_what_para_needs() {
   assert_not_contains "$out" "6.30 is older than"          "a current incus does not warn" || return 1
   assert_not_contains "$out" "cannot select device columns" "…nor fail"
 }
+
 test_init_resolves_the_project_into_the_scaffolded_parafile() {
   # The scaffolded Parafile's commented defaults are meant to READ as what para
-  # already resolved here, so ${PARA_PROJECT_NAME} is substituted on the way in. It
-  # cannot be left for bash: para resolves PARA_PROJECT_NAME after sourcing the
-  # Parafile, so an unsubstituted one is an unbound variable, not a default.
+  # already resolved here, so ${PARA_PROJECT_NAME} is substituted on the way in.
+  # It cannot be left for bash: para resolves PARA_PROJECT_NAME after sourcing
+  # the Parafile, so an unsubstituted one is an unbound variable, not a default.
+  # Both values come off $PWD, which an exported PARA_PROJECT_NAME must not
+  # redirect, so this passes one in and expects the directory to win.
   local d out; d="$(scratch)"
   mkdir -p "$d/Acme.Web"
   git -C "$d/Acme.Web" init -q
   git -C "$d/Acme.Web" remote add origin git@github.com:acme/acme.git
-  ( cd "$d/Acme.Web" && env -u PARA_PROJECT_DIR -u PARA_PROJECT_NAME "$PARA" init void-docker-gh >/dev/null 2>&1 )
+  ( cd "$d/Acme.Web" && env -u PARA_PROJECT_DIR PARA_PROJECT_NAME=inherited "$PARA" init void-docker-gh >/dev/null 2>&1 )
   out="$(cat "$d/Acme.Web/.paraspace/Parafile")"
-  assert_contains "$out" 'PARA_VOLUME:=para-home-acme-web'       "the volume default names this project" || return 1
-  assert_contains "$out" 'PARA_IMAGE_NAME:=acme-web'                  "so does the image default"             || return 1
-  assert_contains "$out" 'PARA_ORIGIN:=git@github.com:acme/acme' "and the origin is this checkout's"     || return 1
+  assert_contains     "$out" 'PARA_VOLUME:=para-home-acme-web'  "the volume default names this project" || return 1
+  assert_contains     "$out" 'PARA_IMAGE_NAME:=acme-web'        "so does the image default"             || return 1
+  assert_contains     "$out" 'PARA_ORIGIN:=git@github.com:acme/acme' "and the origin is this checkout's" || return 1
+  assert_not_contains "$out" 'inherited'                        "an exported name did not redirect it"  || return 1
   # $PARA_PROJECT_DIR is a different variable, and para DOES set it before
   # sourcing, so the substitution must not eat its prefix.
   # shellcheck disable=SC2016  # literal Parafile text, not an expansion
   assert_contains     "$out" 'PARA_HOST_ENV:=$PARA_PROJECT_DIR/.env' "PARA_PROJECT_DIR survived intact" || return 1
   # shellcheck disable=SC2016  # ditto
-  assert_not_contains "$out" '${PARA_PROJECT_NAME}'                       "no placeholder was left behind"  || return 1
+  assert_not_contains "$out" '${PARA_PROJECT_NAME}'             "no placeholder was left behind"        || return 1
 
   # With nowhere to read an origin from, the line names an app you can clone.
   mkdir -p "$d/no-repo"
@@ -361,9 +365,12 @@ test_init_refuses_to_clobber_an_existing_project() {
   # …and --force is how you say you meant it, for what the template owns. Not
   # the Parafile: refreshing a template's hooks is the whole point of --force,
   # and taking PARA_ROUTES with them would make it unusable for that.
-  ( cd "$d" && env -u PARA_PROJECT_DIR -u PARA_PROJECT_NAME "$PARA" init void-minimal --force >/dev/null 2>&1 )
+  out="$(cd "$d" && env -u PARA_PROJECT_DIR -u PARA_PROJECT_NAME "$PARA" init void-minimal --force 2>&1)"
   assert_not_contains "$(cat "$d/.paraspace/hooks/provision")" "# my hook" "--force refreshed the hook" || return 1
-  assert_eq "MINE=yes" "$(cat "$d/.paraspace/Parafile")"                   "…and spared the Parafile"
+  assert_eq "MINE=yes" "$(cat "$d/.paraspace/Parafile")"                   "…and spared the Parafile"   || return 1
+  # A scratch dir has no git origin, but the Parafile it kept is the user's, so
+  # the origin advice would be naming a file this run never wrote.
+  assert_not_contains "$out" "names an example app" "…and says nothing about a Parafile it kept"
 }
 
 test_up_allocates_an_ip_that_is_not_already_taken() {

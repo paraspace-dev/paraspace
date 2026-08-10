@@ -37,7 +37,7 @@ PARA_ROUTES="${PARA_ROUTES-8080}"
 | `PARA_CLONE_DIR` | `app` | directory under `~` to clone into; also where `para sh` starts |
 | `PARA_CLONE_BRANCH` | empty | the branch your provision hook clones, if it reads this |
 | `PARA_HOST_ENV` | `$PARA_PROJECT_DIR/.env` | a base `.env` pushed to `~/.paraspace/host.env` **if the file exists** |
-| `PARA_READY_HOST` | `paraspace.dev` | a hostname the guest must resolve before hooks run |
+| `PARA_READY_HOST` | `paraspace.dev` | a hostname the guest must resolve before hooks run. Declare it empty on a machine whose guests have no public DNS, or `up` waits ~120s and then fails |
 | `PARA_USER` / `PARA_UID` / `PARA_GID` | `app` / `1000` / `1000` | the workspace user para runs everything as |
 | `PARA_WORKCOPY_PORT` | none | proxy `https://localhost` to a stack you run on the **host** |
 | `PARA_WORKCOPY_HOST` | `localhost` | matters only if that host stack terminates TLS with SNI |

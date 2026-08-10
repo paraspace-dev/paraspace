@@ -27,56 +27,56 @@ that already has application code or an earlier ParaSpace setup. The generated
 ## Configure the project
 
 The scaffold runs as-is, but it still describes the template's project rather
-than yours. Four files carry almost everything you need to change.
+than yours. Three hook files and one line of the `Parafile` carry almost
+everything you need to change.
 
 ### 1. Create a project mod
 
-You can directly modify the hooks under `.paraspace/hooks`, however it is
-recommended to store your customizations in a [mod](./mods.md) so that you can
-easily update your template with `para init -f <template>`.
+You can edit the hooks under `.paraspace/hooks` directly, but keeping your
+customizations in a [mod](./mods.md) of your own means `para init -f <template>`
+can refresh the template's hooks later without taking them with it.
 
 ```sh
 para mod init project
 ```
 
-### 2. Set-up the base image
+### 2. Set up the base image
 
-Edit `.paraspace/mods/project/hooks/image-build` to add any customizations to
-your base image. This might include installing custom software, prefetching
-resources from the Web to save time on each provision, etc.
+Edit `.paraspace/mods/project/hooks/image-build` to add what your image needs,
+such as a toolchain or resources prefetched once instead of on every provision.
 
 > [!TIP]
 > The hooks are just bash.
 
-
-### 3. Set-up the provisioner
+### 3. Set up the provisioner
 
 Edit `.paraspace/mods/project/hooks/provision` if needed, which runs before the
 project boots. It usually prepares the shared home volume, configures
 authentication, copies files out of `skel/`, renders `.env`, clones the repo,
 and does any one-time setup. The default template handles the common case.
 
-### 4. Set-up the stack
+### 4. Set up the stack
 
 Edit `.paraspace/mods/project/hooks/boot`, which starts the application stack.
 It must return zero only once every routed service is listening. See
 [Hooks](./hooks.md).
 
-
 ### 5. Set the routes
 
-Edit `.paraspace/Parafile`. Usually one line: give `PARA_ROUTES` one entry per
+Edit `.paraspace/Parafile`. Usually one line, giving `PARA_ROUTES` one entry per
 service port that should get a URL.
 
 ```sh
 # Caddy will proxy:
 #   <ws>.paraspace.dev    --> :3000
 #   db.<ws>.paraspace.dev --> :8081
-PARA_ROUTES="3000, db:8081"
+PARA_ROUTES="${PARA_ROUTES-3000, db:8081}"
 ```
 
-Any `PARA_*` env vars defined here will be forwarded to all of your hooks. See
-the [Parafile reference](./parafile.md) for every pre-defined setting.
+Write it with the idiom the template uses, as above, so a one-off
+`PARA_ROUTES="3000" para up ws` still wins. Any `PARA_*` you define here reaches
+every hook. See the [Parafile reference](./parafile.md) for the rest, and note
+that `para init -f` keeps this file rather than replacing it.
 
 
 ## Build and launch

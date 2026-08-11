@@ -15,15 +15,12 @@
 # is one that cannot refuse anything.
 PARA_CONTRACT=1
 
-# Caddy routes to ports on the workspace container. Anything may listen there:
-# Docker, a runit service under svdir, or a process a hook starts directly.
-# Change or empty this when your project listens elsewhere or nowhere. A bare
-# port is the workspace apex:
-#   PARA_ROUTES=8080                # -> https://<name>.$PARA_DOMAIN
-#   PARA_ROUTES="3000,api:3001"     # several: commas, spaces, tabs or newlines
-PARA_ROUTES=8080
-
 # ---- optional -----------------------------------------------------------------
+# Caddy routes to ports on the workspace container. The Docker mod can infer
+# these from Compose when you add it, or declare them yourself. A bare port is
+# the workspace apex; several routes use subdomain:port entries.
+# PARA_ROUTES="3000,api:3001"
+
 # What para resolves for itself. `para init` fills the ${...} below in with the
 # values it resolved for THIS project, so every one is already in effect and you
 # uncomment a line only to change it. Untouched by para init they are still

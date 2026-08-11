@@ -7,7 +7,8 @@ The `para`↔project interface is versioned. It covers everything a project's
 - the [hook names and semantics](./hooks.md),
 - the `~/.paraspace` layout in the guest,
 - the [`Parafile` keys](./parafile.md),
-- the [project-command](./commands.md#project-commands) mechanism.
+- the [project-command](./commands.md#project-commands) mechanism,
+- bundled mod entry points and `$PARA_HELPERS` functions.
 
 `para` implements a contract version, currently **1**. It is always a plain
 incrementing integer, never a range, a semver string, or a `>=`. Comparing it
@@ -39,9 +40,9 @@ The rules:
 ## Before 1.0
 
 `para` is 0.x and contract 1 is not frozen. A change that breaks a
-`.paraspace/` lands **in** contract 1 rather than bumping it, and neither this
-page nor any other keeps a list of what moved. To see what a break was, scaffold
-a current template into a scratch directory and diff it against yours:
+`.paraspace/` lands **in** contract 1 rather than bumping it, and there is no
+migration log of those breaking changes. To see what a break was, scaffold a
+current template into a scratch directory and diff it against yours:
 
 ```sh
 para init --force

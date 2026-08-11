@@ -1,0 +1,9 @@
+{
+  "services": {
+    "web": {
+      "image": "example/web:latest",
+      "ports": [{ "target": 3000, "published": "8080", "protocol": "tcp" }]
+    },
+    "worker": { "build": "." }
+  }
+}

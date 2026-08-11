@@ -16,6 +16,12 @@ if ! command -v gh >/dev/null 2>&1; then
   warn "gh is not in the workspace image. Run 'para image build' for automatic key authorization."
   exit 0
 fi
+# The git mod writes this before it opens the point. Without it there is no key
+# to upload, and an empty one would match every line gh lists back.
+if [ ! -s ~/.ssh/id_ed25519.pub ]; then
+  warn "no shared SSH key at ~/.ssh/id_ed25519.pub. Vendor the git mod, which creates one: para mod add git"
+  exit 0
+fi
 
 authorize_key() {
   if ! gh auth status --hostname github.com >/dev/null 2>&1; then

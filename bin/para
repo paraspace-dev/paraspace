@@ -1046,6 +1046,27 @@ cmd_mod_add() {
     [ -d "$src" ] || die "no such mod '$name' (see: para mod add --list)."
   done
   for name in "$@"; do vendor_mod "$name"; done
+  for name in "$@"; do configure_mod "$name"; done
+}
+
+configure_mod() { # configure_mod <name>
+  local name="$1" dest="$PARA_PROJECT_DIR/.paraspace/mods/$1" status=0
+  [ -f "$dest/configure" ] || return 0
+  stage "Configuring '$name' on YOUR machine with your privileges…"
+  # Same shape as run_project_command: the guest-only pair unset, PARA_MOD_DIR
+  # pointing at the mod, and every other PARA_* exported as it stands.
+  (
+    cd "$PARA_PROJECT_DIR"
+    unset PARA_HOOKS PARA_SKEL
+    # shellcheck disable=SC2034  # read by the export below, via ${!PARA_@}
+    PARA_MOD_DIR="$dest"
+    export "${!PARA_@}"
+    bash "$dest/configure"
+  ) || status=$?
+  if [ "$status" -ne 0 ]; then
+    warn "'$name' is vendored, but its configure failed (exit $status). Fix the cause above, then re-run the same 'para mod add'."
+    exit "$status"
+  fi
 }
 
 vendor_mod() { # vendor_mod <name>

@@ -14,16 +14,8 @@ stage "Void base packages"
 xbps-install -Syu xbps >/dev/null 2>&1 || true
 xbps-install -Syu -y >/dev/null
 pkgs="zsh kitty-terminfo alacritty-terminfo ncurses-term"
-missing=""
-for package in $pkgs; do
-  if ! xbps-query "$package" >/dev/null 2>&1; then
-    missing="${missing:+$missing }$package"
-  fi
-done
-if [ -n "$missing" ]; then
-  # shellcheck disable=SC2086  # package names are the words assembled above
-  xbps-install -Sy $missing >/dev/null
-fi
+# shellcheck disable=SC2086  # package names are the fixed words above
+xbps_install $pkgs >/dev/null
 
 stage "Writable /tmp"
 chmod 1777 /tmp

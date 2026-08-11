@@ -23,9 +23,8 @@ stage "Toolchain the dotfiles assume"
 # to tree-sitter-cli and base-devel compiles its parsers. The base owns zsh;
 # tmux remains part of this personal toolchain.
 pkgs="tmux just neovim nodejs tree-sitter-cli base-devel ripgrep fd bat fzf lsd tree xz curl"
-missing=()
-for p in $pkgs; do xbps-query "$p" >/dev/null 2>&1 || missing+=("$p"); done
-[ "${#missing[@]}" -eq 0 ] || xbps-install -Sy "${missing[@]}" >/dev/null
+# shellcheck disable=SC2086  # package names are the fixed words above
+xbps_install $pkgs >/dev/null
 
 stage "Claude Code (as $PARA_USER)"
 # The native installer puts the binary in ~/.local/share/claude and a launcher in

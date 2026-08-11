@@ -86,6 +86,40 @@ test_mod_add_vendors_several_mods() {
   assert test -d "$p/.paraspace/mods/gamma"
 }
 
+test_mod_add_runs_configure_after_every_mod_is_vendored() {
+  local pkg root p out
+  pkg="$(a_para_pkg alpha/ beta/)"; root="$(cd "$(dirname "$pkg")/.." && pwd)"; p="$(a_project)"
+  printf '%s\n' '#!/usr/bin/env bash' \
+    '[ -d "$PARA_PROJECT_DIR/.paraspace/mods/beta" ]' \
+    'printf "alpha cwd=%s mod=%s custom=%s\\n" "$PWD" "$PARA_MOD_DIR" "$PARA_CUSTOM" >> "$PARA_PROJECT_DIR/order"' \
+    > "$root/mods/alpha/configure"
+  printf '%s\n' '#!/usr/bin/env bash' \
+    'printf "beta\\n" >> "$PARA_PROJECT_DIR/order"' > "$root/mods/beta/configure"
+  printf 'PARA_CUSTOM=present\n' >> "$p/.paraspace/Parafile"
+
+  out="$(env PARA_PROJECT_DIR="$p" "$pkg" mod add alpha beta 2>&1)" || return 1
+  assert_contains "$out" "YOUR machine with your privileges" "host execution is explicit" || return 1
+  assert_eq "alpha cwd=$p mod=$p/.paraspace/mods/alpha custom=present
+beta" "$(cat "$p/order")" "configure order and environment"
+}
+
+test_mod_add_configuration_failure_leaves_every_mod_vendored() {
+  local pkg root p out rc=0
+  pkg="$(a_para_pkg alpha/ beta/)"; root="$(cd "$(dirname "$pkg")/.." && pwd)"; p="$(a_project)"
+  printf '%s\n' '#!/usr/bin/env bash' 'printf "PARA_ADDITIVE=yes\\n" >> "$PARA_PROJECT_DIR/.paraspace/Parafile"' 'exit 23' \
+    > "$root/mods/alpha/configure"
+  printf '%s\n' '#!/usr/bin/env bash' 'touch "$PARA_PROJECT_DIR/beta-configured"' \
+    > "$root/mods/beta/configure"
+
+  out="$(env PARA_PROJECT_DIR="$p" "$pkg" mod add alpha beta 2>&1)" || rc=$?
+  assert_eq 23 "$rc" "the configure status fails mod add" || return 1
+  assert test -d "$p/.paraspace/mods/alpha" || return 1
+  assert test -d "$p/.paraspace/mods/beta" || return 1
+  assert_contains "$(cat "$p/.paraspace/Parafile")" "PARA_ADDITIVE=yes" "additive edits survive" || return 1
+  assert test ! -e "$p/beta-configured" || return 1
+  assert_contains "$out" "Configuring 'alpha'" "the failing owner is visible"
+}
+
 test_mod_add_preflights_every_name() {
   local pkg p out rc names
   pkg="$(a_para_pkg alpha/hooks/ gamma/hooks/)"
@@ -462,5 +496,9 @@ test_mods_are_packaged() {
   out="$(cd "$repo" && npm pack --dry-run --json 2>/dev/null)" \
     || { echo "  npm pack --dry-run failed" >&2; return 1; }
   assert_contains "$out" "mods/dotfiles/hooks/provision" \
-    "the bundled mod is in the published tarball"
+    "the bundled mod is in the published tarball" || return 1
+  assert_contains "$out" "mods/docker/configure" \
+    "the configure entry point is in the published tarball" || return 1
+  assert_contains "$out" "mods/docker/configure.js" \
+    "the Docker parser is in the published tarball"
 }

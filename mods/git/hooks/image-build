@@ -5,13 +5,4 @@ set -euo pipefail
 . "$PARA_HELPERS"
 
 stage "Git"
-missing=""
-for package in git openssh; do
-  if ! xbps-query "$package" >/dev/null 2>&1; then
-    missing="${missing:+$missing }$package"
-  fi
-done
-if [ -n "$missing" ]; then
-  # shellcheck disable=SC2086  # package names are the words assembled above
-  xbps-install -Sy $missing >/dev/null
-fi
+xbps_install git openssh >/dev/null

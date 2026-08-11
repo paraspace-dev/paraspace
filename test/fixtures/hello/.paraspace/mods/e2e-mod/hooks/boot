@@ -8,8 +8,12 @@ set -euo pipefail
 # (baked into the Alpine image as /usr/sbin/httpd). The body of index.html carries
 # the workspace name, so the routing test can prove it reached THIS workspace and
 # not some other site on the shared Caddy.
+#
+# Sources para's own helpers, the way every bundled mod does, so the tier proves
+# $PARA_HELPERS reaches a hook as a readable file and not just as a path.
 
-. "$PARA_HOOKS/helpers"
+# shellcheck source=/dev/null
+. "$PARA_HELPERS"
 
 docroot="$HOME/www"
 port=8080

@@ -35,7 +35,10 @@ para mod add git docker gh
 
 The command checks every name before copying any. `git` owns cloning, `docker`
 boots a Compose file when present, and `gh` provides optional GitHub key
-authorization. Read each vendored README before building.
+authorization. The Docker mod also tries to infer image pre-pulls and routes
+from `docker compose config`; if either Compose or Node is unavailable, it simply
+warns and leaves configuration to you. Read each vendored README before
+building, including any host-side `configure` it runs automatically.
 
 ### 1. Create a project mod when needed
 
@@ -68,10 +71,11 @@ Edit `.paraspace/mods/project/hooks/boot`, which starts the application stack.
 It must return zero only once every routed service is listening. See
 [Hooks](./hooks.md).
 
-### 5. Set the routes
+### 5. Check or set the routes
 
-Edit `.paraspace/Parafile`. Usually one line, giving `PARA_ROUTES` one entry per
-service port that should get a URL.
+Inspect `.paraspace/Parafile`. The Docker mod may have added `PARA_ROUTES` from
+Compose. Otherwise add one entry per service port that should get a URL, or
+declare it yourself before adding Docker to override inference.
 
 ```sh
 # Caddy will proxy:

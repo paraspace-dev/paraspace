@@ -248,17 +248,16 @@ echo "ready=[$PARA_READY_HOST]"'
   assert_contains "$PARA_OUT" "ready=[]" "an explicit empty skips the wait"
 }
 
-test_a_scaffolded_parafile_is_two_lines() {
-  # The whole point of the defaults: what a project has to decide is the
-  # contract it targets and the port it serves. A third active line here means
-  # something grew a default it should have had, or lost one.
+test_a_scaffolded_parafile_is_one_line() {
+  # The scaffold pins only its contract. Capabilities may add optional settings
+  # later, and a project with no routes is valid.
   local d active; d="$(scratch)"
   mkdir -p "$d/void"
   ( cd "$d/void" && env -u PARA_PROJECT_DIR -u PARA_PROJECT_NAME "$PARA" init void >/dev/null 2>&1 )
   active="$(grep -vE '^[[:space:]]*(#|$)' "$d/void/.paraspace/Parafile")"
-  assert_eq 2 "$(printf '%s\n' "$active" | wc -l | tr -d ' ')" "void is two lines: $active" || return 1
+  assert_eq 1 "$(printf '%s\n' "$active" | wc -l | tr -d ' ')" "void is one line: $active" || return 1
   assert_contains "$active" "PARA_CONTRACT" "…the contract" || return 1
-  assert_contains "$active" "PARA_ROUTES"   "…and the routes"
+  assert_not_contains "$active" "PARA_ROUTES" "routes are left for the project or Docker inference"
 }
 
 test_routes_are_canonicalized() {

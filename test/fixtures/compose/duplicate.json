@@ -1,0 +1,6 @@
+{
+  "services": {
+    "web_app": { "image": "one:1", "ports": [{ "target": 80, "published": "8080" }] },
+    "web-app": { "image": "two:2", "ports": [{ "target": 80, "published": "8081" }] }
+  }
+}

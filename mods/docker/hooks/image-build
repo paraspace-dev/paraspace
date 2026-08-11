@@ -5,16 +5,7 @@ set -euo pipefail
 . "$PARA_HELPERS"
 
 stage "Docker and Compose"
-missing=""
-for package in docker docker-compose; do
-  if ! xbps-query "$package" >/dev/null 2>&1; then
-    missing="${missing:+$missing }$package"
-  fi
-done
-if [ -n "$missing" ]; then
-  # shellcheck disable=SC2086  # package names are the words assembled above
-  xbps-install -Sy $missing >/dev/null
-fi
+xbps_install docker docker-compose >/dev/null
 
 getent group docker >/dev/null 2>&1 || groupadd docker
 usermod -aG docker "$PARA_USER"

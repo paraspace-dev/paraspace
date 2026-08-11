@@ -11,15 +11,16 @@ arrives as its first element), so write a list as a delimited string. See
 
 ## A minimal Parafile
 
-ParaSpace can't guess which port your app listens on, so a project that serves
-HTTP declares `PARA_ROUTES`. Everything else has a default, and `PARA_ORIGIN`
-and `PARA_IMAGE_BOOTSTRAP` derive theirs from your project rather than pinning
-one, so a whole `Parafile` can be two lines:
+Everything has a safe default, and optional mods may add settings they can infer,
+so the scaffolded Parafile has one active line:
 
 ```sh
 PARA_CONTRACT=1
-PARA_ROUTES=8080
 ```
+
+A project serving HTTP still needs `PARA_ROUTES`; declare it manually, or let
+the Docker mod propose it from a resolved Compose model when that is available.
+Existing declarations always win, including `PARA_ROUTES=""`.
 
 ## Every var para reads
 

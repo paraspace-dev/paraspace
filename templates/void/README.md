@@ -16,10 +16,11 @@ para up feat-x
 uses. `dotfiles` adds the bundled personal shell, tmux, Neovim, and Claude Code
 setup.
 
-`PARA_ROUTES=8080` maps Caddy to port 8080 on the workspace container. Docker is
-not involved in that mapping. A runit service under `svdir`, a process launched
-by a hook, or anything else listening on that port works identically. Change or
-empty the route when your project listens elsewhere or nowhere.
+The scaffolded Parafile contains only `PARA_CONTRACT=1` as active configuration.
+Add `PARA_ROUTES` for a runit service or another process, or add the Docker mod
+and let it propose routes from Compose when the required host tools are present.
+Routes remain ordinary Caddy-to-workspace mappings; Docker is not involved once
+they have been declared.
 
 The template is a starting point you own after `para init`. See
 [`docs/project-setup.md`](../../docs/project-setup.md) for the workflow and

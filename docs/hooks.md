@@ -124,6 +124,11 @@ arrays fare no better. Pass a delimited string and split it in the hook, the way
 | `PARA_GIT_NAME`, `PARA_GIT_EMAIL` | your host git identity, for a seeded gitconfig |
 | `PARA_CONTRACT` | the [contract](./versioning.md) your `Parafile` targets. para has already refused a mismatch by the time a hook runs, so this is only ever the one you asked for |
 
+Alongside the output helpers, an image hook targeting Void may call
+`xbps_install <package>...`. It queries each name and runs at most one
+`xbps-install -Sy`, carrying only the ones that are missing. It talks XBPS, so
+it is for a guest that has it and nothing else.
+
 `PARA_NONINTERACTIVE` is yours rather than para's. Set it in the environment to
 force the scripted path, and para forwards it like any other `PARA_*` so your
 hooks can skip their prompts too.

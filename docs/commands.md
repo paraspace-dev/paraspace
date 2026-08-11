@@ -76,7 +76,7 @@ it (`--force` overwrites); `path` prints its location. Both are for scripting.
 | Command | What it does |
 |---|---|
 | `para init [<template>] [--list] [-f\|--force] [--full]` | scaffold `.paraspace/` from a bundled template (default `void`), skipping files that already exist; `-f` overwrites them instead, except your `Parafile`, which it always keeps; `--full` copies the whole template tree, not just `.paraspace/` |
-| `para mod add <name>...` | vendor one or more bundled [mods](./mods.md) into `.paraspace/mods/<name>/`, replacing any already there. para confirms every name exists before copying any. `--list` in place of the names prints what this `para` ships |
+| `para mod add <name>...` | vendor one or more bundled [mods](./mods.md) into `.paraspace/mods/<name>/`, replacing any already there, then run optional host-side `configure` scripts in argument order. para confirms every name exists before copying any. `--list` in place of the names prints what this `para` ships |
 | `para mod init [<name>]` | stub a [mod](./mods.md) of your own at `.paraspace/mods/<name>/` (default `project`), refusing an existing one without `-f\|--force` |
 | `para image build [-i\|--from-current]` | build and publish the project's base image; `-i` layers onto the current one for fast iteration (see [The image contract](./image.md)) |
 | `para image status` | when `$PARA_IMAGE_NAME` was built, and from what base |
@@ -114,7 +114,9 @@ this `para`, so a command can call back without relying on `$PATH`.
 **`PARA_PROJECT_DIR`** is the project directory. **`PARA_MOD_DIR`** is the
 directory a mod was vendored into, and para sets it only when the command came
 from a [mod](./mods.md). **`PARA_HELPERS`** is para's host-side helper library,
-with the same output and interactivity functions hooks receive.
+with the same output and interactivity functions hooks receive, plus
+[`set_parafile_var_if_not_set`](./mods.md#writing-one) for a host script that
+proposes a `Parafile` setting.
 
 Because [`para sh`](#running-one-command) owns all the terminal handling,
 commands that drive something inside a workspace stay one-liners:

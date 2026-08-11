@@ -1,0 +1,23 @@
+{
+  "services": {
+    "Web_App": {
+      "image": "registry.example/app:ready",
+      "ports": [
+        { "name": "HTTP Main", "target": 3000, "published": "8080", "protocol": "tcp", "app_protocol": "http" },
+        { "target": 3001, "published": "8081", "protocol": "tcp" },
+        { "target": 3002, "published": "9000-9002", "protocol": "tcp" },
+        { "target": 53, "published": "53", "protocol": "udp" },
+        { "target": 1883, "published": "1883", "protocol": "tcp", "app_protocol": "mqtt" }
+      ]
+    },
+    "api": {
+      "image": "registry.example/app:ready",
+      "ports": [
+        { "target": 4000, "published": "4000", "protocol": "tcp" },
+        { "target": 4001, "protocol": "tcp" },
+        { "target": 4002, "published": "4002", "protocol": "tcp", "host_ip": "127.0.0.1" }
+      ]
+    },
+    "builder": { "build": { "context": "." } }
+  }
+}

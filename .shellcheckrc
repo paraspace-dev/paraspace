@@ -1,6 +1,8 @@
 # Resolve `source`d files relative to each script's own directory (SCRIPTDIR is
-# a shellcheck magic token for the dir of the file being checked). Test/run's
-# relative `source=` directives resolve through it.
+# a shellcheck magic token for the dir of the file being checked). A hook that
+# sources support code beside it resolves by basename through this, since
+# shellcheck cannot expand the variable, and so do test/run's relative
+# `source=` directives.
 # Drop this line and each becomes an SC1091 that fails lint.
 # (bin/lint passes -x to enable following at all.)
 source-path=SCRIPTDIR

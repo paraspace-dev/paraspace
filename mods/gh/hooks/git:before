@@ -4,10 +4,7 @@ set -euo pipefail
 # shellcheck source=/dev/null
 . "$PARA_HELPERS"
 
-shared="$PARA_SHARED/gh"
-mkdir -p "$shared" ~/.config
-if [ ! -L ~/.config/gh ]; then rm -rf ~/.config/gh; fi
-ln -sfn "$shared" ~/.config/gh
+. "$PARA_HOOKS/shared-config"
 
 marker="$shared/.key-authorized"
 if [ -z "${PARA_GH_AUTH:-}" ] || [ -f "$marker" ]; then exit 0; fi
@@ -21,12 +18,16 @@ if ! command -v gh >/dev/null 2>&1; then
 fi
 
 authorize_key() {
-  infocmp "${TERM:-}" >/dev/null 2>&1 || export TERM=xterm-256color
   if ! gh auth status --hostname github.com >/dev/null 2>&1; then
     interactive || return 1
     gh auth login --hostname github.com --git-protocol ssh \
       --skip-ssh-key --scopes admin:public_key
   fi
+  # GitHub 422s on a key it already holds, and "already authorized" is the state
+  # this hook exists to reach, so ask before adding rather than fail on it.
+  local key title
+  key="$(cut -d' ' -f1,2 < ~/.ssh/id_ed25519.pub)"
+  case "$(gh ssh-key list 2>/dev/null || true)" in *"$key"*) return 0 ;; esac
   title="para $(basename "${PARA_ORIGIN%.git}") (${PARA_HOSTNAME:-$(hostname)})"
   gh ssh-key add ~/.ssh/id_ed25519.pub --title "$title"
 }

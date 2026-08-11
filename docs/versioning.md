@@ -36,92 +36,23 @@ The rules:
 - There is no range syntax and no compatibility window: one integer, compared
   for equality.
 
-## Migrating from the pre-release engine
+## Before 1.0
 
-Contract 1 is the first published contract, so there is nothing to migrate
-*from*, unless you used `para` before it was released, in which case the break
-is total, with no compatibility shim. The fastest path is `para init --force`
-into a scratch directory to diff against a current template. Otherwise:
+`para` is 0.x and contract 1 is not frozen. A change that breaks a
+`.paraspace/` lands **in** contract 1 rather than bumping it, and neither this
+page nor any other keeps a list of what moved. To see what a break was, scaffold
+a current template into a scratch directory and diff it against yours:
 
-| Before | Now |
-|---|---|
-| guest staging dir `~/.para/` | `~/.paraspace/`, the same name as the host directory |
-| `PARA_VERSION` (the key a project declared) | `PARA_CONTRACT`, the same name para uses for its own |
-| `$PROJECT_ROOT` while the `Parafile` is sourced | `$PARA_PROJECT_DIR`, the same value, and it reaches hooks too |
-| `$PARA_ROUTES` comma-separated | space-separated: `for r in $PARA_ROUTES` |
-| `parse_routes` / `route_ports` helpers | delete them; `${r##*:}` is the port |
-| hooks run as `bash <path>` | still `bash <path>`, with the exec bit and the shebang both ignored |
-| `.env` seeded to `~/.para/host.env` | `~/.paraspace/host.env`, pushed only if the file exists |
-| `PARA_HOST_ENV` unset/empty/set three-way | defaults to the project's `.env`; used if present |
-| unset `PARA_ROUTES` was refused | unset means empty means no HTTP; `para doctor` mentions it |
-| para validated routes and domains | `caddy validate` does, before every reload |
-| per-project keys refused from the user config | allowed; `para doctor` advises instead |
-| `PARA_PREPULL_IMAGES` injected into the image build | gone, so set your own key and read it in `hooks/image-build` |
-| image stamped uid/user/contract/incremental | only `user.para.base`, and `para image status` reports when it was built and from what |
-| `para start` / `para stop` | `para caddy start\|stop\|status` |
-| `para config-set KEY VALUE` | `para config edit`, since the file is hand-edited now |
-| `para web`, `key` | project commands in `.paraspace/commands/`; `void` ships `web` and the `git` mod ships `key` |
-| `para run`, `claude` | gone from the engine and from every template, so write your own, or see [Running coding agents](./agents.md#driving-one) |
-| `para reconcile`, `install`, `image-build`, `config-import`, `config-sync` | deleted, since `up` now re-pushes `.paraspace/` every time |
+```sh
+para init --force
+```
 
-New since then: `PARA_READY_HOST` (wait for guest DNS to resolve a host your
-hooks need), `.paraspace/commands/` (your own `para` verbs), `para doctor`, and
-`PARA_HOOKS`/`PARA_SKEL` (name the guest dirs instead of rebuilding them out of
-`$HOME`). All additive, so contract 1 covers them.
+If you want a `.paraspace/` that keeps working without you, pin the version you
+have:
 
-So are the defaults that landed on four keys that used to have none, all listed
-in the [Parafile reference](./parafile.md#every-var-para-reads). `PARA_ORIGIN`
-now takes your checkout's git origin, `PARA_IMAGE_BASE` is `images:voidlinux`,
-`PARA_IMAGE_BOOTSTRAP` is derived from that base, and `PARA_READY_HOST` is
-`paraspace.dev`. A `Parafile` that declares any of them is unaffected, and
-`para image build` no longer refuses an unset `PARA_IMAGE_BASE`, because there
-is no longer such a thing.
+```sh
+npm i -g paraspace@0.2.0
+```
 
-## Changes inside contract 1
-
-Contract 1 is not frozen until 1.0. Until then a break lands **in** it rather
-than bumping it. para has one consumer, and publishing a new contract for a
-migration nobody has made would be a version number describing nothing. Each one
-is listed here, and each is a hand edit to a `.paraspace/` scaffolded before it.
-
-- **`PARA_PROJECT` → `PARA_PROJECT_NAME`, `PARA_IMAGE` → `PARA_IMAGE_NAME`.**
-  Each old name was a prefix of a different key (`PARA_PROJECT_DIR`,
-  `PARA_IMAGE_BASE`, `PARA_IMAGE_BOOTSTRAP`), which read as one setting and its
-  options rather than two settings. Rename them in your `Parafile`, your user
-  config, your hooks and your commands. `para` refuses to run while it can see
-  an old name, rather than reading past it and giving the project a different
-  identity, which would mean a different shared volume and a `para ls` that
-  hides its own workspaces. That refusal goes away at 1.0.
-- **`.paraspace/image-build.sh` → `.paraspace/hooks/image-build`.** One rule for
-  every hook, `para` runs it by name out of `hooks/`. `git mv` it. The old name
-  is not recognized, and nothing reads it. `para image build` says
-  `no 'image-build' hook` and names the path it wants instead.
-- The builder now gets your **whole `.paraspace/`** at `/opt/.paraspace`, so a
-  build hook reads `$PARA_HOOKS` and `$PARA_SKEL` like any other hook, and gets
-  no stdin. A build hook that piped its own input, or that ran a package manager
-  without `-y`, has to stop.
-- **A hook name resolves to more than one script.** para runs your
-  `hooks/<name>`, then each `mods/*/hooks/<name>`. See [Hook
-  points](./hook-points.md) and [Mods](./mods.md). Nothing changes for a project
-  with no `mods/`.
-- **A verb resolves to more than one `commands/`**, and `$PARA_MOD_DIR` is new.
-  para runs your `commands/<verb>` if you have it, else the one mod that does.
-  See [Mods](./mods.md#verbs-a-mod-brings). This is additive: with no `mods/`,
-  or with no mod that ships `commands/`, nothing resolves differently.
-- **`.paraspace/run-hook` is a name para owns**, alongside `env` and `host.env`.
-  para writes its runner there on every push, so a file of yours at that path is
-  overwritten.
-- **`.paraspace/helpers` is a name para owns.** para replaces it on every push
-  and injects its location as `$PARA_HELPERS` in guests and host commands. It
-  provides `stage`, `info`, `warn`, `die`, `interactive`, and `pause`. A project
-  file at that path is overwritten. Source the injected path instead of keeping
-  a copy under each `hooks/` directory.
-- **The exec bit no longer matters in `hooks/`**, and para no longer sets it
-  there. A hook runs as `bash <the file>` whatever its mode, so a
-  `core.fileMode=false` checkout stops breaking a workspace, but a helper *you*
-  run by path out of `hooks/` now needs `bash` in front of it, or its own exec
-  bit committed. `commands/` is unchanged: a command honours its own shebang,
-  so it still needs the bit, and `para init` and `para mod add` both set it.
-
-At 1.0 this section closes and anything that breaks a `.paraspace/` bumps the
+At 1.0 the contract freezes, and anything that breaks a `.paraspace/` bumps the
 number instead.

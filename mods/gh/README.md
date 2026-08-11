@@ -15,5 +15,6 @@ para image build
 para up feat-x
 ```
 
-Without the `git` mod, `gh` remains a standalone CLI and its `git:before` hook
-point is never opened.
+Without the `git` mod nothing opens `git:before`, so no key is authorized. The
+shared `~/.config/gh` link is this mod's `provision` hook, so one `gh` login
+still covers every workspace of the project.

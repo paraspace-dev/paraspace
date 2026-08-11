@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# shellcheck source=/dev/null
+. "$PARA_HELPERS"
+
+# One gh login per project, whether or not the git mod is here to open
+# git:before. Nothing else in this hook needs a clone.
+. "$PARA_HOOKS/shared-config"

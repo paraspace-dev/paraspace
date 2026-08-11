@@ -37,9 +37,14 @@ resolves), and its `commands/` (host-side verbs that become `para <verb>`). A
 **breaking** change to injected env, the hook names or semantics, the
 `~/.paraspace` layout in the guest, or the `Parafile` vars must bump
 `PARA_CONTRACT`; additive changes don't. A project pins the contract it targets
-with the same var in its `Parafile`, and para refuses on mismatch. When you
-change this interface, decide breaking-vs-additive deliberately and update both
-the constant and [`docs/versioning.md`](./docs/versioning.md).
+with the same var in its `Parafile`, and para refuses on mismatch.
+
+That rule starts at 1.0. `PARA_CONTRACT` stays **1** for all of 0.x, breaks land
+inside it, and there are **no consumers to migrate**, so don't write migration
+notes, deprecation shims, renamed-to warnings, or "this used to be called X"
+prose. Rename the thing, update every caller and page in the same change, and
+leave nothing behind that names the old spelling. See
+[`docs/versioning.md`](./docs/versioning.md).
 
 ## Code + conventions
 

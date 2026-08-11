@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+set -euo pipefail
+# The PROJECT filling a point the MOD opened, which is the direction the bundled
+# gh mod fills the git mod's git:before. Together with the mod's own file at
+# this name, it makes an ad-hoc point resolve to more than one script.
+
+printf 'project-point-before\n' >> "$HOME/owners-seen"

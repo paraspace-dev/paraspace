@@ -46,10 +46,6 @@ sandbox_base() {
   # sandbox_e2e sets its own run-unique values after this.
   unset PARA_VOLUME PARA_PROJECT_NAME PARA_PROJECT_DIR
   unset PARA_IMAGE_NAME PARA_IMAGE_BASE PARA_IMAGE_BOOTSTRAP
-  # The pre-rename spellings too. para refuses outright when it sees one, so a
-  # developer with an old export in their shell would fail the whole run rather
-  # than one test, and the failure would name their environment, not the suite.
-  unset PARA_PROJECT PARA_IMAGE
   # PARA_POOL is deliberately NOT in that list, so the run shares the real pools.
   # That is safe because isolation here is by NAME: everything the run creates is
   # run-unique, teardown is guarded to those names, and para has no pool-level

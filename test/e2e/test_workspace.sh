@@ -99,9 +99,11 @@ test_a_mod_fills_the_same_hooks_the_project_does() {
   assert_eq "project-provision" "$(head -n1 <<<"$seen")" "the project's hook ran first" || return 1
   assert_contains "$seen" "mod-provision e2e-mod" "the mod's provision ran too" || return 1
 
-  # And a point the PROJECT opened, which para never learns the name of. It runs
-  # mid-provision, so it lands between the two lines above.
-  assert_contains "$seen" "mod-point-before" "the mod opened and filled its own hook point"
+  # And a point the MOD opened, which para never learns the name of. It runs
+  # mid-provision, so both fills land between the two lines above, the project's
+  # first, the way the bundled gh mod fills the git mod's git:before.
+  assert_contains "$seen" "project-point-before" "the project filled the mod's hook point" || return 1
+  assert_contains "$seen" "mod-point-before"     "and so did the mod that opened it"
 }
 
 test_workspace_is_listed_and_running() {

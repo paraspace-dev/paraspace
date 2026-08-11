@@ -77,9 +77,10 @@ the existence check.
 The fixture also ships **one mod**, `.paraspace/mods/e2e-mod/`, committed rather
 than installed at test time, because `PARA_PROJECT_DIR` points at the tracked fixture,
 so a test that vendored one would dirty the working tree and fail on a second
-run. It fills `provision`, `image-build`, and `boot`, opens and fills a
-`fixture:before` point, and adds a `commands/` verb. That gives the tier coverage
-of a provider-owned point and a mod-owned boot hook. Its `image-build` half is
+run. It fills `provision`, `image-build`, and `boot`, opens a `fixture:before`
+point the project fills too, and adds a `commands/` verb. That gives the tier
+coverage of a provider-owned point, one owner filling another's, and a
+mod-owned boot hook. Its `image-build` half is
 baked into the cached image, so it is one more reason
 `PARA_TEST_REBUILD=1` matters.
 

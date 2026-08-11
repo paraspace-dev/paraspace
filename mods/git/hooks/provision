@@ -35,20 +35,27 @@ ssh_origin() {
   esac
 }
 
-ssh_host() {
-  local host
+# $host and $port from the origin. Only ssh:// can name a port; the scp-like
+# spelling reads everything after the colon as a path.
+ssh_target() {
+  local hostport
   case "$PARA_ORIGIN" in
-    ssh://*) host="${PARA_ORIGIN#ssh://}"; host="${host#*@}"; host="${host%%[/:]*}" ;;
-    *@*:*)   host="${PARA_ORIGIN%%:*}"; host="${host#*@}" ;;
-    *)       return 1 ;;
+    ssh://*) hostport="${PARA_ORIGIN#ssh://}"; hostport="${hostport%%/*}" ;;
+    *)       hostport="${PARA_ORIGIN%%:*}" ;;
   esac
-  printf '%s\n' "$host"
+  hostport="${hostport#*@}"
+  host="${hostport%%:*}"
+  port=22
+  case "$hostport" in *:*) port="${hostport##*:}" ;; esac
 }
 
 if ssh_origin; then
-  host="$(ssh_host)"
-  if ! ssh-keygen -F "$host" >/dev/null 2>&1; then
-    ssh-keyscan -H "$host" >> ~/.ssh/known_hosts 2>/dev/null || true
+  ssh_target
+  # known_hosts spells a non-default port [host]:port, and that is the name
+  # ssh-keygen -F looks for, so ask about the same one keyscan would write.
+  if [ "$port" = 22 ]; then known="$host"; else known="[$host]:$port"; fi
+  if ! ssh-keygen -F "$known" >/dev/null 2>&1; then
+    ssh-keyscan -H -p "$port" "$host" >> ~/.ssh/known_hosts 2>/dev/null || true
   fi
 fi
 

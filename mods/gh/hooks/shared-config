@@ -1,0 +1,12 @@
+# Sourced, never run: only an exact hook-name match runs out of hooks/. It
+# leaves this mod's directory on the shared volume in $shared.
+#
+# Both this mod's provision and its git:before source it, because mods run in
+# no promised order. Whichever comes first puts ~/.config/gh on the shared
+# volume, so a `gh auth login` during git:before can never be written into a
+# directory the other one later replaces.
+
+shared="$PARA_SHARED/gh"
+mkdir -p "$shared" ~/.config
+if [ ! -L ~/.config/gh ]; then rm -rf ~/.config/gh; fi
+ln -sfn "$shared" ~/.config/gh

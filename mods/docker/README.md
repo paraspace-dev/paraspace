@@ -17,3 +17,9 @@ Caddy-to-workspace-port mappings and do not otherwise depend on Docker.
 Set `PARA_PREPULL_IMAGES` in the project Parafile to a space-separated list of
 images to bake into the workspace image. Nested Docker needs an Incus `dir`
 pool, or another pool backed by ext4, so it can use overlayfs.
+
+The image hook ends by opening the `docker:after` [hook
+point](https://paraspace.dev/docs/hook-points), so a `hooks/docker:after` of
+yours installs into an image where the daemon already answers. It also leaves
+`/etc/paraspace/points/docker` in the image, which a `provision` hook can test
+when it must refuse rather than proceed without Docker.

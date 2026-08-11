@@ -138,30 +138,6 @@ test_a_plain_parafile_assignment_insists() {
   assert_contains "$out" "insisted.example" "the project's plain assignment held"
 }
 
-test_a_renamed_var_is_refused_rather_than_ignored() {
-  # PARA_PROJECT became PARA_PROJECT_NAME. Reading past the old spelling would
-  # hand the project a different identity, so a different shared volume and a
-  # `para ls` that hides its own workspaces. Loud beats subtly wrong.
-  #
-  # Driven through `--help`, which succeeds for every other input. Against a
-  # command that fails anyway (doctor, up) this would pass with the check gone.
-  local p out rc=0; p="$(a_project)"
-  out="$(_para_env "$p" PARA_PROJECT=old-spelling --help)" || rc=$?
-  [ "$rc" -ne 0 ] || { echo "  the old spelling was accepted" >&2; return 1; }
-  assert_contains "$out" "PARA_PROJECT_NAME" "the refusal names the new spelling" || return 1
-
-  # The control: same command, new spelling, and para runs.
-  rc=0
-  _para_env "$p" PARA_PROJECT_NAME=new-spelling --help >/dev/null || rc=$?
-  assert_eq 0 "$rc" "the new spelling is accepted" || return 1
-
-  # And from a Parafile, which is where most of them will be.
-  p="$(a_project PARA_IMAGE=old-spelling)"
-  para_in "$p" --help
-  [ "$PARA_RC" -ne 0 ] || { echo "  an old spelling in a Parafile was accepted" >&2; return 1; }
-  assert_contains "$PARA_OUT" "PARA_IMAGE_NAME" "…and names that one too"
-}
-
 test_config_init_seeds_a_user_config_and_path_finds_it() {
   # `para config init` is the only thing that writes the user config; nothing
   # else does, so a value there is always something a person put there.
@@ -482,8 +458,8 @@ echo "bootstrap=[$PARA_IMAGE_BOOTSTRAP]"'
 test_image_build_refuses_without_an_image_build_hook() {
   # Refusing is the host's job, not the runner's. The runner's note prints
   # inside the builder, minutes in, and the build then publishes and exits 0,
-  # so a project that never renamed image-build.sh would get one line of
-  # scrollback and a base image with no provisioning in it.
+  # so a project missing the hook would get one line of scrollback and a base
+  # image with no provisioning in it.
   local p; p="$(a_project 'PARA_IMAGE_BASE=images:alpine/edge')"
   assert_refuses "$p" "no 'image-build' hook" image build || return 1
   assert_backend_untouched

@@ -31,7 +31,9 @@ chmod 1777 /tmp
 stage "$PARA_USER user ($PARA_UID:$PARA_GID)"
 getent group "$PARA_USER" >/dev/null 2>&1 \
   || groupadd -g "$PARA_GID" "$PARA_USER"
-shell="$(command -v zsh)"
+# Resolved, not as found: Void merges sbin into bin and root's PATH finds
+# /usr/sbin/zsh first, a real path that /etc/shells does not list.
+shell="$(readlink -f "$(command -v zsh)")"
 if ! id -u "$PARA_USER" >/dev/null 2>&1; then
   useradd -m -u "$PARA_UID" -g "$PARA_GID" -s "$shell" "$PARA_USER"
 else

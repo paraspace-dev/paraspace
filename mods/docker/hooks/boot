@@ -16,3 +16,6 @@ command -v docker >/dev/null 2>&1 \
 cd "$clone"
 stage "docker compose up"
 docker compose up -d --wait --wait-timeout 300
+
+"$PARA_RUN_HOOK" docker:boot:after
+

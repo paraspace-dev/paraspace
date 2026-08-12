@@ -45,14 +45,18 @@ test_docker_mod_boots_only_a_compose_clone() {
   # Both halves of "only": it boots a clone that has a Compose file, and it is a
   # no-op for the two shapes that have none, which is what lets a project vendor
   # this mod without a Compose stack.
-  local repo root fake calls
+  local repo root fake calls points
   repo="$(capability_repo)"; root="$(scratch)"; fake="$root/bin"; calls="$root/docker-calls"
+  points="$root/points"
   mkdir -p "$fake"
   printf '%s\n' '#!/usr/bin/env bash' 'printf "%s\n" "$*" >> "$DOCKER_CALLS"' > "$fake/docker"
-  chmod +x "$fake/docker"
+  printf '%s\n' '#!/usr/bin/env bash' 'printf "%s\n" "$*" >> "$POINT_CALLS"' \
+    > "$fake/run-hook"
+  chmod +x "$fake/docker" "$fake/run-hook"
   a_docker_boot() { # a_docker_boot <home>
     env HOME="$1" PATH="$fake:$PATH" PARA_HELPERS="$repo/libexec/helpers" \
-      PARA_CLONE_DIR=app DOCKER_CALLS="$calls" \
+      PARA_CLONE_DIR=app DOCKER_CALLS="$calls" POINT_CALLS="$points" \
+      PARA_RUN_HOOK="$fake/run-hook" \
       bash "$repo/mods/docker/hooks/boot" >/dev/null 2>&1
   }
 
@@ -67,7 +71,11 @@ test_docker_mod_boots_only_a_compose_clone() {
   mkdir -p "$root/stack/app"; : > "$root/stack/app/compose.yaml"
   a_docker_boot "$root/stack" || return 1
   assert_eq "compose up -d --wait --wait-timeout 300" "$(cat "$calls")" \
-    "the compose boot waits for readiness"
+    "the compose boot waits for readiness" || return 1
+  assert_eq 3 "$(wc -l < "$points" | tr -d ' ')" \
+    "the hook point opens on every boot, stack or no stack" || return 1
+  assert_eq "docker:boot:after" "$(tail -n1 "$points")" \
+    "and it is the mod's own point that opened"
 }
 
 test_git_mod_trusts_the_ssh_host_it_will_clone_from() {

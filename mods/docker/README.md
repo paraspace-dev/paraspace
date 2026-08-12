@@ -34,8 +34,12 @@ adding the mod for a manual override. Re-adding the mod reruns inspection but
 does not duplicate declarations.
 
 During boot it runs `docker compose up -d --wait --wait-timeout 300` when the
-clone contains a Compose file. Routes are ordinary Caddy-to-workspace-port
-mappings and do not otherwise depend on Docker.
+clone contains a Compose file. It then opens the `docker:boot:after` [hook
+point](https://paraspace.dev/docs/hook-points) on every boot, whether or not a
+stack came up, so a `hooks/docker:boot:after` of yours runs after the stack is
+answering and still runs for a clone that has no Compose file. Routes are
+ordinary Caddy-to-workspace-port mappings and do not otherwise depend on
+Docker.
 
 Set `PARA_PREPULL_IMAGES` in the project Parafile to a space-separated list of
 images to bake into the workspace image. Nested Docker needs an Incus `dir`

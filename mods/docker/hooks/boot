@@ -4,18 +4,18 @@ set -euo pipefail
 # shellcheck source=/dev/null
 . "$PARA_HELPERS"
 
-clone="$HOME/$PARA_CLONE_DIR"
-if [ ! -d "$clone" ]; then exit 0; fi
-if [ ! -f "$clone/compose.yaml" ] && [ ! -f "$clone/compose.yml" ] \
-   && [ ! -f "$clone/docker-compose.yaml" ] && [ ! -f "$clone/docker-compose.yml" ]; then
-  exit 0
-fi
+has_compose() { # has_compose <dir>
+  [ -f "$1/compose.yaml" ] || [ -f "$1/compose.yml" ] \
+    || [ -f "$1/docker-compose.yaml" ] || [ -f "$1/docker-compose.yml" ]
+}
 
-command -v docker >/dev/null 2>&1 \
-  || die "docker is not in the workspace image. Run: para image build"
-cd "$clone"
-stage "docker compose up"
-docker compose up -d --wait --wait-timeout 300
+if has_compose "$HOME/$PARA_CLONE_DIR"; then
+  command -v docker >/dev/null 2>&1 \
+    || die "docker is not in the workspace image. Run: para image build"
+  cd "$HOME/$PARA_CLONE_DIR"
+  stage "docker compose up"
+  docker compose up -d --wait --wait-timeout 300
+fi
 
 "$PARA_RUN_HOOK" docker:boot:after
 

@@ -22,24 +22,25 @@ interactive() { [ -z "${PARA_NONINTERACTIVE:-}" ] && [ -t 0 ] && [ -t 1 ]; }
 pause() { if interactive; then printf '%s ' "$*" >&2; read -r _ || true; fi; }
 
 # Add one project setting without taking ownership away from the project. Both
-# assignment spellings documented for Parafiles count, including an explicitly
-# empty value. This is a host helper; guest hooks do not have a Parafile.
-set_parafile_var_if_not_set() { # set_parafile_var_if_not_set <PARA_NAME> <value>
-  [ "$#" -eq 2 ] || die "usage: set_parafile_var_if_not_set <PARA_NAME> <value>"
-  local name="$1" value="$2" parafile="${PARA_PROJECT_DIR:-}/.paraspace/Parafile"
+# assignment spellings documented for the env file count, including an
+# explicitly empty value. This is a host helper, for a layer's configure;
+# guest hooks have no project env to edit.
+set_env_var_if_not_set() { # set_env_var_if_not_set <PARA_NAME> <value>
+  [ "$#" -eq 2 ] || die "usage: set_env_var_if_not_set <PARA_NAME> <value>"
+  local name="$1" value="$2" envfile="${PARA_PROJECT_DIR:-}/.paraspace/env"
   [[ "$name" =~ ^PARA_[A-Z0-9_]+$ ]] \
-    || die "invalid Parafile variable '$name': expected a PARA_* name using uppercase letters, digits and underscores"
-  [ -f "$parafile" ] || die "no Parafile at $parafile"
+    || die "invalid env variable '$name': expected a PARA_* name using uppercase letters, digits and underscores"
+  [ -f "$envfile" ] || die "no env file at $envfile"
 
   # Direct assignments and the documented defaulting idioms are authoritative.
   # Anchor the complete variable name so PARA_ROUTE never matches PARA_ROUTES.
-  if grep -Eq "^[[:space:]]*(export[[:space:]]+)?${name}[[:space:]]*=" "$parafile" \
-    || grep -Eq "^[[:space:]]*:[[:space:]]+['\"]?[$][{]${name}:=" "$parafile"; then
+  if grep -Eq "^[[:space:]]*(export[[:space:]]+)?${name}[[:space:]]*=" "$envfile" \
+    || grep -Eq "^[[:space:]]*:[[:space:]]+['\"]?[$][{]${name}:=" "$envfile"; then
     return 0
   fi
 
-  printf '\n%s=%q\n' "$name" "$value" >> "$parafile"
-  info "Set $name in .paraspace/Parafile."
+  printf '\n%s=%q\n' "$name" "$value" >> "$envfile"
+  info "Set $name in .paraspace/env."
 }
 
 # Install only packages the Void image does not already contain, in one xbps

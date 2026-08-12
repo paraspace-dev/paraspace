@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+# summary: prove a layer's own verb reaches the host with its own directory
+set -euo pipefail
+# A layer's commands/ run on the HOST, not in the workspace, so this file is
+# the other half of the layer contract from hooks/. $PARA_LAYER_DIR is how it
+# finds its own files out here.
+[ "$#" -ge 1 ] || { echo "usage: para modhello <workspace>" >&2; exit 1; }
+
+printf 'layer-command-ok dir=%s\n' "${PARA_LAYER_DIR-unset}"
+
+# And it composes with the engine the way a real one does.
+exec "$PARA_BIN" sh "$1" -c 'echo layer-command-reached-the-guest'

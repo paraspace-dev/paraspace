@@ -1,4 +1,0 @@
-#!/usr/bin/env bash
-set -euo pipefail
-
-# The fixture's mod owns the app boot so e2e covers a mod-provided boot hook.

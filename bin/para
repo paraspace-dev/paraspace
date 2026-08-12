@@ -8,20 +8,20 @@ set -euo pipefail
 # stack, a static bridge IP, and an https:// URL served by a para-owned Caddy.
 #
 # This file is the generic mechanism and nothing else: everything a project
-# needs done lives in that project's .paraspace/ dir (Parafile, hooks/,
-# commands/), which para runs but never contains.
+# needs done lives in that project's .paraspace/ dir (env, stack, layers/),
+# which para runs but never contains.
 #
-# The prose lives in docs/ (parafile.md, hooks.md, commands.md, image.md,
-# urls.md, how-it-works.md, versioning.md). It is not restated here.
+# The prose lives in docs/ (env.md, layers.md, hooks.md, commands.md,
+# image.md, urls.md, how-it-works.md, versioning.md). It is not restated here.
 # ============================================================================
 
 CT_PREFIX=para-
 
 # The para<->project contract this engine implements: the injected env, the hook
-# names and semantics, the ~/.paraspace layout in the guest, the Parafile keys,
-# and the project-command mechanism. A breaking change to any of them bumps it;
-# additive changes don't. A project declares the one it targets as PARA_CONTRACT
-# and para refuses on a mismatch. See docs/versioning.md.
+# names and semantics, the ~/.paraspace layout in the guest, the env and stack
+# files, and the layer-command mechanism. A breaking change to any of them bumps
+# it; additive changes don't. A project declares the one it targets as
+# PARA_CONTRACT and para refuses on a mismatch. See docs/versioning.md.
 CONTRACT=1
 
 # The oldest incus para is known to work with. It reads every workspace out of
@@ -57,8 +57,8 @@ need() { command -v "$1" >/dev/null 2>&1 || die "missing required command: $1"; 
 #   : "${PARA_X:=value}"   yields to the environment
 #   PARA_X=value           insists
 #
-# so precedence is environment > user config > Parafile > the defaults at the
-# bottom of load_config. Nothing below implements that; bash does.
+# so precedence is environment > user config > project env > the defaults at
+# the bottom of load_config. Nothing below implements that; bash does.
 load_config() {
   PARA_CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/para"
   PARA_CONFIG="$PARA_CONFIG_DIR/config"
@@ -77,7 +77,7 @@ load_config() {
   # shellcheck source=/dev/null  # a per-user and a per-project file, both runtime
   if [ -f "$PARA_CONFIG" ]; then . "$PARA_CONFIG"; fi
   # shellcheck source=/dev/null
-  if [ -f "$PARA_PROJECT_DIR/.paraspace/Parafile" ]; then . "$PARA_PROJECT_DIR/.paraspace/Parafile"; fi
+  if [ -f "$PARA_PROJECT_DIR/.paraspace/env" ]; then . "$PARA_PROJECT_DIR/.paraspace/env"; fi
 
   # Engine-owned on both host and guest, and reasserted after the two files
   # above so a config cannot point commands at a replacement for it.
@@ -126,6 +126,9 @@ load_config() {
   # hook runs, require_project has already refused a mismatch, so the two are
   # equal and injecting ours would say nothing a hook doesn't know.
   : "${PARA_CONTRACT:=}"
+  # Derived from the stack file on every invocation, so a declaration in env
+  # cannot override it: host paths here, guest paths in the guest.
+  PARA_STACK="$(stack_load)"
 }
 
 find_project_root() {
@@ -170,17 +173,97 @@ normalize_routes() {
 }
 
 # Commands that clone, boot or build need a project; the rest work anywhere.
+# Stack resolution happens here too, once, up front, so nothing downstream
+# touches a workspace before every layer is known to exist.
 require_project() {
   [ -n "$PARA_PROJECT_DIR" ] \
     || die "not inside a para project: no .paraspace/ directory from \$PWD upward. cd into one, or set PARA_PROJECT_DIR."
   if [ -n "$PARA_CONTRACT" ] && [ "$PARA_CONTRACT" != "$CONTRACT" ]; then
     die "this project targets para contract $PARA_CONTRACT, but this para provides $CONTRACT. See docs/versioning.md."
   fi
+  stack_check
+}
+
+# ---- the stack -------------------------------------------------------------
+# The stack file is the project's layer list: one directory path per line,
+# resolved against the project root, composed top to bottom. Blank lines and
+# #-comment lines are ignored. docs/layers.md.
+
+# The stack file, normalized: comments and blanks dropped, whitespace trimmed.
+stack_lines() {
+  local file="$PARA_PROJECT_DIR/.paraspace/stack"
+  [ -f "$file" ] || return 0
+  awk '{ gsub(/^[ \t]+|[ \t]+$/, "") } $0 == "" || $0 ~ /^#/ { next } { print }' "$file"
+}
+
+# The normalized lines resolved against the project root, which is what
+# load_config puts in $PARA_STACK.
+stack_load() {
+  local line
+  while IFS= read -r line; do
+    [ -n "$line" ] || continue
+    case "$line" in
+      /*) printf '%s\n' "$line" ;;
+      *)  printf '%s\n' "$PARA_PROJECT_DIR/$line" ;;
+    esac
+  done < <(stack_lines)
+}
+
+# Every layer directory in the stack, in order. The one iteration source for
+# hooks, commands and the pushes below.
+stack_dirs() {
+  [ -n "$PARA_STACK" ] || return 0
+  printf '%s\n' "$PARA_STACK"
+}
+
+# The one name a layer goes by: its stack line with the known roots stripped,
+# so a bundled layer keeps its catalog name ('docker', 'base/void'), a
+# plugin's carries its vendor ('acme/mod-a'), and anything else keeps its
+# last path component. It is also the layer's directory name in the guest,
+# which is why stack_check refuses two layers that share one.
+layer_name() { # layer_name <resolved-dir>
+  local rel="${1#"$PARA_PROJECT_DIR"/}" vendor
+  case "$rel" in
+    node_modules/paraspace/layers/*) printf '%s\n' "${rel#node_modules/paraspace/layers/}" ;;
+    node_modules/paraspace-plugin-*/layers/*)
+      vendor="${rel#node_modules/paraspace-plugin-}"
+      printf '%s/%s\n' "${vendor%%/*}" "${rel#*/layers/}" ;;
+    .paraspace/layers/*) printf '%s\n' "${rel#.paraspace/layers/}" ;;
+    *) printf '%s\n' "${rel##*/}" ;;
+  esac
+}
+
+stack_names() {
+  local dir
+  while IFS= read -r dir; do
+    [ -n "$dir" ] || continue
+    layer_name "$dir"
+  done < <(stack_dirs)
+}
+
+# Refuse a stack the engine cannot compose: the same line twice, two layers
+# that materialize under one guest name, or a directory that is not there.
+# Every problem in one report, so one fix round covers them all.
+stack_check() {
+  [ -n "$PARA_STACK" ] || return 0
+  local dupes missing="" dir
+  dupes="$(stack_dirs | sort | uniq -d)"
+  [ -z "$dupes" ] || die "duplicate stack lines in .paraspace/stack:
+$dupes"
+  dupes="$(stack_names | sort | uniq -d)"
+  [ -z "$dupes" ] || die "two stack lines share a layer name ($(printf '%s' "$dupes" | tr '\n' ' ')). Rename one, or point one line at a copy under .paraspace/layers/."
+  while IFS= read -r dir; do
+    if [ ! -d "$dir" ]; then missing="${missing:+$missing
+}  ${dir#"$PARA_PROJECT_DIR"/}"; fi
+  done < <(stack_dirs)
+  [ -z "$missing" ] || die "stack layers missing on disk:
+$missing
+Run 'npm install' if these live under node_modules/, else fix .paraspace/stack."
 }
 
 # Every PARA_* in scope, as export lines. This is the one way para hands its
 # context to anything it runs for you: guest hooks, project commands, and the
-# image builder. A key you invent in your Parafile reaches all three.
+# image builder. A key you invent in your env file reaches all three.
 para_env() {
   local var
   for var in "${!PARA_@}"; do printf 'export %s=%q\n' "$var" "${!var}"; done
@@ -455,85 +538,92 @@ ws_exec() { # ws_exec <name> [<command>]
 }
 
 # ---- hooks -----------------------------------------------------------------
-# para_env as the guest sees it: the three path keys renamed to where <dest>
+# $PARA_STACK as the guest sees it: the same layers, in the same order, where
+# push_stack puts them under <dest>.
+guest_stack() { # guest_stack <dest>
+  local dir
+  while IFS= read -r dir; do
+    [ -n "$dir" ] || continue
+    printf '%s/.paraspace/stack/%s\n' "$1" "$(layer_name "$dir")"
+  done < <(stack_dirs)
+}
+
+# para_env as the guest sees it: the path keys renamed to where <dest>
 # actually put them, and the ones that must not cross unset rather than left
-# pointing at host files, or, for PARA_HOOK_STACK, at a lie.
+# pointing at host files.
 guest_env() { # guest_env <dest>
   # Local, because the host keeps its own PARA_HOST_ENV, which push_project reads.
   # shellcheck disable=SC2034  # all three are read by para_env's ${!PARA_@}
-  local PARA_HOOKS="$1/.paraspace/hooks" \
-        PARA_SKEL="$1/.paraspace/skel" \
-        PARA_HOST_ENV="$1/.paraspace/host.env" \
-        PARA_HELPERS="$1/.paraspace/helpers"
+  local PARA_HOST_ENV="$1/.paraspace/host.env" \
+        PARA_HELPERS="$1/.paraspace/helpers" \
+        PARA_STACK
+  PARA_STACK="$(guest_stack "$1")"
   para_env
   # para_env forwards every PARA_* in scope, including whatever the caller
-  # happened to export. PARA_HOOK_STACK is the runner's to build from empty:
+  # happened to export. PARA_HOOK_CHAIN is the runner's to build from empty:
   # inherited, it reads as "we are already inside that hook" and every run
-  # trips the cycle guard instead of running anything.
-  printf 'unset PARA_BIN PARA_PROJECT_DIR PARA_CONFIG PARA_CONFIG_DIR PARA_STATE_DIR PARA_HOOK_STACK PARA_MOD_DIR\n'
+  # trips the cycle guard instead of running anything. PARA_LAYER_DIR is
+  # per-hook and per-command, never ambient.
+  printf 'unset PARA_BIN PARA_PROJECT_DIR PARA_CONFIG PARA_CONFIG_DIR PARA_STATE_DIR PARA_HOOK_CHAIN PARA_LAYER_DIR\n'
 }
 
-# Replace <instance>:<dest>/.paraspace with the project's, plus para's context.
-# The rm is what makes it a replace: `incus file push -r` merges into whatever
-# is already there, so a hook you deleted would otherwise survive in the guest.
-push_paraspace() { # push_paraspace <instance> <dest>
+# Replace <instance>:<dest>/.paraspace with the composed stack, plus para's
+# context. The rm is what makes it a replace: `incus file push -r` merges into
+# whatever is already there, so a layer you dropped would otherwise survive in
+# the guest.
+push_stack() { # push_stack <instance> <dest>
+  local dir name parent
   incus exec "$1" -- rm -rf "$2/.paraspace"
-  incus_q file push -r "$PARA_PROJECT_DIR/.paraspace" "$1$2/"
-  # The push carries your checkout's own modes, so a `umask 077` one lands 0700
-  # and a build hook that steps down to $PARA_USER can't read $PARA_SKEL. Before
-  # the env push, which keeps the 0600 it is given.
+  incus exec "$1" -- mkdir -p "$2/.paraspace/stack"
+  while IFS= read -r dir; do
+    [ -n "$dir" ] || continue
+    # Each layer lands at stack/<layer name>; the name's last component is the
+    # directory's own basename, which is what `file push -r` creates.
+    name="$(layer_name "$dir")"
+    parent="$2/.paraspace/stack"
+    case "$name" in */*) parent="$parent/${name%/*}" ;; esac
+    incus exec "$1" -- mkdir -p "$parent"
+    incus_q file push -r "$dir" "$1$parent/"
+  done < <(stack_dirs)
+  # The push carries your checkout's own modes, so a `umask 077` tree lands
+  # 0700 and a build hook that steps down to $PARA_USER can't read its own
+  # layer. Before the env push, which keeps the 0600 it is given.
   incus exec "$1" -- chmod -R a+rX "$2/.paraspace"
   guest_env "$2" | incus_q file push --mode 0600 - "$1$2/.paraspace/env"
-  # After the tree, so a project shipping its own .paraspace/run-hook can't
-  # shadow para's. The helpers follow for the same reason. Both the workspace
-  # and the builder run hooks through these files.
+  # After the tree, so a layer shipping its own run-hook can't shadow para's.
+  # The helpers follow for the same reason. Both the workspace and the builder
+  # run hooks through these files.
   incus_q file push --mode 0755 "$(pkg_root)/libexec/run-hook" "$1$2/.paraspace/run-hook"
   incus_q file push --mode 0644 "$(pkg_root)/libexec/helpers" "$1$2/.paraspace/helpers"
 }
 
-# The workspace's copy: the tree, plus the project's base .env and the user's
+# The workspace's copy: the stack, plus the project's base .env and the user's
 # ownership of it. Fresh on every up, so an edit to a hook takes effect without
 # re-cloning anything.
 push_project() { # push_project <name>
   local ct="$CT_PREFIX$1" home="/home/$PARA_USER"
-  push_paraspace "$ct" "$home"
+  push_stack "$ct" "$home"
   if [ -f "$PARA_HOST_ENV" ]; then
     incus_q file push --mode 0600 "$PARA_HOST_ENV" "$ct$home/.paraspace/host.env"
   fi
   incus exec "$ct" -- chown -R "$PARA_UID:$PARA_GID" "$home/.paraspace"
 }
 
-# Run <hook> everywhere it is defined, the project first and then each mod. The
-# runner announces what it finds, because only it knows how many that is.
-# Hooks own all provisioning; para only decides when they run. docs/hooks.md.
+# Run <hook> from every layer that defines it, in stack order. The runner
+# announces what it finds, because only it knows how many that is. Hooks own
+# all provisioning; para only decides when they run. docs/hooks.md.
 run_hook() { # run_hook <hook> <name>
   ws_exec "$2" "exec ~/.paraspace/run-hook '$1'" || die "the '$1' hook failed (above)."
 }
 
-# Every directory shaped like a .paraspace, starting with the project's own and
-# then each mod it vendored, most specific first. Each holds its own hooks/,
-# skel/ and commands/, so every name para resolves runs down this list;
-# libexec/run-hook walks the same one on the guest side.
-#
-# The glob is `mods/*`, never `mods/*/hooks/x`, since bash sorts a
-# multi-component glob with strcoll, which ignores `/` under en_US and orders
-# mods/m2 before mods/m. One component keeps the order the same in every locale.
-paraspace_dirs() {
-  printf '%s\n' "$PARA_PROJECT_DIR/.paraspace"
-  local pdir
-  for pdir in "$PARA_PROJECT_DIR"/.paraspace/mods/*; do
-    if [ -d "$pdir" ]; then printf '%s\n' "$pdir"; fi
-  done
-}
-
-# Does the project or any of its mods fill <hook>? Resolution is the runner's
-# job, but refusing is the host's: the runner's note prints inside a container,
-# minutes in, and the caller has already committed by then.
+# Does any layer fill <hook>? Resolution is the runner's job, but refusing is
+# the host's: the runner's note prints inside a container, minutes in, and the
+# caller has already committed by then.
 have_hook() { # have_hook <hook>
-  local pdir
-  while IFS= read -r pdir; do
-    if [ -f "$pdir/hooks/$1" ]; then return 0; fi
-  done < <(paraspace_dirs)
+  local dir
+  while IFS= read -r dir; do
+    if [ -f "$dir/hooks/$1" ]; then return 0; fi
+  done < <(stack_dirs)
   return 1
 }
 
@@ -601,7 +691,7 @@ cmd_up() {
   workspace_context "$name"
   push_project "$name"
   run_hook provision "$name"
-  stage "Booting the stack. The first run pulls images, so be patient…"
+  stage "Booting. The first run pulls images, so be patient…"
   run_hook boot "$name"
   caddy_sync
   trap - EXIT
@@ -769,13 +859,13 @@ cmd_config() {
 config_template() {
   local key
   cat <<-'EOF'
-	# para user config, sourced as bash like a project's Parafile.
+	# para user config, sourced as bash like a project's .paraspace/env.
 	#
 	#   : "${PARA_X:=value}"   yields to the environment
 	#   PARA_X=value           insists
 	#
 	# This describes your BOX. Per-project settings (routes, image, origin…)
-	# belong in the project's .paraspace/Parafile. Nothing enforces that; `para
+	# belong in the project's .paraspace/env. Nothing enforces that; `para
 	# doctor` will tell you when a value here looks project-shaped.
 	EOF
   for key in PARA_DOMAIN PARA_HTTPS_PORT PARA_CADDY_ADMIN PARA_POOL PARA_BRIDGE \
@@ -808,7 +898,7 @@ cmd_image_build() {
     esac
   done
   # Everything the project itself has to get right, checked before the daemon,
-  # because an incomplete Parafile is more useful to hear about than an absent
+  # because an incomplete project env is more useful to hear about than an absent
   # incus.
   have_hook image-build \
     || die "no 'image-build' hook. Write one at .paraspace/hooks/image-build. See docs/image.md."
@@ -839,11 +929,11 @@ cmd_image_build() {
     stage "Bootstrapping the builder: $PARA_IMAGE_BOOTSTRAP"
     incus exec "$builder" -- sh -c "$PARA_IMAGE_BOOTSTRAP"
   fi
-  # The builder gets the whole .paraspace/ the way a workspace does, at /opt
-  # because /root is 0700 and a build hook that steps down to $PARA_USER has to
-  # be able to read $PARA_SKEL through it.
+  # The builder gets the whole stack the way a workspace does, at /opt because
+  # /root is 0700 and a build hook that steps down to $PARA_USER has to be
+  # able to read its layer through it.
   incus exec "$builder" -- mkdir -p /opt
-  push_paraspace "$builder" /opt
+  push_stack "$builder" /opt
   stage "Provisioning the image. This takes a few minutes…"
   # Backgrounded so Ctrl-C works: incus relays SIGINT only into a process it
   # gave a pty, and this one has none. `wait` can be interrupted, which runs the
@@ -874,7 +964,7 @@ image_publish() { # image_publish <base>
   incus image delete "$PARA_IMAGE_NAME" >/dev/null 2>&1 || true
   incus image alias rename "$tmp_alias" "$PARA_IMAGE_NAME" \
     || die "the new image is published as '$tmp_alias' but could not be renamed. Recover with: incus image alias rename $tmp_alias $PARA_IMAGE_NAME"
-  # What this image was built from, as opposed to what the Parafile names today,
+  # What this image was built from, as opposed to what the env names today,
   # which is what the *next* build would use. `-i` stamps $PARA_IMAGE_NAME itself.
   incus image set-property "$PARA_IMAGE_NAME" user.para.base "$1"
 }
@@ -920,297 +1010,273 @@ pkg_root() {
   cd -P "$(dirname "$self")/.." && pwd
 }
 
-cmd_init() {
-  local template="" force=0 full=0
+# `para init` and `para add` are one convergent verb with two names: in a
+# fresh directory it scaffolds .paraspace/ (env, stack, the project layer);
+# given names it expands them to stack lines and inserts them before the
+# project's own layers; and every invocation reruns the configure chain,
+# which is idempotent because existing env declarations win. docs/layers.md.
+cmd_add() {
+  local usage="usage: para add [<name>...] [--list] [--new <name>]"
+  local names="" new="" list=0 name
   while [ "$#" -gt 0 ]; do
     case "$1" in
-      --list)     bundled_names templates; return ;;
-      -f|--force) force=1; shift ;;
-      --full)     full=1; shift ;;
-      -*) die "usage: para init [<template>] [--list] [-f|--force] [--full]" ;;
-      *)  template="$1"; shift ;;
+      --list) list=1; shift ;;
+      --new)  shift; [ "$#" -gt 0 ] || die "$usage"; new="$1"; shift ;;
+      -*|"")  die "$usage" ;;
+      *)      names="${names:+$names
+}$1"; shift ;;
     esac
   done
-  local src
-  template="${template:-void}"
-  # A bundled template is a plain directory name. Without this, `para init ../..`
-  # would scaffold an arbitrary tree into the current directory.
-  case "$template" in
-    */*|.|..) die "a template is a plain directory name (see: para init --list); got '$template'." ;;
-  esac
-  src="$(pkg_root)/templates/$template"
-  [ -d "$src" ] || die "no such template '$template' (see: para init --list)."
-  local root="$src/.paraspace"
-  [ "$full" -eq 0 ] || root="$src"
+  if [ "$list" -eq 1 ]; then add_list; return; fi
+  require_project
 
-  stage "Scaffolding '$template' into ${PWD}…"
-  local file rel dest added=0 skipped=0 wrote_parafile=0
-  while IFS= read -r file; do
-    rel="${file#"$src"/}"
-    [ "$rel" != README.md ] || continue    # the template's own README, not yours
-    dest="$PWD/$rel"
-    # The Parafile is yours rather than the template's, since PARA_ROUTES and
-    # everything else you set live in it, so even --force leaves it alone.
-    # Delete it first on the rare occasion you want the template's back.
-    if [ -e "$dest" ] && [ "$rel" = .paraspace/Parafile ]; then
-      printf '  keep (yours): %s\n' "$rel" >&2
-      skipped=$((skipped + 1))
-      continue
+  local sp="$PARA_PROJECT_DIR/.paraspace" fresh=0
+  if [ ! -f "$sp/stack" ]; then
+    fresh=1
+    stage "Scaffolding .paraspace/ in ${PARA_PROJECT_DIR}…"
+    layer_stub project
+    # The default base only when nothing is named, so an explicit list is
+    # exactly what you get. The project's own layer goes last, so its files
+    # and verbs win.
+    if [ -z "$names" ] && [ -z "$new" ]; then
+      printf 'node_modules/paraspace/layers/base/void\n' > "$sp/stack"
+    else
+      : > "$sp/stack"
     fi
-    if [ -e "$dest" ] && [ "$force" -eq 0 ]; then
-      printf '  skip (exists): %s\n' "$rel" >&2
-      skipped=$((skipped + 1))
-      continue
-    fi
-    mkdir -p "$(dirname "$dest")"
-    case "$rel" in
-      .paraspace/Parafile) init_parafile "$file" > "$dest"; wrote_parafile=1 ;;
-      *)                   cp "$file" "$dest" ;;
-    esac
-    case "$rel" in .paraspace/commands/*|*.sh) chmod +x "$dest" ;; esac
-    printf '  add: %s\n' "$rel" >&2
-    added=$((added + 1))
-  done < <(find "$root" -type f)
-  stage "Done. $added added, $skipped skipped."
-  if [ "$added" -eq 0 ]; then return; fi
-  # PARA_ORIGIN defaults to this checkout's origin, so it is one less thing to
-  # edit here. Nowhere to read one from is worth saying, since the first thing
-  # that notices is a provision hook, minutes later, inside a container. Only
-  # when this run wrote the Parafile, or the warning names a file it kept.
-  if [ "$wrote_parafile" -eq 1 ] && [ -z "$(git_origin "$PWD")" ]; then
-    warn "no git origin here to clone, so .paraspace/Parafile names an example app instead. Uncomment its PARA_ORIGIN, or point that at your repo."
+    printf '.paraspace/layers/project\n' >> "$sp/stack"
+    info "add: .paraspace/stack"
   fi
-  stage "Next: review .paraspace/Parafile, add the mods you need, then run 'para image build' and 'para up <name>'."
+  if [ ! -f "$sp/env" ]; then
+    printf 'PARA_CONTRACT=%s\n' "$CONTRACT" > "$sp/env"
+    info "add: .paraspace/env"
+  fi
+
+  local line
+  if [ -n "$names" ]; then
+    while IFS= read -r name; do
+      # Checked, because expand_layer's die runs inside a $( ) where bash
+      # strips set -e, so its non-zero status is all that reaches us.
+      line="$(expand_layer "$name")" || exit 1
+      stack_insert "$line"
+    done <<<"$names"
+  fi
+  if [ -n "$new" ]; then
+    layer_stub "$new"
+    stack_insert ".paraspace/layers/$new"
+  fi
+
+  # The file just changed, so re-derive before checking and configuring.
+  PARA_STACK="$(stack_load)"
+  stack_check
+  run_configures
+  if [ "$fresh" -eq 1 ]; then
+    stage "Next: review .paraspace/, then 'para image build' and 'para up <name>'."
+  fi
 }
 
-# The template's Parafile with its placeholders resolved to what para resolves
-# for THIS project, so the commented defaults name real values (para-home-acme,
-# your own origin) and read as what is already in effect. The braces are what
-# make a placeholder, and they leave $PARA_PROJECT_DIR alone. Only the Parafile:
-# a hook's $PARA_PROJECT_NAME is a runtime value and stays one.
-init_parafile() { # init_parafile <template-parafile>
-  local body project origin
-  body="$(cat "$1")"
-  # Both read off $PWD, which is what this scaffold becomes the project for.
-  # $PARA_PROJECT_NAME would be an enclosing project's, or a stray export.
-  project="$(slug "${PWD##*/}")"
-  # Nowhere to read an origin from leaves the line naming an app you can
-  # actually clone, rather than a placeholder you have to notice and replace.
-  origin="$(git_origin "$PWD")"
-  body="${body//\$\{PARA_PROJECT_NAME\}/$project}"
-  printf '%s\n' "${body//\$\{PARA_ORIGIN\}/${origin:-https://github.com/paraspace-dev/example-docker-app.git}}"
-}
-
-# What this para ships under templates/ or mods/, one name per line.
-bundled_names() { # bundled_names <templates|mods>
-  local dir
-  for dir in "$(pkg_root)/$1"/*/; do
-    if [ -d "$dir" ]; then printf '%s\n' "$(basename "$dir")"; fi
-  done
-}
-
-# A mod is a directory shaped like a .paraspace/ (hooks/, skel/) that para
-# resolves alongside the project's own. Two kinds, and the verb is the
-# difference: `add` vendors one this para ships and replacing it is the update
-# path, `init` stubs an empty one that is yours to edit. docs/mods.md.
-cmd_mod() {
-  local sub="${1:-}"
-  shift || true
-  case "$sub" in
-    add)  cmd_mod_add "$@" ;;
-    init) cmd_mod_init "$@" ;;
-    *) die "usage: para mod <add <name>...|init [<name>]>  ('para mod add --list' names what this para ships)" ;;
+# 'acme/mod-a' as an installed plugin's layer path, or nothing when the name
+# names no vendor.
+vendor_candidate() {
+  case "$1" in
+    */*) printf 'node_modules/paraspace-plugin-%s/layers/%s\n' "${1%%/*}" "${1#*/}" ;;
   esac
 }
 
-# Copied from what this para ships, never fetched, so a mod lands in the
-# project's own git history and `para up` stays offline.
-cmd_mod_add() {
-  local usage="usage: para mod add <name>...  ('para mod add --list' names what this para ships)"
-  [ "$#" -gt 0 ] || die "$usage"
-  if [ "$1" = --list ]; then
-    [ "$#" -eq 1 ] || die "$usage"
-    bundled_names mods
-    return
-  fi
-  require_project
-  local name src
-  for name in "$@"; do
-    # Same reason as a template's: without it, `para mod add ../..` copies an
-    # arbitrary tree in, and the destination is one your project commits.
-    case "$name" in
-      "") die "$usage" ;;
-      */*|.|..|--*) die "a mod is a plain directory name (see: para mod add --list); got '$name'." ;;
+# A name at add time. Three sugar forms, no more, and the output is always the
+# explicit stack line, so the runtime never sees a bare name: a bundled name
+# expands under this package's layers/, a vendor name under the plugin's, and
+# anything else is a path, tried literally and then under node_modules/. More
+# than one match dies naming each, and the fix is writing the full path.
+expand_layer() { # expand_layer <name> -> one stack line
+  local name="$1" c matches=""
+  for c in "node_modules/paraspace/layers/$name" "$(vendor_candidate "$name")" \
+           "$name" "node_modules/$name"; do
+    [ -n "$c" ] || continue
+    case "$c" in
+      /*) [ -d "$c" ] || continue ;;
+      *)  [ -d "$PARA_PROJECT_DIR/$c" ] || continue ;;
     esac
-    src="$(pkg_root)/mods/$name"
-    [ -d "$src" ] || die "no such mod '$name' (see: para mod add --list)."
+    matches="${matches:+$matches
+}$c"
   done
-  for name in "$@"; do vendor_mod "$name"; done
-  for name in "$@"; do configure_mod "$name"; done
-}
-
-configure_mod() { # configure_mod <name>
-  local name="$1" dest="$PARA_PROJECT_DIR/.paraspace/mods/$1" status=0
-  [ -f "$dest/configure" ] || return 0
-  stage "Configuring '$name' on YOUR machine with your privileges…"
-  # Same shape as run_project_command: the guest-only pair unset, PARA_MOD_DIR
-  # pointing at the mod, and every other PARA_* exported as it stands.
-  (
-    cd "$PARA_PROJECT_DIR"
-    unset PARA_HOOKS PARA_SKEL
-    # shellcheck disable=SC2034  # read by the export below, via ${!PARA_@}
-    PARA_MOD_DIR="$dest"
-    export "${!PARA_@}"
-    bash "$dest/configure"
-  ) || status=$?
-  if [ "$status" -ne 0 ]; then
-    warn "'$name' is vendored, but its configure failed (exit $status). Fix the cause above, then re-run the same 'para mod add'."
-    exit "$status"
+  if [ -z "$matches" ]; then
+    if [ -d "$(pkg_root)/layers/$name" ]; then
+      die "'$name' is a bundled layer, but this project has no node_modules/paraspace to load it from. Run 'npm install --save-dev paraspace', or copy it in: cp -R '$(pkg_root)/layers/$name' .paraspace/layers/"
+    fi
+    die "no layer '$name' (see: para add --list). A directory path works too."
   fi
+  case "$matches" in
+    *"
+"*) die "'$name' matches more than one layer:
+$matches
+Write the full path of the one you mean." ;;
+  esac
+  printf '%s\n' "$matches"
 }
 
-vendor_mod() { # vendor_mod <name>
-  local name="$1" src dest f verbs=""
-  src="$(pkg_root)/mods/$name"
-  dest="$PARA_PROJECT_DIR/.paraspace/mods/$name"
-  # Replace, so adding it again is how you update. The mkdir is not optional: cp
-  # creates the last component but not the mods/ above it.
-  rm -rf "$dest"
-  mkdir -p "$dest"
-  cp -R "$src/." "$dest"
-  stage "Vendored '$name' into .paraspace/mods/$name. Read it, commit it, then: para up <name>"
-  # A command honours its shebang, so unlike a hook it needs the exec bit, and a
-  # checkout with core.fileMode=false has none to copy. Same repair cmd_init makes.
-  for f in "$dest"/commands/*; do
-    if [ -f "$f" ]; then chmod +x "$f"; verbs="${verbs:+$verbs, }${f##*/}"; fi
-  done
-  [ -z "$verbs" ] \
-    || warn "it adds para verbs that run on YOUR machine with your privileges ($verbs). Read .paraspace/mods/$name/commands/ before you run them."
-}
-
-# A mod of your own: the shape para resolves, with nothing in it. Keeping your
-# customizations here rather than in the template's hooks is what lets `para
-# init -f <template>` refresh the template without taking them with it.
-cmd_mod_init() {
-  local usage="usage: para mod init [<name>] [-f|--force]"
-  local name="" force=0
-  while [ "$#" -gt 0 ]; do
-    case "$1" in
-      -f|--force) force=1; shift ;;
-      -*) die "$usage" ;;
-      *)  [ -z "$name" ] || die "$usage"
-          name="$1"; shift ;;
-    esac
-  done
-  name="${name:-project}"
-  case "$name" in */*|.|..) die "a mod is a plain directory name; got '$name'." ;; esac
-  require_project
-
-  local dest="$PARA_PROJECT_DIR/.paraspace/mods/$name"
-  # Unlike `add`, which replaces because that IS its update path, this one holds
-  # work you did by hand, so it refuses rather than take it with it.
-  if [ -d "$dest" ] && [ "$force" -eq 0 ]; then
-    die "$dest already exists. Edit it, or 'para mod init $name --force' to replace it."
+# Insert <line> into the stack file before the project's own layers, which
+# stay last so their files and verbs win. A line already present is a no-op,
+# which is what makes add convergent.
+stack_insert() { # stack_insert <line>
+  local file="$PARA_PROJECT_DIR/.paraspace/stack"
+  if stack_lines | grep -qxF "$1"; then
+    info "keep: $1 (already in the stack)"
+    return 0
   fi
-  rm -rf "$dest"
+  awk -v line="$1" '
+    !done && $0 ~ /^[ \t]*\.paraspace\/layers\// { print line; done = 1 }
+    { print }
+    END { if (!done) print line }
+  ' "$file" > "$file.new"
+  mv "$file.new" "$file"
+  info "add: $1 (.paraspace/stack)"
+}
+
+# Stub .paraspace/layers/<name>: the shape para composes, with nothing in it
+# but three hook stubs, since what a hook DOES is the project's to say.
+# Convergent, so an existing layer is left alone.
+layer_stub() { # layer_stub <name>
+  case "/$1/" in
+    //*|*/../*|*/./*) die "a layer name is a relative path under .paraspace/layers/; got '$1'." ;;
+  esac
+  local dest="$PARA_PROJECT_DIR/.paraspace/layers/$1" hook
+  if [ -d "$dest" ]; then
+    info "keep: .paraspace/layers/$1 (exists)"
+    return 0
+  fi
   mkdir -p "$dest/hooks"
-  local hook
   for hook in image-build provision boot; do
-    mod_stub "$hook" > "$dest/hooks/$hook"
-    printf '  add: %s\n' "mods/$name/hooks/$hook" >&2
+    hook_stub "$hook" > "$dest/hooks/$hook"
+    printf '  add: .paraspace/layers/%s/hooks/%s\n' "$1" "$hook" >&2
   done
-  stage "Stubbed .paraspace/mods/$name. Its hooks run after the ones the project ships, and they are yours to edit."
 }
 
-# What `para mod init` writes: para's shape and nothing else, since what a hook
-# DOES is the project's to say. Each one says when it runs, because that is the
-# part a reader cannot see from the file. docs/hooks.md.
-mod_stub() { # mod_stub <hook>
+# What layer_stub writes: para's shape and nothing else. Each stub says when
+# it runs, because that is the part a reader cannot see from the file.
+hook_stub() { # hook_stub <hook>
   local when=""
   case "$1" in
     image-build) when='as root in the builder. What it installs is baked into the image' ;;
     provision)   when='in the workspace before boot, on every up, so keep it idempotent' ;;
-    boot)        when='once the stack is up. Return zero only when yours is listening' ;;
+    boot)        when='once the services are up. Return zero only when yours is listening' ;;
   esac
   printf '#!/usr/bin/env bash\nset -euo pipefail\n\n'
-  printf '# Runs %s.\n# After the hook the project ships, and yours to edit.\n\n' "$when"
+  printf '# Runs %s,\n# after every layer above this one in the stack.\n\n' "$when"
   # shellcheck disable=SC2016  # the generated hook expands this, para does not
   printf '# shellcheck source=/dev/null\n. "$PARA_HELPERS"\n'
 }
 
-# ---- project commands ------------------------------------------------------
-# A project extends para by dropping an executable in .paraspace/commands/, and
-# a mod it vendored may ship its own: `para <verb>` runs it on the HOST, with
-# every PARA_* exported and its arguments passed through. Engine verbs always
-# win, and a project's own commands/ wins over any mod's. docs/commands.md.
+# Each layer's configure, host-side, in stack order. A layer proposes env
+# values through set_env_var_if_not_set; existing declarations win, explicit
+# empty ones included, so the chain is idempotent and add reruns it wholesale
+# on every invocation. A failure leaves the writes made so far in place, and
+# rerunning after the fix converges.
+run_configures() {
+  local dir name status
+  # The list rides fd 3 so a configure keeps the caller's stdin and can prompt.
+  while IFS= read -r dir <&3; do
+    [ -n "$dir" ] || continue
+    [ -f "$dir/configure" ] || continue
+    name="$(layer_name "$dir")"
+    stage "Configuring '$name' on YOUR machine with your privileges…"
+    status=0
+    (
+      cd "$PARA_PROJECT_DIR"
+      # shellcheck disable=SC2030,SC2034  # read by the export below, via ${!PARA_@}
+      PARA_LAYER_DIR="$dir"
+      export "${!PARA_@}"
+      bash "$dir/configure"
+    ) || status=$?
+    # The layer's own status, handed back unchanged rather than flattened to 1.
+    if [ "$status" -ne 0 ]; then
+      warn "the '$name' configure failed (exit $status). Fix the cause above, then re-run: para add"
+      exit "$status"
+    fi
+  done 3< <(stack_dirs)
+}
+
+# The one flat catalog: bundled layers, installed plugins' layers, and the
+# project's own, named exactly as add accepts them, the ones already in the
+# stack checked. It answers both "what can I add" and "what do I have".
+add_list() {
+  local have pdir vendor display line
+  have="$(stack_lines)"
+  {
+    catalog_names "$(pkg_root)/layers" "" "node_modules/paraspace/layers/"
+    for pdir in "$PARA_PROJECT_DIR"/node_modules/paraspace-plugin-*/layers; do
+      if [ -d "$pdir" ]; then
+        vendor="${pdir%/layers}"; vendor="${vendor##*paraspace-plugin-}"
+        catalog_names "$pdir" "$vendor/" "node_modules/paraspace-plugin-$vendor/layers/"
+      fi
+    done
+    catalog_names "$PARA_PROJECT_DIR/.paraspace/layers" ".paraspace/layers/" ".paraspace/layers/"
+  } | sort | while IFS="$(printf '\t')" read -r display line; do
+    if printf '%s\n' "$have" | grep -qxF "$line"; then
+      printf '✔ %s\n' "$display"
+    else
+      printf '  %s\n' "$display"
+    fi
+  done
+}
+
+# The layers under one root, as "display<TAB>stack line" rows: the directories
+# at the top, plus base/* one level down, which is the whole recognized shape.
+catalog_names() { # catalog_names <root-dir> <display-prefix> <line-prefix>
+  local d rel
+  for d in "$1"/*/ "$1"/base/*/; do
+    [ -d "$d" ] || continue
+    d="${d%/}"
+    rel="${d#"$1"/}"
+    [ "$rel" = base ] || printf '%s%s\t%s%s\n' "$2" "$rel" "$3" "$rel"
+  done
+}
+
+# ---- layer commands ---------------------------------------------------------
+# A layer extends para by dropping an executable in its commands/: `para
+# <verb>` runs it on the HOST, with every PARA_* exported and its arguments
+# passed through. Engine verbs always win, and between layers the later
+# layer's verb wins, the same rule as skel files. docs/commands.md.
 project_commands() {
-  local pdir f
-  while IFS= read -r pdir; do
-    for f in "$pdir"/commands/*; do
+  local dir f
+  while IFS= read -r dir; do
+    for f in "$dir"/commands/*; do
       if [ -f "$f" ]; then printf '%s\n' "${f##*/}"; fi
     done
-  done < <(paraspace_dirs) | sort -u
+  done < <(stack_dirs) | sort -u
 }
 
-# Every command file answering to <verb>, in resolution order.
+# Every command file answering to <verb>, in stack order.
 command_files() { # command_files <verb>
-  local pdir
-  while IFS= read -r pdir; do
-    if [ -f "$pdir/commands/$1" ]; then printf '%s\n' "$pdir/commands/$1"; fi
-  done < <(paraspace_dirs)
+  local dir
+  while IFS= read -r dir; do
+    if [ -f "$dir/commands/$1" ]; then printf '%s\n' "$dir/commands/$1"; fi
+  done < <(stack_dirs)
 }
 
-# The file `para <verb>` runs, or nothing: yours first, then each mod's.
+# The file `para <verb>` runs, or nothing: the LAST layer that defines it,
+# so the project layer, sitting last, can replace any verb above it.
 command_path() { # command_path <verb>
-  local pdir
-  while IFS= read -r pdir; do
-    if [ -f "$pdir/commands/$1" ]; then printf '%s\n' "$pdir/commands/$1"; return 0; fi
-  done < <(paraspace_dirs)
-  return 1
+  local f found=""
+  while IFS= read -r f; do found="$f"; done < <(command_files "$1")
+  [ -n "$found" ] || return 1
+  printf '%s\n' "$found"
 }
 
-# Does more than one mod define <verb>? Nothing promises an order between them,
-# so dispatch refuses rather than pick. See run_project_command. Your own
-# commands/ settles it, which is why finding one here means "no conflict", and
-# why everything command_files then returns belongs to a mod.
-command_conflict() { # command_conflict <verb>
-  if [ -f "$PARA_PROJECT_DIR/.paraspace/commands/$1" ]; then return 1; fi
-  local f n=0
-  while IFS= read -r f; do n=$((n + 1)); done < <(command_files "$1")
-  [ "$n" -gt 1 ]
-}
-
-# The mod's .paraspace dir a resolved command came from, or nothing when the
-# command is the project's own.
-command_pdir() { # command_pdir <path>
-  case "$1" in
-    "$PARA_PROJECT_DIR"/.paraspace/mods/*) printf '%s' "${1%/commands/*}" ;;
-  esac
-}
-
-# The "# summary: …" line a project command may carry, for `para --help`.
+# The "# summary: …" line a command may carry, for `para --help`.
 command_summary() { sed -n '1,5s/^# summary: *//p' "$1"; }
 
 run_project_command() {
-  local verb="$1" script pdir
+  local verb="$1" script
   shift
-  # A verb names a file in commands/, never a path out of it.
+  # A verb names a file in a layer's commands/, never a path out of one.
   case "$verb" in */*|.|..) die "unknown command '$verb'. See 'para --help'." ;; esac
   script="$(command_path "$verb")" || die "unknown command '$verb'. See 'para --help'."
   require_project   # commands are part of the contract, so honour the pin
-  # Refuse rather than pick: para promises no order between mods, so running one
-  # of them would be a coin toss the reader cannot see the result of.
-  if command_conflict "$verb"; then
-    die "more than one mod defines '$verb'. Remove one of these, or shadow it with your own .paraspace/commands/$verb:
-$(command_files "$verb")"
-  fi
-  # PARA_HOOKS and PARA_SKEL name paths inside a workspace, so an inherited pair
-  # would point a host command at directories that do not exist here. PARA_MOD_DIR
-  # is the host-side answer, and only a mod's own command gets one.
-  pdir="$(command_pdir "$script")"
-  unset PARA_HOOKS PARA_SKEL PARA_MOD_DIR
+  # PARA_LAYER_DIR is how a command finds its own files, and it is always the
+  # owning layer's: a stale value inherited from a calling command must not
+  # leak through, so it is reasserted rather than trusted.
   # shellcheck disable=SC2034  # read by the export below, via ${!PARA_@}
-  if [ -n "$pdir" ]; then PARA_MOD_DIR="$pdir"; fi
+  PARA_LAYER_DIR="${script%/commands/*}"
   export "${!PARA_@}"
   exec "$script" "$@"
 }
@@ -1263,7 +1329,7 @@ doctor_config() {
   local key
   for key in PARA_PROJECT_NAME PARA_IMAGE_NAME PARA_ORIGIN PARA_ROUTES PARA_IMAGE_BASE PARA_VOLUME; do
     if [ -f "$PARA_CONFIG" ] && grep -q "^[^#]*$key" "$PARA_CONFIG"; then
-      d_warn "$key is set in the user config, so it applies to EVERY project on this box. It probably belongs in a Parafile."
+      d_warn "$key is set in the user config, so it applies to EVERY project on this box. It probably belongs in the project's .paraspace/env."
     fi
   done
 }
@@ -1354,46 +1420,64 @@ version_ge() { [ "$1" = "$2" ] || [ "$(printf '%s\n%s\n' "$1" "$2" | sort -V | t
 doctor_project() {
   if [ -z "$PARA_PROJECT_DIR" ]; then d_warn "not inside a para project"; return; fi
   if [ -z "$PARA_CONTRACT" ]; then
-    d_warn "the Parafile declares no PARA_CONTRACT. Add : \"\${PARA_CONTRACT:=$CONTRACT}\" so a breaking para change fails loudly"
+    d_warn "the env file declares no PARA_CONTRACT. Add PARA_CONTRACT=$CONTRACT so a breaking para change fails loudly"
   elif [ "$PARA_CONTRACT" = "$CONTRACT" ]; then
-    d_ok "Parafile targets contract $PARA_CONTRACT"
+    d_ok "env targets contract $PARA_CONTRACT"
   else
     d_bad "this project targets contract $PARA_CONTRACT, but this para provides $CONTRACT. See docs/versioning.md"
   fi
+  doctor_stack
   if [ -n "$PARA_ROUTES" ]; then d_ok "routes: $PARA_ROUTES"; else d_warn "no PARA_ROUTES, so this project publishes no HTTP"; fi
   # Derived from the checkout, so it is worth showing which repo that came out as.
   if [ -n "$PARA_ORIGIN" ]; then d_ok "origin: $PARA_ORIGIN"; else d_warn "no PARA_ORIGIN, and no git origin here to derive one from, so a hook that clones has nothing to clone"; fi
   if incus image info "$PARA_IMAGE_NAME" >/dev/null 2>&1; then d_ok "image '$PARA_IMAGE_NAME' exists"
   else d_bad "no image '$PARA_IMAGE_NAME'. Build it with: para image build"; fi
-  # A command that shadows an engine verb never runs, and a verb more than one
-  # mod defines refuses at dispatch until you break the tie. An engine verb wins
-  # over both, so it is reported instead of the tie, not as well as it.
+  # A command that shadows an engine verb never runs; the engine verb wins.
   local verb
   while IFS= read -r verb; do
-    if is_engine_verb "$verb"; then
-      doctor_shadowed "$verb"
-    elif command_conflict "$verb"; then
-      d_bad "more than one mod defines '$verb', so 'para $verb' refuses until one is removed"
-    fi
+    if is_engine_verb "$verb"; then doctor_shadowed "$verb"; fi
   done < <(project_commands)
 }
 
-# Everything that defines a verb the engine already owns. All of them, not the
-# one that would have run: none of them will, so naming one would send you to
-# fix a file picked by glob order.
+# The resolved chain, in order, each line checked on disk. Every layer
+# composes identically, but a chain with no base (no 'base/' path component)
+# or with several usually means a broken image contract, so say so.
+doctor_stack() {
+  if [ -z "$PARA_STACK" ]; then
+    d_warn "no .paraspace/stack, so the stack is empty and no hooks will run. Start with: para add"
+    return
+  fi
+  local dir rel bases=0 dupes
+  while IFS= read -r dir; do
+    [ -n "$dir" ] || continue
+    rel="${dir#"$PARA_PROJECT_DIR"/}"
+    if [ -d "$dir" ]; then d_ok "layer $rel"; else d_bad "layer $rel is missing ('npm install', or fix .paraspace/stack)"; fi
+    case "/$rel/" in */base/*) bases=$((bases + 1)) ;; esac
+  done < <(stack_dirs)
+  dupes="$(stack_dirs | sort | uniq -d)"
+  [ -z "$dupes" ] || d_bad "duplicate stack lines: $(printf '%s' "$dupes" | tr '\n' ' ')"
+  dupes="$(stack_names | sort | uniq -d)"
+  [ -z "$dupes" ] || d_bad "two stack lines share a layer name: $(printf '%s' "$dupes" | tr '\n' ' ')"
+  if [ "$bases" -eq 0 ]; then
+    d_warn "the stack has no base layer, so nothing establishes the image, its bootstrap, or its user"
+  elif [ "$bases" -gt 1 ]; then
+    d_warn "the stack has $bases base layers; usually exactly one establishes the image"
+  fi
+}
+
+# Everything that defines a verb the engine already owns. All of them, not
+# the one that would have run: none of them will.
 doctor_shadowed() { # doctor_shadowed <verb>
-  local path pdir owner
+  local path
   while IFS= read -r path; do
-    pdir="$(command_pdir "$path")"
-    if [ -n "$pdir" ]; then owner="mod ${pdir##*/}'s command"; else owner="project command"; fi
-    d_warn "$owner '$1' is shadowed by the engine verb of the same name"
+    d_warn "layer $(layer_name "${path%/commands/*}")'s command '$1' is shadowed by the engine verb of the same name"
   done < <(command_files "$1")
 }
 
 # ---- help ------------------------------------------------------------------
 is_engine_verb() {
   case "$1" in
-    up|down|rm|ls|sh|caddy|config|image|init|mod|doctor|commands|completions|exec) return 0 ;;
+    up|down|rm|ls|sh|caddy|config|image|init|add|doctor|commands|completions|exec) return 0 ;;
     # Every spelling main dispatches, or doctor stays silent about a command
     # named for one and the reader never learns why theirs does nothing.
     help|-h|--help|--version) return 0 ;;
@@ -1419,11 +1503,10 @@ usage() {
 	                            on first use), or seed it, or say where it is
 
 	PROJECT
-	  init [<template>]         scaffold .paraspace/ into the current directory
-	  mod add <name>...         vendor bundled mods into .paraspace/mods/
-	  mod init [<name>]         stub a mod of your own there (default: project)
+	  init | add [<name>...]    scaffold .paraspace/ if needed and add layers to
+	                            the stack (--list, --new <name>)
 	  image <build|status|rm>   the base image workspaces launch from
-	  commands                  the verbs this project adds, its mods' included
+	  commands                  the verbs this project's layers add
 	  completions <bash|zsh>    source <(para completions bash)
 	  --version                 the installed paraspace version
 	EOF
@@ -1434,25 +1517,21 @@ usage() {
 	EOF
 }
 
-# A project's own verbs, listed so nothing it added runs invisibly, including
-# the ones a mod brought, which is why each row names the mod it came from.
+# A project's own verbs, listed so nothing a layer added runs invisibly,
+# which is why each row names the layer it resolved to.
 usage_project_commands() {
-  local list verb path pdir
+  local list verb path
   list="$(project_commands)"
   [ -n "$list" ] || return 0
   printf '\nPROJECT COMMANDS (%s/.paraspace)\n' "$PARA_PROJECT_DIR"
   while IFS= read -r verb; do
     path="$(command_path "$verb")" || continue
-    pdir="$(command_pdir "$path")"
-    # Two ways a verb that exists never runs, both of them para doctor's report:
-    # the engine owns the name, or more than one mod claims it. Either way there
-    # is nothing worth crediting and no summary worth advertising.
+    # A verb named for an engine verb never runs; the engine wins, and doctor
+    # is where that gets pointed out.
     if is_engine_verb "$verb"; then
       printf '  %-25s %s\n' "$verb" "never runs, since the engine verb wins (para doctor)"
-    elif command_conflict "$verb"; then
-      printf '  %-25s %s\n' "$verb" "never runs, since more than one mod defines it (para doctor)"
     else
-      printf '  %-25s %s%s\n' "$verb" "$(command_summary "$path")" "${pdir:+ [${pdir##*/}]}"
+      printf '  %-25s %s [%s]\n' "$verb" "$(command_summary "$path")" "$(layer_name "${path%/commands/*}")"
     fi
   done <<<"$list"
 }
@@ -1470,7 +1549,7 @@ cmd_completions() {
   cat <<-'EOF'
 	_para() {
 	  local cur="${COMP_WORDS[COMP_CWORD]}" cmd="${COMP_WORDS[1]:-}"
-	  local verbs="up down rm ls sh caddy config image init mod doctor commands completions help"
+	  local verbs="up down rm ls sh caddy config image init add doctor commands completions help"
 
 	  if [ "$COMP_CWORD" -eq 1 ]; then
 	    COMPREPLY=( $(compgen -W "$verbs $(para commands 2>/dev/null)" -- "$cur") )
@@ -1481,14 +1560,8 @@ cmd_completions() {
 	    config)      COMPREPLY=( $(compgen -W "edit init path" -- "$cur") ) ;;
 	    image)       COMPREPLY=( $(compgen -W "build status rm" -- "$cur") ) ;;
 	    completions) COMPREPLY=( $(compgen -W "bash zsh" -- "$cur") ) ;;
-	    init)        COMPREPLY=( $(compgen -W "--list --full --force" -- "$cur") ) ;;
-	    # Two levels, so the position decides: the subcommand, then what add takes.
-	    # Only add, since init's argument is a name you are inventing.
-	    mod)         if [ "$COMP_CWORD" -eq 2 ]; then
-	                   COMPREPLY=( $(compgen -W "add init" -- "$cur") )
-	                 elif [ "${COMP_WORDS[2]}" = add ]; then
-	                   COMPREPLY=( $(compgen -W "--list $(para mod add --list 2>/dev/null)" -- "$cur") )
-	                 fi ;;
+	    # The catalog rows are "checkmark name"; the name is the last field.
+	    init|add)    COMPREPLY=( $(compgen -W "--list --new $(para add --list 2>/dev/null | awk '{print $NF}')" -- "$cur") ) ;;
 	    ls)          COMPREPLY=( $(compgen -W "--all --names" -- "$cur") ) ;;
 	    # Everything else, including every project command, takes a workspace.
 	    *)           [ "$COMP_CWORD" -eq 2 ] \
@@ -1510,9 +1583,15 @@ main() {
   HELPERS="$(pkg_root)/libexec/helpers"
   # shellcheck source=/dev/null
   . "$HELPERS"
-  load_config
   local cmd="${1:-}"
   shift || true
+  # init/add may be creating the project here, so the root they operate on is
+  # pinned before load_config derives identity from it: the enclosing
+  # project, or the current directory.
+  case "$cmd" in
+    init|add) PARA_PROJECT_DIR="${PARA_PROJECT_DIR:-$(find_project_root || pwd)}" ;;
+  esac
+  load_config
   case "$cmd" in
     up)          cmd_up "$@" ;;
     down)        cmd_down "$@" ;;
@@ -1522,8 +1601,7 @@ main() {
     caddy)       cmd_caddy "$@" ;;
     config)      cmd_config "$@" ;;
     image)       cmd_image "$@" ;;
-    init)        cmd_init "$@" ;;
-    mod)         cmd_mod "$@" ;;
+    init|add)    cmd_add "$@" ;;
     doctor)      cmd_doctor "$@" ;;
     commands)    project_commands ;;
     completions) cmd_completions "$@" ;;

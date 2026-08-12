@@ -1,0 +1,47 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# shellcheck source=/dev/null
+. "$PARA_HELPERS"
+
+# shellcheck source=shared-config
+. "$PARA_LAYER_DIR/hooks/shared-config"
+
+marker="$shared/.key-authorized"
+if [ -z "${PARA_GH_AUTH:-}" ] || [ -f "$marker" ]; then exit 0; fi
+case "$PARA_ORIGIN" in
+  git@github.com:*|ssh://git@github.com/*) ;;
+  *) exit 0 ;;
+esac
+if ! command -v gh >/dev/null 2>&1; then
+  warn "gh is not in the workspace image. Run 'para image build' for automatic key authorization."
+  exit 0
+fi
+# The git layer writes this before it opens the point. Without it there is no key
+# to upload, and an empty one would match every line gh lists back.
+if [ ! -s ~/.ssh/id_ed25519.pub ]; then
+  warn "no shared SSH key at ~/.ssh/id_ed25519.pub. Add the git layer, which creates one: para add git"
+  exit 0
+fi
+
+authorize_key() {
+  if ! gh auth status --hostname github.com >/dev/null 2>&1; then
+    interactive || return 1
+    gh auth login --hostname github.com --git-protocol ssh \
+      --skip-ssh-key --scopes admin:public_key
+  fi
+  # GitHub 422s on a key it already holds, and "already authorized" is the state
+  # this hook exists to reach, so ask before adding rather than fail on it.
+  local key title
+  key="$(cut -d' ' -f1,2 < ~/.ssh/id_ed25519.pub)"
+  case "$(gh ssh-key list 2>/dev/null || true)" in *"$key"*) return 0 ;; esac
+  title="para $(basename "${PARA_ORIGIN%.git}") (${PARA_HOSTNAME:-$(hostname)})"
+  gh ssh-key add ~/.ssh/id_ed25519.pub --title "$title"
+}
+
+stage "Authorizing the shared SSH key with GitHub"
+if authorize_key; then
+  touch "$marker"
+else
+  warn "GitHub key authorization did not complete; the git layer will offer the manual path"
+fi

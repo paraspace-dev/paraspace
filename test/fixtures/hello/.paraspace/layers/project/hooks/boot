@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# The fixture's e2e-mod layer owns the app boot, so e2e covers a boot hook
+# supplied by a non-project layer.

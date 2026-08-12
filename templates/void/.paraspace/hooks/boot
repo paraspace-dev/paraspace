@@ -1,5 +1,0 @@
-#!/usr/bin/env bash
-set -euo pipefail
-
-# The base starts nothing. Add a project boot command here, or vendor a mod that
-# supplies one. Return only after every service behind PARA_ROUTES is ready.

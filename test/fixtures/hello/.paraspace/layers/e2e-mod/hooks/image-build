@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+set -euo pipefail
+# A layer's build hook, run in the builder. This is the path with the least
+# margin for error: the builder's stack is at /opt, not in a $HOME that
+# exists yet, so a wrong $PARA_LAYER_DIR here reads an absent directory
+# behind some `[ -f ]` guard and seeds nothing, silently.
+#
+# Baked into the image rather than written per workspace, so a workspace finding
+# this file proves the layer's hook ran at BUILD time.
+
+[ -d "$PARA_LAYER_DIR" ] \
+  || { echo "PARA_LAYER_DIR ($PARA_LAYER_DIR) does not resolve in the builder" >&2; exit 1; }
+
+echo "e2e-mod-was-here" > /etc/para-layer-marker

@@ -1,0 +1,42 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Host-side, run by `para add` in stack order. Proposes env values; existing
+# declarations win, so this is idempotent.
+# shellcheck source=/dev/null
+. "$PARA_HELPERS"
+
+if ! command -v node >/dev/null 2>&1; then
+  warn "Docker layer configuration skipped: Node.js is not available. Set PARA_PREPULL_IMAGES and PARA_ROUTES manually."
+  exit 0
+fi
+if ! command -v docker >/dev/null 2>&1 || ! docker compose version >/dev/null 2>&1; then
+  warn "Docker layer configuration skipped: Docker Compose is not available. Set PARA_PREPULL_IMAGES and PARA_ROUTES manually."
+  exit 0
+fi
+
+model=""
+if ! model="$(docker compose config --format json)"; then
+  warn "Docker layer configuration skipped: Compose could not resolve this project. Set PARA_PREPULL_IMAGES and PARA_ROUTES manually."
+  exit 0
+fi
+
+inferred=""
+if ! inferred="$(printf '%s' "$model" | node "$PARA_LAYER_DIR/configure.js")"; then
+  warn "Docker layer configuration skipped: Compose returned a model that could not be inspected. Set PARA_PREPULL_IMAGES and PARA_ROUTES manually."
+  exit 0
+fi
+
+images="" routes="" routes_ok=0 line=""
+while IFS= read -r line; do
+  case "$line" in
+    IMAGES=*) images="${line#IMAGES=}" ;;
+    ROUTES=*) routes="${line#ROUTES=}"; routes_ok=1 ;;
+  esac
+done <<< "$inferred"
+
+# Calculate both first, then make the two independent additive changes.
+[ -z "$images" ] || set_env_var_if_not_set PARA_PREPULL_IMAGES "$images"
+if [ "$routes_ok" -eq 1 ] && [ -n "$routes" ]; then
+  set_env_var_if_not_set PARA_ROUTES "$routes"
+fi

@@ -4,37 +4,37 @@
 
 helpers_repo() { cd "$(dirname "$PARA")/.." && pwd; }
 
-test_set_parafile_var_respects_existing_assignment_forms() {
+test_set_env_var_respects_existing_assignment_forms() {
   local root p form before
   root="$(helpers_repo)"
   for form in 'PARA_ROUTES=8080' 'PARA_ROUTES=""' ': "${PARA_ROUTES:=3000}"' 'PARA_ROUTES="${PARA_ROUTES-4000}"'; do
-    p="$(a_project "$form")"; before="$(cat "$p/.paraspace/Parafile")"
+    p="$(a_project "$form")"; before="$(cat "$p/.paraspace/env")"
     assert env PARA_PROJECT_DIR="$p" PARA_HELPERS="$root/libexec/helpers" bash -c \
-      '. "$PARA_HELPERS"; set_parafile_var_if_not_set PARA_ROUTES 9000' || return 1
-    assert_eq "$before" "$(cat "$p/.paraspace/Parafile")" "existing form wins: $form" || return 1
+      '. "$PARA_HELPERS"; set_env_var_if_not_set PARA_ROUTES 9000' || return 1
+    assert_eq "$before" "$(cat "$p/.paraspace/env")" "existing form wins: $form" || return 1
   done
 }
 
-test_set_parafile_var_ignores_comments_and_similar_names_and_escapes() {
+test_set_env_var_ignores_comments_and_similar_names_and_escapes() {
   local root p value resolved
   root="$(helpers_repo)"; p="$(a_project '# PARA_ROUTES=8080' 'PARA_ROUTE=7000')"
   value="one two'\"\$three"
   assert env PARA_PROJECT_DIR="$p" PARA_HELPERS="$root/libexec/helpers" VALUE="$value" bash -c \
-    '. "$PARA_HELPERS"; set_parafile_var_if_not_set PARA_ROUTES "$VALUE"' || return 1
-  resolved="$(env -i bash -c '. "$1"; printf "%s" "$PARA_ROUTES"' bash "$p/.paraspace/Parafile")"
+    '. "$PARA_HELPERS"; set_env_var_if_not_set PARA_ROUTES "$VALUE"' || return 1
+  resolved="$(env -i bash -c '. "$1"; printf "%s" "$PARA_ROUTES"' bash "$p/.paraspace/env")"
   assert_eq "$value" "$resolved" "the appended assignment round-trips through bash" || return 1
-  assert_eq 1 "$(grep -c '^PARA_ROUTES=' "$p/.paraspace/Parafile")" "exactly one declaration"
+  assert_eq 1 "$(grep -c '^PARA_ROUTES=' "$p/.paraspace/env")" "exactly one declaration"
 }
 
-test_set_parafile_var_rejects_bad_names_and_missing_parafiles() {
+test_set_env_var_rejects_bad_names_and_missing_env_files() {
   local root p
   root="$(helpers_repo)"; p="$(scratch)"
   assert_fails env PARA_PROJECT_DIR="$p" PARA_HELPERS="$root/libexec/helpers" bash -c \
-    '. "$PARA_HELPERS"; set_parafile_var_if_not_set ROUTES 80' || return 1
+    '. "$PARA_HELPERS"; set_env_var_if_not_set ROUTES 80' || return 1
   assert_fails env PARA_PROJECT_DIR="$p" PARA_HELPERS="$root/libexec/helpers" bash -c \
-    '. "$PARA_HELPERS"; set_parafile_var_if_not_set PARA_bad 80' || return 1
+    '. "$PARA_HELPERS"; set_env_var_if_not_set PARA_bad 80' || return 1
   assert_fails env PARA_PROJECT_DIR="$p" PARA_HELPERS="$root/libexec/helpers" bash -c \
-    '. "$PARA_HELPERS"; set_parafile_var_if_not_set PARA_ROUTES 80'
+    '. "$PARA_HELPERS"; set_env_var_if_not_set PARA_ROUTES 80'
 }
 
 test_xbps_install_skips_an_all_installed_set() {

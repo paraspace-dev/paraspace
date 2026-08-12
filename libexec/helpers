@@ -21,10 +21,9 @@ interactive() { [ -z "${PARA_NONINTERACTIVE:-}" ] && [ -t 0 ] && [ -t 1 ]; }
 # Print a prompt and wait for Enter, only when someone can answer.
 pause() { if interactive; then printf '%s ' "$*" >&2; read -r _ || true; fi; }
 
-# Add one project setting without taking ownership away from the project. Both
-# assignment spellings documented for the env file count, including an
-# explicitly empty value. This is a host helper, for a layer's configure;
-# guest hooks have no project env to edit.
+# Add one project setting without taking ownership from the project: both env
+# assignment spellings count as existing, an explicit empty value included.
+# Host-side, for a layer's configure; guest hooks have no project env to edit.
 maybe_write_env() { # maybe_write_env <PARA_NAME> <value>
   [ "$#" -eq 2 ] || die "usage: maybe_write_env <PARA_NAME> <value>"
   local name="$1" value="$2" envfile="${PARA_PROJECT_DIR:-}/.paraspace/env"

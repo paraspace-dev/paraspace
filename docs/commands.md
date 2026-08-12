@@ -2,18 +2,19 @@
 
 `para --help` is always current for the build you're running; this page is the
 same surface with room to explain. It comes in two halves: the **engine verbs**
-below, which are fixed, and the **project commands** your repo adds, including
-any a [mod](./mods.md) brought with it.
+below, which are fixed, and the **project commands** your repo's layers add,
+including any a layer you added brought with it.
 
-Only `para up`, `para image …` and `para mod add` must run inside a project (a
-`.paraspace/` directory, found from `$PWD` upward). Everything else works from
-anywhere, including `para init`, which is how you *create* one.
+Only `para up`, `para image …`, and project commands must run inside a project
+(a `.paraspace/` directory, found from `$PWD` upward). `para init` and
+`para add` create one in the current directory when none encloses it.
+Everything else works from anywhere.
 
 ## Workspaces
 
 | Command | What it does |
 |---|---|
-| `para up <name>` | create or reconverge a workspace, then boot it: launch, attach the shared volume, push `.paraspace/`, run the hooks, publish the routes. Idempotent |
+| `para up <name>` | create or reconverge a workspace, then boot it: launch, attach the shared volume, push the composed layer stack, run the hooks, publish the routes. Idempotent |
 | `para down <name>` | stop the container. Data is kept; `para up` resumes it |
 | `para rm <name>` | delete the workspace. The shared volume is untouched |
 | `para ls [-a\|--all] [--names]` | list this project's workspaces; `--all` spans every project, `--names` prints bare names (this is what completion reads) |
@@ -60,7 +61,7 @@ There is no `para exec`; this is it.
 |---|---|
 | `para caddy <start\|stop\|status>` | the para Caddy that serves `*.$PARA_DOMAIN`. `para up` starts it for you; `stop` leaves workspaces running |
 | `para doctor` | check this machine and print the resolved config (see [Troubleshooting](./troubleshooting.md)) |
-| `para config <edit\|init\|path>` | open, seed, or locate the [user config](./parafile.md#user-config-not-parafile) |
+| `para config <edit\|init\|path>` | open, seed, or locate the [user config](./env.md#user-config-vs-the-env-file) |
 
 The user config is hand-edited, so `config` just gets you to it:
 
@@ -75,13 +76,11 @@ it (`--force` overwrites); `path` prints its location. Both are for scripting.
 
 | Command | What it does |
 |---|---|
-| `para init [<template>] [--list] [-f\|--force] [--full]` | scaffold `.paraspace/` from a bundled template (default `void`), skipping files that already exist; `-f` overwrites them instead, except your `Parafile`, which it always keeps; `--full` copies the whole template tree, not just `.paraspace/` |
-| `para mod add <name>...` | vendor one or more bundled [mods](./mods.md) into `.paraspace/mods/<name>/`, replacing any already there, then run optional host-side `configure` scripts in argument order. para confirms every name exists before copying any. `--list` in place of the names prints what this `para` ships |
-| `para mod init [<name>]` | stub a [mod](./mods.md) of your own at `.paraspace/mods/<name>/` (default `project`), refusing an existing one without `-f\|--force` |
+| `para init` / `para add [<layer>...] [--list] [--new <name>]` | converge the project and rerun its layers' configure chain. In a fresh directory with no arguments, scaffold `.paraspace/` with the env file, stack file, and a stubbed project layer at `.paraspace/layers/project/`. Given layer names, add them to the stack. `--list` prints the flat catalog of bundled layers, installed plugins' layers, and the project's own, marking layers already in the stack. `--new <name>` stubs `.paraspace/layers/<name>` and adds it. See [Layers](./layers.md) |
 | `para image build [-i\|--from-current]` | build and publish the project's base image; `-i` layers onto the current one for fast iteration (see [The image contract](./image.md)) |
 | `para image status` | when `$PARA_IMAGE_NAME` was built, and from what base |
 | `para image rm` | delete `$PARA_IMAGE_NAME`. Running workspaces are clones and keep running |
-| `para commands` | list the verbs this project adds, its mods' included, one per line |
+| `para commands` | list the verbs this project's layers add, one per line |
 | `para completions <bash\|zsh>` | print a completion script |
 
 ```sh
@@ -91,10 +90,10 @@ source <(para completions zsh)    # ~/.zshrc
 
 ## Project commands
 
-A project adds its own `para` verbs by dropping an executable in
-`.paraspace/commands/`. `para <verb> [args…]` runs it **on the host**, with your
-tty, with every `PARA_*` exported, and with its arguments passed through
-untouched.
+An executable in a layer's `commands/` directory becomes `para <verb>`. Put
+commands of your own in `.paraspace/layers/project/commands/`. `para <verb>
+[args…]` runs the command **on the host**, with your tty, with every `PARA_*`
+exported, and with its arguments passed through untouched.
 
 ```sh
 #!/usr/bin/env bash
@@ -108,15 +107,14 @@ url="https://$1.$PARA_DOMAIN"
 xdg-open "$url"
 ```
 
-Save that as `.paraspace/commands/web`, make it executable, and `para web ws1`
-works. Four variables exist for exactly this. **`PARA_BIN`** is the path to
-this `para`, so a command can call back without relying on `$PATH`.
-**`PARA_PROJECT_DIR`** is the project directory. **`PARA_MOD_DIR`** is the
-directory a mod was vendored into, and para sets it only when the command came
-from a [mod](./mods.md). **`PARA_HELPERS`** is para's host-side helper library,
-with the same output and interactivity functions hooks receive, plus
-[`set_parafile_var_if_not_set`](./mods.md#writing-one) for a host script that
-proposes a `Parafile` setting.
+Save that as `.paraspace/layers/project/commands/web`, make it executable, and
+`para web ws1` works. Four variables exist for exactly this. **`PARA_BIN`** is
+the path to this `para`, so a command can call back without relying on `$PATH`.
+**`PARA_PROJECT_DIR`** is the project directory. **`PARA_LAYER_DIR`** is always
+the directory of the layer the command came from. **`PARA_HELPERS`** is para's
+host-side helper library, with the same output and interactivity functions hooks
+receive, plus [`maybe_write_env`](./layers.md#configure-layers) for a host
+script that proposes a project env setting.
 
 Because [`para sh`](#running-one-command) owns all the terminal handling,
 commands that drive something inside a workspace stay one-liners:
@@ -129,22 +127,21 @@ exec "$PARA_BIN" sh "$1" -c "exec claude --name $1"
 
 A few rules keep this safe to have in a repo you cloned:
 
-- **Engine verbs always win.** A project can't redefine `para up`. `para doctor`
+- **Engine verbs always win.** A layer can't redefine `para up`. `para doctor`
   warns about a command that's shadowed and therefore never runs.
+- When two layers define the same verb, the later layer in the stack wins. The
+  project layer sits last, so it can replace any verb a packaged layer added.
+  `para --help` names the owning layer beside each verb.
 - **Nothing runs invisibly.** Everything discovered is listed under `PROJECT
   COMMANDS` in `para --help`, with the `# summary:` line from the file if it has
   one.
 - They run with **your** privileges, on the host, like any other script in the
   repo. Read them before you run them.
 
-Bundled content ships a few as examples, not as engine features:
+Bundled layers ship a few commands as examples, not as engine features:
 
 | Owner | Commands |
 |---|---|
-| `void` template | `web` |
-| `git` mod | `key` |
-| `dotfiles` mod | `claude`, `run` |
-
-A [mod](./mods.md) you vendored can add verbs too, listed the same way with the
-mod named beside them. [The precedence rules are
-there](./mods.md#verbs-a-mod-brings).
+| `base/void` layer | `web` |
+| `git` layer | `key` |
+| `dotfiles` layer | `claude`, `run` |

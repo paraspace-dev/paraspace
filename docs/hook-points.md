@@ -8,7 +8,7 @@ have, especially if it came from someone else.
 Open a point where the ordering matters:
 
 ```sh
-# .paraspace/hooks/provision, the line just before you clone
+# .paraspace/layers/project/hooks/provision, the line just before you clone
 "$PARA_RUN_HOOK" clone:before
 ```
 
@@ -20,22 +20,23 @@ the name. You invent it and you place it.
 Write the file. There is nothing to register:
 
 ```sh
-cat > .paraspace/hooks/clone:before <<'EOF'
+cat > .paraspace/layers/project/hooks/clone:before <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
 git config --global url."git@github.com:".insteadOf https://github.com/
 EOF
 ```
 
-More than one file can answer to a name. `hooks/<name>` runs first, then that
-same name under each [mod](./mods.md)'s `hooks/`. **Mods run in no particular
-order**, so write each one so it doesn't care what else filled the point. This
-is how every hook name resolves, `provision` and `boot` included.
+More than one layer can answer to a name. A hook name runs from every layer in
+the stack that defines it, in stack order, with the top layer first. Write each
+one so it doesn't care what else filled the point. That keeps it portable
+between projects with different layer stacks. This is how every hook name
+resolves, `provision` and `boot` included.
 
 ## Naming
 
 Use `<subject>:before` and `<subject>:after` around the thing itself, so that
-listing `hooks/` groups them by subject:
+listing a layer's `hooks/` directory groups them by subject:
 
 ```
 clone:after   clone:before   provision
@@ -56,13 +57,13 @@ runs are separate processes, so:
   as another user has to carry what it needs across:
 
   ```sh
-  su - "$PARA_USER" -c "PARA_SKEL=$PARA_SKEL install-my-dotfiles"
+  su - "$PARA_USER" -c "PARA_LAYER_DIR=$PARA_LAYER_DIR install-my-dotfiles"
   ```
 
 - **Don't re-source `~/.paraspace/env`** to get para's variables "back". It
-  holds your project's values, so doing that mid-run silently repoints
-  `$PARA_HOOKS` at your `hooks/` even when the hook reading it came from
-  somewhere else. Wrong files, no error.
+  does not carry the per-hook values, so doing that mid-run strips the running
+  hook's own context: `$PARA_LAYER_DIR` vanishes and `$PARA_HOOK_CHAIN` resets
+  the cycle guard. Wrong files, no error.
 
 ## Reading a failure
 
@@ -70,24 +71,24 @@ Once points nest, "which hook failed" stops being obvious, so para reports at
 every level as it unwinds:
 
 ```
-error: hook failed (exit 7): hooks/keys:setup
-  stack: provision > clone:before > keys:setup
-error: hook failed (exit 7): hooks/clone:before
-  stack: provision > clone:before
-error: hook failed (exit 7): hooks/provision
+error: hook failed (exit 7): project/hooks/keys:setup
+  chain: provision > clone:before > keys:setup
+error: hook failed (exit 7): project/hooks/clone:before
+  chain: provision > clone:before
+error: hook failed (exit 7): project/hooks/provision
 ```
 
 Read it top down. **The first line is where it actually broke**, and the
-`stack:` beside it is the route para took to get there. Everything under it is
+`chain:` beside it is the route para took to get there. Everything under it is
 the unwind. The exit status is the failing hook's own, carried up untouched, so
 `exit 7` reaches you as 7. A hook that opens no point fails in a single line,
-with no stack.
+with no chain.
 
 **Your hook needs `set -e` for any of that to fire.** `"$PARA_RUN_HOOK" …` exits
 non-zero when something it ran failed, but a hook that doesn't stop on error
 carries on past it and can still exit 0, and then `para up` reports a ready
-workspace with the error sitting in your scrollback. Every bundled template
-opens with `set -euo pipefail`. Start yours there too.
+workspace with the error sitting in your scrollback. Every hook stub `para init`
+writes opens with `set -euo pipefail`. Start yours there too.
 
 A point that ends up invoking itself is refused rather than left to recurse:
 

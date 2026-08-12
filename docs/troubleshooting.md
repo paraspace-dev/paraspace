@@ -31,7 +31,10 @@ incus
   ✓ bridge 'incusbr0' up
 
 project
-  ✓ Parafile targets contract 1
+  ✓ env targets contract 1
+  ✓ layer node_modules/paraspace/layers/base/void
+  ✓ layer node_modules/paraspace/layers/git
+  ✓ layer .paraspace/layers/project
   ✓ routes: 8080
   ✓ image 'myapp' exists
 ```
@@ -87,7 +90,7 @@ Put para on a `dir` pool over ext4/xfs:
 incus storage create para-dir dir source=/path/on/ext4
 ```
 
-Then set `PARA_POOL` in your [user config](./parafile.md#user-config-not-parafile).
+Then set `PARA_POOL` in your [user config](./env.md#user-config-vs-the-env-file).
 
 ### The workspace is up but the URL doesn't load
 
@@ -120,6 +123,22 @@ re-run.
 
 ## The project
 
+### Stack layers are missing on disk
+
+> stack layers missing on disk:
+>   node_modules/paraspace/layers/base/void
+> Run 'npm install' if these live under node_modules/, else fix .paraspace/stack.
+
+Fresh clones can be missing layers that live under `node_modules`. Install the
+project dependencies:
+
+```sh
+npm install
+```
+
+If the layer path is simply wrong, fix its line in `.paraspace/stack`. See
+[Layers](./layers.md).
+
 ### `no image 'myapp'. Build it with: para image build`
 
 The base image is per-project and per-arch, and it isn't built for you. Run
@@ -138,7 +157,7 @@ Caddy is proxying to a port nothing is listening on. Almost always a `boot` hook
 that returned zero before its services were actually up. The
 [readiness contract](./hooks.md#boot) requires that it return only once every
 routed service is listening (`docker compose up -d --wait` does that for a
-Compose stack; anything else needs its own wait). Check from inside:
+Compose project; anything else needs its own wait). Check from inside:
 
 ```sh
 para sh <name> -c 'ss -ltnp'

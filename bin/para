@@ -17,11 +17,9 @@ set -euo pipefail
 
 CT_PREFIX=para-
 
-# The para<->project contract this engine implements: the injected env, the hook
-# names and semantics, the ~/.paraspace layout in the guest, the env and stack
-# files, and the layer-command mechanism. A breaking change to any of them bumps
-# it; additive changes don't. A project declares the one it targets as
-# PARA_CONTRACT and para refuses on a mismatch. See docs/versioning.md.
+# The para<->project contract this engine implements: injected env, hook names
+# and semantics, the guest ~/.paraspace layout, the env and stack files, and
+# layer commands. A project pins PARA_CONTRACT. Bump rules: docs/versioning.md.
 CONTRACT=1
 
 # The oldest incus para is known to work with. It reads every workspace out of
@@ -190,9 +188,8 @@ require_project() {
 # #-comment lines are ignored. docs/layers.md.
 
 # The stack file, normalized: comments and blanks dropped, whitespace and
-# trailing slashes trimmed. The slashes matter: a layer name ending in '/'
-# lands the guest copy at one path and advertises another, so its hooks
-# silently never run.
+# trailing slashes trimmed. A trailing slash would land the guest copy at one
+# path while advertising another, and the layer's hooks would never run.
 stack_lines() {
   local file="$PARA_PROJECT_DIR/.paraspace/stack"
   [ -f "$file" ] || return 0
@@ -219,11 +216,9 @@ stack_dirs() {
   printf '%s\n' "$PARA_STACK"
 }
 
-# The one name a layer goes by: its stack line with the known roots stripped,
-# so a bundled layer keeps its catalog name ('docker', 'base/void'), a
-# plugin's carries its vendor ('acme/mod-a'), and anything else keeps its
-# last path component. It is also the layer's directory name in the guest,
-# which is why stack_check refuses two layers that share one.
+# The one name a layer goes by: its stack line with the known roots stripped
+# ('docker', 'base/void', 'acme/mod-a'), else its last path component. Also its
+# directory name in the guest, why stack_check refuses two layers sharing one.
 layer_name() { # layer_name <resolved-dir>
   local rel="${1#"$PARA_PROJECT_DIR"/}" vendor
   case "$rel" in
@@ -567,18 +562,15 @@ guest_env() { # guest_env <dest>
         PARA_STACK
   PARA_STACK="$(guest_stack "$1")"
   para_env
-  # para_env forwards every PARA_* in scope, including whatever the caller
-  # happened to export. PARA_HOOK_CHAIN is the runner's to build from empty:
-  # inherited, it reads as "we are already inside that hook" and every run
-  # trips the cycle guard instead of running anything. PARA_LAYER_DIR is
-  # per-hook and per-command, never ambient.
+  # para_env forwards every PARA_* in scope, even ones the caller exported.
+  # PARA_HOOK_CHAIN must start empty or every run trips the runner's cycle
+  # guard, and PARA_LAYER_DIR is per-hook, never ambient.
   printf 'unset PARA_BIN PARA_PROJECT_DIR PARA_CONFIG PARA_CONFIG_DIR PARA_STATE_DIR PARA_HOOK_CHAIN PARA_LAYER_DIR\n'
 }
 
-# Replace <instance>:<dest>/.paraspace with the composed stack, plus para's
-# context. The rm is what makes it a replace: `incus file push -r` merges into
-# whatever is already there, so a layer you dropped would otherwise survive in
-# the guest.
+# Replace <instance>:<dest>/.paraspace with the composed stack plus para's
+# context. The rm makes it a replace: `incus file push -r` merges, so a layer
+# you dropped would otherwise survive in the guest.
 push_stack() { # push_stack <instance> <dest>
   local dir name parent
   incus exec "$1" -- rm -rf "$2/.paraspace"
@@ -1021,11 +1013,9 @@ pkg_root() {
   cd -P "$(dirname "$self")/.." && pwd
 }
 
-# `para init` and `para add` are one convergent verb with two names: in a
-# fresh directory it scaffolds .paraspace/ (env, stack, the project layer);
-# given names it expands them to stack lines and inserts them before the
-# project's own layers; and every invocation reruns the configure chain,
-# which is idempotent because existing env declarations win. docs/layers.md.
+# `para init` and `para add` are one convergent verb with two names: scaffold
+# .paraspace/ if needed, insert named layers before the project's own, and
+# rerun the (idempotent) configure chain every time. docs/layers.md.
 cmd_add() {
   local usage="usage: para add [<name>...] [--list] [--new <name>]"
   local names="" new="" list=0 name
@@ -1100,11 +1090,9 @@ vendor_candidate() {
   esac
 }
 
-# A name at add time. Three sugar forms, no more, and the output is always the
-# explicit stack line, so the runtime never sees a bare name: a bundled name
-# expands under this package's layers/, a vendor name under the plugin's, and
-# anything else is a path, tried literally and then under node_modules/. More
-# than one match dies naming each, and the fix is writing the full path.
+# A name at add time: three sugar forms, and the output is always the explicit
+# stack line, so the runtime never sees a bare name. More than one match dies
+# naming each, and the fix is writing the full path. docs/layers.md.
 expand_layer() { # expand_layer <name> -> one stack line
   local name="$1" c matches=""
   for c in "node_modules/paraspace/layers/$name" "$(vendor_candidate "$name")" \
@@ -1185,11 +1173,9 @@ hook_stub() { # hook_stub <hook>
   printf '# shellcheck source=/dev/null\n. "$PARA_HELPERS"\n'
 }
 
-# Each layer's configure, host-side, in stack order. A layer proposes env
-# values through maybe_write_env; existing declarations win, explicit
-# empty ones included, so the chain is idempotent and add reruns it wholesale
-# on every invocation. A failure leaves the writes made so far in place, and
-# rerunning after the fix converges.
+# Each layer's configure, host-side, in stack order. Existing env declarations
+# win over maybe_write_env, so the chain is idempotent and add reruns it
+# wholesale. A failure keeps earlier writes; rerunning after the fix converges.
 run_configures() {
   local dir name status
   # The list rides fd 3 so a configure keeps the caller's stdin and can prompt.
@@ -1252,9 +1238,8 @@ catalog_names() { # catalog_names <root-dir> <display-prefix> <line-prefix>
 
 # ---- layer commands ---------------------------------------------------------
 # A layer extends para by dropping an executable in its commands/: `para
-# <verb>` runs it on the HOST, with every PARA_* exported and its arguments
-# passed through. Engine verbs always win, and between layers the later
-# layer's verb wins, the same rule as skel files. docs/commands.md.
+# <verb>` runs it on the HOST with every PARA_* exported. Engine verbs always
+# win, and between layers the later layer's verb wins. docs/commands.md.
 project_commands() {
   local dir f
   while IFS= read -r dir; do

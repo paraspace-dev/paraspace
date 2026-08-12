@@ -49,8 +49,7 @@ export default defineConfig({
   srcExclude: [
     'README.md',
     'CLAUDE.md',
-    'templates/**',
-    'mods/**',
+    'layers/**',
     'plans/**',
     'test/**',
   ],
@@ -99,10 +98,11 @@ export default defineConfig({
           text: 'Reference',
           items: [
             { text: 'Commands', link: '/docs/commands' },
-            { text: 'The Parafile', link: '/docs/parafile' },
+            { text: 'The env file', link: '/docs/env' },
             { text: 'Hooks', link: '/docs/hooks' },
             { text: 'Hook points', link: '/docs/hook-points' },
-            { text: 'Mods', link: '/docs/mods' },
+            { text: 'Layers', link: '/docs/layers' },
+            { text: 'Publishing plugins', link: '/docs/plugins' },
             { text: 'The image contract', link: '/docs/image' },
             { text: 'Contract versioning', link: '/docs/versioning' },
             { text: 'Internals', link: '/docs/internals' },

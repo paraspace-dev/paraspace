@@ -189,11 +189,14 @@ require_project() {
 # resolved against the project root, composed top to bottom. Blank lines and
 # #-comment lines are ignored. docs/layers.md.
 
-# The stack file, normalized: comments and blanks dropped, whitespace trimmed.
+# The stack file, normalized: comments and blanks dropped, whitespace and
+# trailing slashes trimmed. The slashes matter: a layer name ending in '/'
+# lands the guest copy at one path and advertises another, so its hooks
+# silently never run.
 stack_lines() {
   local file="$PARA_PROJECT_DIR/.paraspace/stack"
   [ -f "$file" ] || return 0
-  awk '{ gsub(/^[ \t]+|[ \t]+$/, "") } $0 == "" || $0 ~ /^#/ { next } { print }' "$file"
+  awk '{ gsub(/^[ \t]+|[ \t]+$/, "") } $0 == "" || $0 ~ /^#/ { next } { gsub(/\/+$/, ""); print }' "$file"
 }
 
 # The normalized lines resolved against the project root, which is what
@@ -241,16 +244,21 @@ stack_names() {
   done < <(stack_dirs)
 }
 
+# The two collisions the engine cannot compose, as emitters, so stack_check
+# can refuse on them and doctor_stack can report them off the same facts.
+stack_dupe_lines() { stack_dirs | sort | uniq -d; }
+stack_dupe_names() { stack_names | sort | uniq -d; }
+
 # Refuse a stack the engine cannot compose: the same line twice, two layers
 # that materialize under one guest name, or a directory that is not there.
 # Every problem in one report, so one fix round covers them all.
 stack_check() {
   [ -n "$PARA_STACK" ] || return 0
   local dupes missing="" dir
-  dupes="$(stack_dirs | sort | uniq -d)"
+  dupes="$(stack_dupe_lines)"
   [ -z "$dupes" ] || die "duplicate stack lines in .paraspace/stack:
 $dupes"
-  dupes="$(stack_names | sort | uniq -d)"
+  dupes="$(stack_dupe_names)"
   [ -z "$dupes" ] || die "two stack lines share a layer name ($(printf '%s' "$dupes" | tr '\n' ' ')). Rename one, or point one line at a copy under .paraspace/layers/."
   while IFS= read -r dir; do
     if [ ! -d "$dir" ]; then missing="${missing:+$missing
@@ -581,8 +589,11 @@ push_stack() { # push_stack <instance> <dest>
     # directory's own basename, which is what `file push -r` creates.
     name="$(layer_name "$dir")"
     parent="$2/.paraspace/stack"
-    case "$name" in */*) parent="$parent/${name%/*}" ;; esac
-    incus exec "$1" -- mkdir -p "$parent"
+    # Only a nested name ('base/void') needs a parent the mkdir above did not
+    # already make; skipping the exec otherwise saves a daemon round-trip per layer.
+    case "$name" in
+      */*) parent="$parent/${name%/*}"; incus exec "$1" -- mkdir -p "$parent" ;;
+    esac
     incus_q file push -r "$dir" "$1$parent/"
   done < <(stack_dirs)
   # The push carries your checkout's own modes, so a `umask 077` tree lands
@@ -901,7 +912,7 @@ cmd_image_build() {
   # because an incomplete project env is more useful to hear about than an absent
   # incus.
   have_hook image-build \
-    || die "no 'image-build' hook. Write one at .paraspace/hooks/image-build. See docs/image.md."
+    || die "no 'image-build' hook in any layer. Write one at .paraspace/layers/project/hooks/image-build. See docs/image.md."
   local base="$PARA_IMAGE_BASE"
   [ "$from_current" -eq 0 ] || base="$PARA_IMAGE_NAME"
 
@@ -1032,6 +1043,13 @@ cmd_add() {
 
   local sp="$PARA_PROJECT_DIR/.paraspace" fresh=0
   if [ ! -f "$sp/stack" ]; then
+    # Refused before anything is written, or a bare init in a directory with
+    # no npm install would scaffold a stack whose base stack_check then
+    # reports missing, leaving a half-made project behind.
+    if [ -z "$names" ] && [ -z "$new" ] \
+      && [ ! -d "$PARA_PROJECT_DIR/node_modules/paraspace/layers/base/void" ]; then
+      die "the default base is node_modules/paraspace/layers/base/void, and there is no node_modules/paraspace here. Run 'npm install --save-dev paraspace' first, or name a layer or path: para init <name>."
+    fi
     fresh=1
     stage "Scaffolding .paraspace/ in ${PARA_PROJECT_DIR}…"
     layer_stub project
@@ -1101,7 +1119,8 @@ expand_layer() { # expand_layer <name> -> one stack line
   done
   if [ -z "$matches" ]; then
     if [ -d "$(pkg_root)/layers/$name" ]; then
-      die "'$name' is a bundled layer, but this project has no node_modules/paraspace to load it from. Run 'npm install --save-dev paraspace', or copy it in: cp -R '$(pkg_root)/layers/$name' .paraspace/layers/"
+      die "'$name' is a bundled layer, but this project has no node_modules/paraspace to load it from. Run 'npm install --save-dev paraspace', or copy it in and add the copy:
+  mkdir -p '.paraspace/layers/$(dirname "$name")' && cp -R '$(pkg_root)/layers/$name' '.paraspace/layers/$name' && para add '.paraspace/layers/$name'"
     fi
     die "no layer '$name' (see: para add --list). A directory path works too."
   fi
@@ -1147,7 +1166,7 @@ layer_stub() { # layer_stub <name>
   mkdir -p "$dest/hooks"
   for hook in image-build provision boot; do
     hook_stub "$hook" > "$dest/hooks/$hook"
-    printf '  add: .paraspace/layers/%s/hooks/%s\n' "$1" "$hook" >&2
+    info "add: .paraspace/layers/$1/hooks/$hook"
   done
 }
 
@@ -1167,7 +1186,7 @@ hook_stub() { # hook_stub <hook>
 }
 
 # Each layer's configure, host-side, in stack order. A layer proposes env
-# values through set_env_var_if_not_set; existing declarations win, explicit
+# values through maybe_write_env; existing declarations win, explicit
 # empty ones included, so the chain is idempotent and add reruns it wholesale
 # on every invocation. A failure leaves the writes made so far in place, and
 # rerunning after the fix converges.
@@ -1277,6 +1296,10 @@ run_project_command() {
   # leak through, so it is reasserted rather than trusted.
   # shellcheck disable=SC2034  # read by the export below, via ${!PARA_@}
   PARA_LAYER_DIR="${script%/commands/*}"
+  # Layers run in place, so nothing repairs a bit a zip, a tarball, or a
+  # core.fileMode=false checkout lost. Name the fix instead of exec's
+  # "permission denied".
+  [ -x "$script" ] || die "'$verb' is not executable. Fix: chmod +x '$script'"
   export "${!PARA_@}"
   exec "$script" "$@"
 }
@@ -1454,9 +1477,9 @@ doctor_stack() {
     if [ -d "$dir" ]; then d_ok "layer $rel"; else d_bad "layer $rel is missing ('npm install', or fix .paraspace/stack)"; fi
     case "/$rel/" in */base/*) bases=$((bases + 1)) ;; esac
   done < <(stack_dirs)
-  dupes="$(stack_dirs | sort | uniq -d)"
+  dupes="$(stack_dupe_lines)"
   [ -z "$dupes" ] || d_bad "duplicate stack lines: $(printf '%s' "$dupes" | tr '\n' ' ')"
-  dupes="$(stack_names | sort | uniq -d)"
+  dupes="$(stack_dupe_names)"
   [ -z "$dupes" ] || d_bad "two stack lines share a layer name: $(printf '%s' "$dupes" | tr '\n' ' ')"
   if [ "$bases" -eq 0 ]; then
     d_warn "the stack has no base layer, so nothing establishes the image, its bootstrap, or its user"

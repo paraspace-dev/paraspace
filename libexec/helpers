@@ -25,8 +25,8 @@ pause() { if interactive; then printf '%s ' "$*" >&2; read -r _ || true; fi; }
 # assignment spellings documented for the env file count, including an
 # explicitly empty value. This is a host helper, for a layer's configure;
 # guest hooks have no project env to edit.
-set_env_var_if_not_set() { # set_env_var_if_not_set <PARA_NAME> <value>
-  [ "$#" -eq 2 ] || die "usage: set_env_var_if_not_set <PARA_NAME> <value>"
+maybe_write_env() { # maybe_write_env <PARA_NAME> <value>
+  [ "$#" -eq 2 ] || die "usage: maybe_write_env <PARA_NAME> <value>"
   local name="$1" value="$2" envfile="${PARA_PROJECT_DIR:-}/.paraspace/env"
   [[ "$name" =~ ^PARA_[A-Z0-9_]+$ ]] \
     || die "invalid env variable '$name': expected a PARA_* name using uppercase letters, digits and underscores"

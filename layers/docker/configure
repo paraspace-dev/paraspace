@@ -36,7 +36,7 @@ while IFS= read -r line; do
 done <<< "$inferred"
 
 # Calculate both first, then make the two independent additive changes.
-[ -z "$images" ] || set_env_var_if_not_set PARA_PREPULL_IMAGES "$images"
+[ -z "$images" ] || maybe_write_env PARA_PREPULL_IMAGES "$images"
 if [ "$routes_ok" -eq 1 ] && [ -n "$routes" ]; then
-  set_env_var_if_not_set PARA_ROUTES "$routes"
+  maybe_write_env PARA_ROUTES "$routes"
 fi

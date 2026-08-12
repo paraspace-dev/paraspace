@@ -113,15 +113,19 @@ agent, over git worktrees, with an orchestrator on top).
 
 ✅ yes · ⚠️ partial, or with caveats · ❌ no · ❓ not documented
 
-| | Isolation unit | Workspace files | Supports nested containers | Interface | Per-workspace URL |
+| | Isolation unit | Workspace files | Nests unprivileged | Interface | Per-workspace URL |
 |---|---|---|---|---|---|
 | par | none (host processes) | worktree | n/a (host Docker) | CLI + tmux | ❌ |
 | Container Use | app container | branch per env | ❓ | MCP + CLI | ❌ |
 | Sculptor | container backend | worktree | ❓ | desktop app | ⚠️ in-app |
 | Agent of Empires | Docker / Podman / Apple Container | worktree | ❓ | TUI + web | ⚠️ in-app |
 | Code on Incus | system container | host bind mount | ✅ | CLI | ⚠️ `localhost:<port>` |
-| Coasts | runtime + own Docker daemon | host worktree | ✅ per env | CLI | ⚠️ per-env ports |
-| **ParaSpace** | system container | clone inside | ✅ unprivileged | native terminal | ✅ stable hostname |
+| Coasts | runtime + own Docker daemon | host worktree | ❓ own daemon per env | CLI | ⚠️ per-env ports |
+| **ParaSpace** | system container | clone inside | ✅ | native terminal | ✅ stable hostname |
+
+"Nests unprivileged" means route 3 below, a nested daemon that costs neither the
+host socket nor `--privileged`. Plenty of these run containers inside a
+workspace; that column is about what it costs you.
 
 The emoji columns are the ones with a real yes/no. The rest describe *how*, and
 the "how" is usually what decides it.
@@ -144,8 +148,14 @@ are three routes:
 
 `para up` launches each workspace with `security.nesting=true` on an
 unprivileged container, with no host socket, no `--privileged`, and a real
-Docker daemon inside. That's why a Compose file written for your laptop boots
-unchanged, and why the storage-driver question in
+Docker daemon inside. The workspace's root is an unprivileged uid on your host,
+so what the nested containers ask for stops mattering. Even a `docker run
+--privileged` in there is still bounded by the workspace's user namespace.
+
+The workspace also owns its network namespace and a bridge IP, so the nested
+daemon's bridge and every port it binds stay inside the workspace. Nothing is
+published to the host and nothing is remapped, which is why a Compose file
+written for your laptop boots unchanged, and why the storage-driver question in
 [Troubleshooting](./troubleshooting.md#everything-inside-the-workspace-is-slow)
 exists at all, since nesting is doing real work.
 

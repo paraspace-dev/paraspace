@@ -5,8 +5,9 @@ This guide adds ParaSpace to a repository you maintain. Finish
 machine is ready.
 
 Install ParaSpace as a project development dependency. The lockfile pins the
-layer code that provisions workspaces, and contributors receive it with `npm
-install`.
+engine and the layer code that provision workspaces, contributors receive both
+with `npm install`, and a globally installed `para`
+[hands off to this copy](./install.md).
 
 ```sh
 npm install --save-dev paraspace

@@ -8,6 +8,16 @@ npm i -g paraspace
 para --version
 ```
 
+You install `para` globally once, but inside a project the project's copy runs.
+When `paraspace` is installed under the project's `node_modules` (or a
+workspace root above it), `para` hands the invocation to that copy and says so,
+which keeps workspaces on the version the project's lockfile pins rather than
+whatever this machine has. In a project that pins none, the commands that
+depend on the project warn and run the global copy. The exception is
+`para completions`, which always answers from the copy you invoked, so
+sourcing it from a shell rc stays quiet in any directory. Pinning is part of
+[Add ParaSpace to a project](./project-setup.md).
+
 ## Install the host dependencies
 
 ParaSpace needs Incus and Caddy on the host.

@@ -95,6 +95,14 @@ a_layer_command() {
   chmod +x "$1/.paraspace/layers/$2/commands/$3"
 }
 
+# a_project_para <project> [<body>]: "install" a fake paraspace bin where the
+# handoff probes for it. The default body proves delivery by echoing its argv.
+a_project_para() {
+  mkdir -p "$1/node_modules/paraspace/bin"
+  printf '#!/bin/sh\n%s\n' "${2:-echo \"project para got: \$*\"}" > "$1/node_modules/paraspace/bin/para"
+  chmod +x "$1/node_modules/paraspace/bin/para"
+}
+
 # a_linked_package <project> [<npm-name>]: "install" this repo (or another
 # package root, via PARA_PKG_ROOT) into the project as a symlink, which is
 # all stack resolution ever needs. Defaults to the paraspace package itself.

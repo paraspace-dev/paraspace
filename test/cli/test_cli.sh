@@ -53,6 +53,80 @@ test_rejects_an_invalid_workspace_name() {
   assert_backend_untouched
 }
 
+test_hands_off_to_the_projects_own_para() {
+  # A project that ships its own para is run by that copy, whichever para was
+  # invoked. The probe goes through the package, never node_modules/.bin,
+  # whose pnpm spelling is a script shim that would re-enter the handoff
+  # forever; the booby-trapped shim proves the probe stays off it.
+  local p; p="$(a_project)"
+  a_project_para "$p"
+  mkdir -p "$p/node_modules/.bin"
+  printf '#!/bin/sh\necho "the .bin shim ran"\n' > "$p/node_modules/.bin/para"
+  chmod +x "$p/node_modules/.bin/para"
+  para_in "$p" ls --names
+  assert_contains "$PARA_OUT" "project para got: ls --names" "the package's bin receives the argv" || return 1
+  assert_contains "$PARA_OUT" "project's own para" "the handoff is announced" || return 1
+  assert_not_contains "$PARA_OUT" "the .bin shim ran" "the .bin shim is never probed"
+}
+
+test_a_hoisted_paraspace_is_found() {
+  # Workspace managers hoist node_modules above the package that declares the
+  # dependency, so the probe walks upward from the project root.
+  local repo p; repo="$(scratch)"; p="$repo/packages/app"
+  mkdir -p "$p/.paraspace/layers/project"
+  printf 'PARA_CONTRACT=1\n' > "$p/.paraspace/env"
+  printf '.paraspace/layers/project\n' > "$p/.paraspace/stack"
+  a_project_para "$repo"
+  para_in "$p" ls --names
+  assert_contains "$PARA_OUT" "project para got: ls --names" "the hoisted install receives the argv"
+}
+
+test_a_linked_paraspace_is_already_the_projects_para() {
+  # A linked package resolves to the very file that is running, so there is
+  # nothing to hand off to, and no handoff loop to fall into.
+  local p; p="$(a_scaffolded_project)"
+  para_in "$p" commands
+  [ "$PARA_RC" -eq 0 ] || { printf '  para commands failed:\n    %s\n' "$PARA_OUT" >&2; return 1; }
+  assert_not_contains "$PARA_OUT" "project's own para" "a linked install is not handed off to"
+}
+
+test_warns_when_a_project_pins_no_paraspace() {
+  # No install to hand off to, so a command that depends on the project warns
+  # and names the fix; a verb like --help stays quiet.
+  local p; p="$(a_project)"
+  para_in "$p" add
+  assert_contains "$PARA_OUT" "npm install --save-dev paraspace" "the warn names the fix" || return 1
+  para_in "$p" --help
+  assert_not_contains "$PARA_OUT" "npm install" "help is not the place to nag"
+}
+
+test_names_plain_npm_install_when_already_pinned() {
+  # package.json already declares paraspace, so the fix is installing what is
+  # pinned, not re-pinning it (--save-dev would rewrite the version range).
+  local p; p="$(a_project)"
+  printf '{ "devDependencies": { "paraspace": "0.3.0" } }\n' > "$p/package.json"
+  para_in "$p" add
+  assert_contains "$PARA_OUT" "npm install" "the warn names the fix" || return 1
+  assert_not_contains "$PARA_OUT" "--save-dev" "an existing pin is not rewritten"
+}
+
+test_completions_do_not_hand_off() {
+  # Shell rcs source completions at startup from any directory, so this one
+  # verb answers from the copy invoked even when the project ships its own.
+  local p; p="$(a_project)"
+  a_project_para "$p"
+  para_in "$p" completions bash
+  assert_contains "$PARA_OUT" "complete -F _para para" "the invoked copy answers" || return 1
+  assert_not_contains "$PARA_OUT" "project para got:" "completions are not handed off"
+}
+
+test_completions_do_not_nag() {
+  # The same startup path in a project that pins nothing must stay quiet.
+  local p; p="$(a_project)"
+  para_in "$p" completions bash
+  assert_not_contains "$PARA_OUT" "npm install" "sourcing completions stays quiet"
+}
+
 # ---------------------------------------------------------- project commands
 
 test_project_commands_extend_the_verb_set() {

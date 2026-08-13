@@ -52,14 +52,10 @@ between two versions, run:
 npm diff --diff=paraspace@0.2.0 --diff=paraspace@0.3.0
 ```
 
-Pinning the global CLI still works too:
-
-```sh
-npm i -g paraspace@0.2.0
-```
-
-The global CLI version should match the version pinned by the project's
-lockfile.
+A globally installed `para`
+[hands the invocation to the project's own copy](./install.md), so the version
+the lockfile pins is the one that runs and the global version does not need to
+match.
 
 At 1.0 the contract freezes, and anything that breaks a `.paraspace/` bumps the
 number instead.

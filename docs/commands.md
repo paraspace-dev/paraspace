@@ -81,7 +81,7 @@ it (`--force` overwrites); `path` prints its location. Both are for scripting.
 | `para image status` | when `$PARA_IMAGE_NAME` was built, and from what base |
 | `para image rm` | delete `$PARA_IMAGE_NAME`. Running workspaces are clones and keep running |
 | `para commands` | list the verbs this project's layers add, one per line |
-| `para completions <bash\|zsh>` | print a completion script |
+| `para completions <bash\|zsh>` | print a completion script, always from the copy invoked ([the handoff exception](./install.md)) |
 
 ```sh
 source <(para completions bash)   # ~/.bashrc

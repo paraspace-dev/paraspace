@@ -179,6 +179,7 @@ require_project() {
   if [ -n "$PARA_CONTRACT" ] && [ "$PARA_CONTRACT" != "$CONTRACT" ]; then
     die "this project targets para contract $PARA_CONTRACT, but this para provides $CONTRACT. See docs/versioning.md."
   fi
+  warn_unpinned
   stack_check
 }
 
@@ -1589,6 +1590,52 @@ cmd_version() {
   sed -n 's/.*"version": *"\([^"]*\)".*/\1/p' "$(pkg_root)/package.json" | head -1
 }
 
+# ---- the project's para ----------------------------------------------------
+# A project that ships paraspace is run BY that copy, so the engine and the
+# bundled layers its stack resolves both come from the one install the
+# project's lockfile pins. docs/install.md.
+
+# The paraspace the project's package manager installed, searched upward from
+# the project root because workspace managers hoist node_modules. The one
+# resolver that knows where installs land; mise would be a new probe here.
+project_para_bin() { # project_para_bin <project-dir>
+  local dir="$1" bin
+  while [ "$dir" != / ]; do
+    # Through the package, never node_modules/.bin: pnpm writes that entry as
+    # a script shim, a file no para invocation ever is, so the same-file check
+    # below would pass once per exec, forever.
+    bin="$dir/node_modules/paraspace/bin/para"
+    if [ -x "$bin" ]; then printf '%s\n' "$bin"; return 0; fi
+    dir="$(dirname "$dir")"
+  done
+  return 1
+}
+
+# Hand the invocation to the project's para, unless -ef says we already are
+# that file through whatever symlinks, which is what stops the handed-off
+# copy from handing off again.
+reexec_project_para() { # reexec_project_para "$@"
+  local bin
+  PARA_PROJECT_DIR="${PARA_PROJECT_DIR:-$(find_project_root || true)}"
+  [ -n "$PARA_PROJECT_DIR" ] || return 0
+  bin="$(project_para_bin "$PARA_PROJECT_DIR")" || return 0
+  if [ "$bin" -ef "$0" ]; then return 0; fi
+  info "using the project's own para (${bin#"$PARA_PROJECT_DIR"/})"
+  exec "$bin" "$@"
+}
+
+# The other half of the handoff, said by require_project so it lands on the
+# commands that depend on the project rather than on every invocation. The
+# named fix depends on whether package.json already declares paraspace.
+warn_unpinned() {
+  if project_para_bin "$PARA_PROJECT_DIR" >/dev/null; then return 0; fi
+  if grep -q '"paraspace"[[:space:]]*:' "$PARA_PROJECT_DIR/package.json" 2>/dev/null; then
+    warn "this project pins paraspace but it is not installed here yet. Run: npm install"
+  else
+    warn "this project pins no paraspace of its own, so every machine runs whatever para it has installed. Pin one with: npm install --save-dev paraspace"
+  fi
+}
+
 # ---- dispatch --------------------------------------------------------------
 main() {
   # Sourced before load_config, so die and stage work while it reads, and it is
@@ -1596,14 +1643,20 @@ main() {
   HELPERS="$(pkg_root)/libexec/helpers"
   # shellcheck source=/dev/null
   . "$HELPERS"
-  local cmd="${1:-}"
-  shift || true
   # init/add may be creating the project here, so the root they operate on is
-  # pinned before load_config derives identity from it: the enclosing
-  # project, or the current directory.
-  case "$cmd" in
+  # pinned before anything derives from it: the enclosing project, or the
+  # current directory.
+  case "${1:-}" in
     init|add) PARA_PROJECT_DIR="${PARA_PROJECT_DIR:-$(find_project_root || pwd)}" ;;
   esac
+  # Shell rcs source completions at startup, from whatever directory the shell
+  # opens in, so that one verb answers from the copy invoked, silently.
+  case "${1:-}" in
+    completions) ;;
+    *) reexec_project_para "$@" ;;
+  esac
+  local cmd="${1:-}"
+  shift || true
   load_config
   case "$cmd" in
     up)          cmd_up "$@" ;;

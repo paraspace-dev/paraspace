@@ -10,8 +10,9 @@ layer can keep seed files in `skel/`; its hooks can copy them from
 described in [Commands](./commands.md).
 
 On every `para up`, the resolved layers are pushed into the workspace fresh at
-`~/.paraspace/stack/<layer name>`. See [Hooks](./hooks.md) for the guest
-layout.
+`~/.paraspace/stack/<layer name>`. Symlinks are followed on the push, so a
+package installed with `npm link` or `bun link` lands as real files in the
+guest. See [Hooks](./hooks.md) for the guest layout.
 
 ## The stack file
 

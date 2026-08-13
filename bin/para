@@ -555,12 +555,14 @@ guest_stack() { # guest_stack <dest>
 # actually put them, and the ones that must not cross unset rather than left
 # pointing at host files.
 guest_env() { # guest_env <dest>
+  # Computed before the locals below: guest_stack reads the host's $PARA_STACK.
+  local stack
+  stack="$(guest_stack "$1")"
   # Local, because the host keeps its own PARA_HOST_ENV, which push_project reads.
   # shellcheck disable=SC2034  # all three are read by para_env's ${!PARA_@}
   local PARA_HOST_ENV="$1/.paraspace/host.env" \
         PARA_HELPERS="$1/.paraspace/helpers" \
-        PARA_STACK
-  PARA_STACK="$(guest_stack "$1")"
+        PARA_STACK="$stack"
   para_env
   # para_env forwards every PARA_* in scope, even ones the caller exported.
   # PARA_HOOK_CHAIN must start empty or every run trips the runner's cycle
@@ -569,25 +571,28 @@ guest_env() { # guest_env <dest>
 }
 
 # Replace <instance>:<dest>/.paraspace with the composed stack plus para's
-# context. The rm makes it a replace: `incus file push -r` merges, so a layer
-# you dropped would otherwise survive in the guest.
+# context. Composed on the host first: a linked package (npm/bun link) is a
+# tree of symlinks into the host, and `file push -r` pushes symlinks as-is,
+# dangling in the guest. cp -RL dereferences them. The rm makes it a replace:
+# the push merges, so a layer you dropped would otherwise survive in the guest.
 push_stack() { # push_stack <instance> <dest>
-  local dir name parent
-  incus exec "$1" -- rm -rf "$2/.paraspace"
-  incus exec "$1" -- mkdir -p "$2/.paraspace/stack"
+  local dir name tmp
+  tmp="$(mktemp -d)"
+  mkdir "$tmp/stack"
   while IFS= read -r dir; do
     [ -n "$dir" ] || continue
-    # Each layer lands at stack/<layer name>; the name's last component is the
-    # directory's own basename, which is what `file push -r` creates.
+    # Each layer lands at stack/<layer name>; only a nested name ('base/void')
+    # needs a parent made first.
     name="$(layer_name "$dir")"
-    parent="$2/.paraspace/stack"
-    # Only a nested name ('base/void') needs a parent the mkdir above did not
-    # already make; skipping the exec otherwise saves a daemon round-trip per layer.
     case "$name" in
-      */*) parent="$parent/${name%/*}"; incus exec "$1" -- mkdir -p "$parent" ;;
+      */*) mkdir -p "$tmp/stack/${name%/*}" ;;
     esac
-    incus_q file push -r "$dir" "$1$parent/"
+    cp -RL "$dir" "$tmp/stack/$name"
   done < <(stack_dirs)
+  incus exec "$1" -- rm -rf "$2/.paraspace"
+  incus exec "$1" -- mkdir -p "$2/.paraspace"
+  incus_q file push -r "$tmp/stack" "$1$2/.paraspace/"
+  rm -rf "$tmp"
   # The push carries your checkout's own modes, so a `umask 077` tree lands
   # 0700 and a build hook that steps down to $PARA_USER can't read its own
   # layer. Before the env push, which keeps the 0600 it is given.

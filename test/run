@@ -85,10 +85,10 @@ trap 'echo >&2; echo "interrupted, tearing down…" >&2; exit 130' INT TERM
 
 if [ "$run_e2e" -eq 1 ]; then
   sandbox_e2e
-  # Three fixed, pre-tracked workspace names so teardown reclaims them even if a
+  # Four fixed, pre-tracked workspace names so teardown reclaims them even if a
   # test aborts (tests run in subshells and can't grow the parent's tracking list).
-  export PARA_WS="para${$}a" PARA_WS2="para${$}b" PARA_WS3="para${$}c"
-  sandbox_track "$PARA_WS"; sandbox_track "$PARA_WS2"; sandbox_track "$PARA_WS3"
+  export PARA_WS="para${$}a" PARA_WS2="para${$}b" PARA_WS3="para${$}c" PARA_WS4="para${$}d"
+  sandbox_track "$PARA_WS"; sandbox_track "$PARA_WS2"; sandbox_track "$PARA_WS3"; sandbox_track "$PARA_WS4"
   # The one expensive shared boot: bring the primary workspace up once. Read-only
   # tests assert against it; if this fails the whole e2e tier is moot, so surface
   # the log and stop.

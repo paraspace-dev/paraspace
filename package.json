@@ -51,8 +51,7 @@
     "README.md",
     "LICENSE",
     "docs",
-    "mods",
-    "templates"
+    "layers"
   ],
   "publishConfig": {
     "access": "public"

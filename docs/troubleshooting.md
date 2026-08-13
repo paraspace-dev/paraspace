@@ -31,7 +31,10 @@ incus
   ✓ bridge 'incusbr0' up
 
 project
-  ✓ Parafile targets contract 1
+  ✓ env targets contract 1
+  ✓ layer node_modules/paraspace/layers/base/void
+  ✓ layer node_modules/paraspace/layers/git
+  ✓ layer .paraspace/layers/project
   ✓ routes: 8080
   ✓ image 'myapp' exists
 ```
@@ -87,7 +90,7 @@ Put para on a `dir` pool over ext4/xfs:
 incus storage create para-dir dir source=/path/on/ext4
 ```
 
-Then set `PARA_POOL` in your [user config](./parafile.md#user-config-not-parafile).
+Then set `PARA_POOL` in your [user config](./env.md#user-config-vs-the-env-file).
 
 ### The workspace is up but the URL doesn't load
 
@@ -113,12 +116,61 @@ every `caddy` upgrade), or stay on the default `:8443`:
 sudo setcap cap_net_bind_service=+ep "$(readlink -f "$(command -v caddy)")"
 ```
 
+### A workspace has no outbound network access
+
+`ping` is not a connectivity test inside a workspace. Unprivileged containers
+cannot open raw sockets, so it fails with `ping: socket: Operation not permitted`
+and `missing cap_net_raw+p capability or setuid?` even when networking works.
+
+Test DNS and outbound TCP from the workspace instead:
+
+```sh
+getent hosts github.com
+curl -m5 -sI https://github.com
+```
+
+Docker on the host commonly blocks the `incusbr0` bridge. Confirm it with:
+
+```sh
+sudo iptables -S FORWARD | head -3
+```
+
+If it shows `-P FORWARD DROP` and has a `DOCKER-USER` chain, allow the bridge:
+
+```sh
+sudo iptables -I DOCKER-USER -i incusbr0 -j ACCEPT
+sudo iptables -I DOCKER-USER -o incusbr0 -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
+```
+
+Persist these rules because Docker rebuilds its chains on restart. For hosts
+using ufw, run `sudo ufw route allow in on incusbr0` and
+`sudo ufw route allow out on incusbr0`; with firewalld, add `incusbr0` to the
+trusted zone. If a literal-IP `curl` works but `getent` fails, the same firewall
+is blocking dnsmasq on port 53. See [Prevent connectivity issues with Incus and
+Docker](https://linuxcontainers.org/incus/docs/main/howto/network_bridge_firewalld/).
+
 ### macOS: `incus daemon unreachable`
 
 Incus runs inside a Colima VM there. `colima start --runtime incus`, then
 re-run.
 
 ## The project
+
+### Stack layers are missing on disk
+
+> stack layers missing on disk:
+>   node_modules/paraspace/layers/base/void
+> Run 'npm install' if these live under node_modules/, else fix .paraspace/stack.
+
+Fresh clones can be missing layers that live under `node_modules`. Install the
+project dependencies:
+
+```sh
+npm install
+```
+
+If the layer path is simply wrong, fix its line in `.paraspace/stack`. See
+[Layers](./layers.md).
 
 ### `no image 'myapp'. Build it with: para image build`
 
@@ -138,7 +190,7 @@ Caddy is proxying to a port nothing is listening on. Almost always a `boot` hook
 that returned zero before its services were actually up. The
 [readiness contract](./hooks.md#boot) requires that it return only once every
 routed service is listening (`docker compose up -d --wait` does that for a
-Compose stack; anything else needs its own wait). Check from inside:
+Compose project; anything else needs its own wait). Check from inside:
 
 ```sh
 para sh <name> -c 'ss -ltnp'

@@ -1,6 +1,0 @@
-#!/usr/bin/env bash
-set -euo pipefail
-# Fills a point the mod's own provision hook opens, like the bundled git mod
-# opens git:before around the operation it owns.
-
-printf 'mod-point-before\n' >> "$HOME/owners-seen"

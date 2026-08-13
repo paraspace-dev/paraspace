@@ -1,0 +1,22 @@
+# para shared zshrc, seeded once and then yours.
+
+HISTFILE=~/.zsh_history
+HISTSIZE=100000
+SAVEHIST=100000
+setopt append_history share_history hist_ignore_all_dups hist_reduce_blanks
+setopt autocd interactive_comments
+
+# Layers put completion functions on the base image's fpath. Run this here, after
+# the global zshrc has established its drop-ins.
+autoload -Uz compinit && compinit -u
+
+setopt prompt_subst
+PROMPT='%F{cyan}%m%f %F{yellow}%1~%f %# '
+export PATH="$HOME/.local/bin:$PATH"
+
+# The git layer records its clone here. Projects without it stay in $HOME.
+para_clone="$(cat "$HOME/.config/para/clone-dir" 2>/dev/null || true)"
+if [ -n "$para_clone" ] && [ -d "$HOME/$para_clone" ]; then
+  cd "$HOME/$para_clone"
+fi
+unset para_clone

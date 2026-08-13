@@ -6,38 +6,40 @@ Guidance for Claude Code working in this repo.
 
 ParaSpace ships the `para` tool, which gives you parallel dev workspaces. Each
 workspace is an unprivileged Incus system container with its own clone, its own
-stack, a bridge IP, and a `https://<name>.<domain>` URL. Nesting means a stack
-of containers can run inside one, but no project has to have one. **It is a
+running services, a bridge IP, and a `https://<name>.<domain>` URL. Nesting
+means containers can run inside one, but no project has to have one. **It is a
 standalone, self-contained, MIT-licensed npm package (`paraspace`)**, published
 from a `v*` tag by `.github/workflows/publish.yml`.
 
 The README is the funnel (what it is, pointers into the docs). `docs/` is the
-authoritative spec, and it owns the `Parafile` schema (`docs/parafile.md`), the
+authoritative spec, and it owns the env file schema (`docs/env.md`), the layer
+and stack model (`docs/layers.md`), plugin publishing (`docs/plugins.md`), the
 hook and image contracts (`docs/hooks.md`, `docs/hook-points.md`,
-`docs/image.md`), the vendoring model (`docs/mods.md`), the command surface
-(`docs/commands.md`), the architecture (`docs/how-it-works.md`), and the case
-para makes for itself (`docs/why.md`). Don't duplicate any of that here or in
-commit messages; link to it.
+`docs/image.md`), the command surface (`docs/commands.md`), the architecture
+(`docs/how-it-works.md`), and the case para makes for itself (`docs/why.md`).
+Don't duplicate any of that here or in commit messages; link to it.
 
 ## The generic-mechanism boundary
 
 `para` is a **thin generic mechanism**, the incus/Caddy/volume/lifecycle engine,
 much like `docker compose`. It bakes in **nothing** about *how* a workspace is
 provisioned. The real provision and boot logic lives in a consumer's
-`.paraspace/` dir (`Parafile` + `hooks/` + vendored `mods/`), which para runs
-but never contains. The `mods/` and `templates/` this package ships are
-*content* under that boundary, not engine, and `para mod add` only copies them.
+`.paraspace/` dir (`env` + `stack` + `layers/`), which para runs but never
+contains. The `layers/` this package ships, including bases, are *content* under
+that boundary, not engine, and `para add` only writes stack lines pointing at
+them. Nothing is copied into the consumer's repo.
 
 ## Contract version
 
 The para↔project interface is versioned with `PARA_CONTRACT`, currently **1**.
-That interface is the `.paraspace/` dir a project ships: its `Parafile`, its
-`hooks/`, its `mods/` (vendored `hooks/`+`skel/`+`commands/` para also
-resolves), and its `commands/` (host-side verbs that become `para <verb>`). A
-**breaking** change to injected env, the hook names or semantics, the
-`~/.paraspace` layout in the guest, or the `Parafile` vars must bump
-`PARA_CONTRACT`; additive changes don't. A project pins the contract it targets
-with the same var in its `Parafile`, and para refuses on mismatch.
+That interface is the `.paraspace/` dir a project ships: its `env` file, its
+`stack` file (an ordered list of layer paths), and its `layers/` (each layer
+carrying `hooks/`, `skel/`, and `commands/`, the last becoming host-side
+`para <verb>`s). A **breaking** change to injected env, the hook names or
+semantics, the `~/.paraspace` layout in the guest, the env vars, or the stack
+file format must bump `PARA_CONTRACT`; additive changes don't. A project pins
+the contract it targets with the same var in its `env` file, and para refuses on
+mismatch.
 
 That rule starts at 1.0. `PARA_CONTRACT` stays **1** for all of 0.x, breaks land
 inside it, and there are **no consumers to migrate**, so don't write migration
@@ -56,10 +58,9 @@ leave nothing behind that names the old spelling. See
   style** below. New code should read like it.
 - **ShellCheck is the static gate**, run via `bin/lint` (or `npm run lint`), and
   CI runs the same on every push and PR. It lints the CLI, the runner, the
-  templates' and `mods/`' hooks, and the `test/` scripts (discovered by
-  shebang). Hook sources resolve via `.shellcheckrc` (`source-path`), so prefer
-  that over per-file directives. **Run `bin/lint` before finishing any change
-  here.**
+  bundled layers' hooks, and the `test/` scripts (discovered by shebang). Hook
+  sources resolve via `.shellcheckrc` (`source-path`), so prefer that over
+  per-file directives. **Run `bin/lint` before finishing any change here.**
 - **Behavioral tests live in [`test/`](./test/README.md)** (`test/run`, or
   `npm test`), in two tiers. The CLI tier needs no incus and runs in CI. The
   e2e tier drives a real Incus workspace off a tiny Alpine fixture and asserts
@@ -133,9 +134,9 @@ This style applies to:
 - all code output intended for human users.
 
 `README.md` and `docs/` are a published spec, not internal notes. **If you
-change a command, flag, `Parafile` var, hook semantic, or the image contract,
-update the relevant page in the same change.** Drift between `bin/para` and the
-docs is a bug.
+change a command, flag, env var, hook semantic, or the image contract, update
+the relevant page in the same change.** Drift between `bin/para` and the docs is
+a bug.
 
 ### Do not write AI slop
 
@@ -175,8 +176,8 @@ one was a mess that a full rewrite had to clean up.
 - **Behavior, not the reasoning that produced it.** A reference entry says what
   a thing does, what it defaults to, who reads it, and what breaks if you get
   it wrong. Why it was *designed* that way goes in `plans/`, and the page does
-  not link to it. (`parafile.md` spent forty lines justifying route validation
-  the engine no longer performs; that is what this rule is for.)
+  not link to it. (`env.md` spent forty lines justifying route validation the
+  engine no longer performs; that is what this rule is for.)
 - **A doc links to other docs.** `plans/` is a working note that gets deleted,
   and it ships in neither the tarball nor the site, so a link to one is a dead
   link for every reader who isn't in the repo. If a page needs something a plan
@@ -190,14 +191,14 @@ one was a mess that a full rewrite had to clean up.
   section nobody reads. `para ls` needs incus reachable; an interactive
   `para sh` needs util-linux `su`; images are per-arch; the first
   `para image build` takes minutes.
-- **Never document template or mod policy as engine behavior.** The
-  generic-mechanism boundary applies to prose. `para claude` is a file the
-  `dotfiles` mod ships (no bundled *template* does), not something the
-  engine knows about, and every page that shows it says so. Blurring it teaches
-  people to file engine bugs about their own hooks.
+- **Never document layer policy as engine behavior.** The generic-mechanism
+  boundary applies to prose. `para claude` is a file the `dotfiles` layer ships
+  (no bundled base does), not something the engine knows about, and every page
+  that shows it says so. Blurring it teaches people to file engine bugs about
+  their own hooks.
 - **Show the command.** A page earns its keep with the line the reader can
   paste. Prose that surrounds no command is usually rationale in disguise.
-- **Don't restate defaults.** A doc (or a Parafile) that repeats a default is a
+- **Don't restate defaults.** A doc (or an env file) that repeats a default is a
   copy that goes stale.
 - **`para --help` and `docs/commands.md` share one grouping** (WORKSPACES /
   HOST / PROJECT) so the two can't silently diverge.

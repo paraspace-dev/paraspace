@@ -23,7 +23,7 @@ colima start --runtime incus
 ```
 
 Colima provides the Linux VM where Incus runs. See
-[How it works](./how-it-works.md#macos-adds-one-layer).
+[How it works](./how-it-works.md#macos-adds-a-vm).
 
 ### Linux
 

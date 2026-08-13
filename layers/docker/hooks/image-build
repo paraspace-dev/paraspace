@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# shellcheck source=/dev/null
+. "$PARA_HELPERS"
+
+stage "Docker and Compose"
+xbps_install docker docker-compose >/dev/null
+
+getent group docker >/dev/null 2>&1 || groupadd docker
+usermod -aG docker "$PARA_USER"
+
+stage "Docker service"
+sed -i 's/modprobe -q loop || exit 1/modprobe -q loop || true/' /etc/sv/docker/run
+ln -sf /etc/sv/docker /var/service/
+for _ in $(seq 1 30); do
+  if docker info >/dev/null 2>&1; then break; fi
+  sleep 1
+done
+
+driver="$(docker info --format '{{.Driver}}' 2>/dev/null || true)"
+case "$driver" in
+  overlay|overlayfs|overlay2) info "storage driver: $driver" ;;
+  *) die "docker driver is '$driver', not overlay(fs). Use a dir/ext4 Incus pool." ;;
+esac
+
+if [ -n "${PARA_PREPULL_IMAGES:-}" ]; then
+  stage "Pre-pulling Docker images"
+  # In parallel: the daemon serves concurrent pulls, and the slowest image
+  # bounds the wall clock instead of the sum.
+  for image in $PARA_PREPULL_IMAGES; do
+    docker pull -q "$image" || warn "failed to pre-pull $image; the workspace will retry" &
+  done
+  wait
+fi
+
+stage "Docker shell integration"
+mkdir -p /etc/zsh/zshrc.d /usr/share/zsh/site-functions /etc/paraspace/points
+cat > /etc/zsh/zshrc.d/docker.zsh <<'EOF'
+alias d=docker
+alias dc='docker compose'
+EOF
+docker completion zsh > /usr/share/zsh/site-functions/_docker
+touch /etc/paraspace/points/docker
+"$PARA_RUN_HOOK" docker:after

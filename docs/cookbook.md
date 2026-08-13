@@ -10,7 +10,7 @@ together, and [Hooks](./hooks.md) for the contract they run under.
 one `gh auth login` covers every workspace of the project, permanently.
 
 ```sh
-# .paraspace/hooks/provision
+# .paraspace/layers/project/hooks/provision
 mkdir -p "$PARA_SHARED/gh"
 ln -sfn "$PARA_SHARED/gh" ~/.config/gh
 
@@ -34,9 +34,10 @@ gh ssh-key add ~/.ssh/id_ed25519.pub --title "para $PARA_PROJECT_NAME ($PARA_HOS
 ```
 
 That needs the `admin:public_key` scope, so add
-`--scopes admin:public_key` to the `gh auth login` above. The bundled `gh` mod
-does this behind `PARA_GH_AUTH=1` at the `git` mod's `git:before` point. Read
-its hook for the version with the retry marker and error handling filled in.
+`--scopes admin:public_key` to the `gh auth login` above. The bundled `gh`
+layer does this behind `PARA_GH_AUTH=1` at the `git` layer's `git:before`
+point. Read its hook for the version with the retry marker and error handling
+filled in.
 
 ## Share an agent's session
 
@@ -52,27 +53,28 @@ More in [Shared authentication](./shared-auth.md).
 
 ## Bring your dotfiles
 
-Put them in `.paraspace/skel/`, which para pushes to `$PARA_SKEL` before hooks
-run. Copy them for files you'll edit per workspace, link them through the
-shared volume for ones you want to change everywhere at once:
+Put them in `.paraspace/layers/project/skel/`, and copy them from the layer for
+files you'll edit per workspace. Link them through the shared volume for ones
+you want to change everywhere at once:
 
 ```sh
-cp "$PARA_SKEL/zshrc" ~/.zshrc                   # per workspace
+cp "$PARA_LAYER_DIR/skel/zshrc" ~/.zshrc          # per workspace
 mkdir -p "$PARA_SHARED/nvim"
-ln -sfn "$PARA_SHARED/nvim" ~/.config/nvim       # shared across workspaces
+ln -sfn "$PARA_SHARED/nvim" ~/.config/nvim        # shared across workspaces
 ```
 
 `skel/` is re-pushed on every `up`, so editing a dotfile in your checkout and
 re-running `para up` is the whole update loop, with no image rebuild.
 
-If someone has already packaged the set you want, vendor it instead of writing
-this by hand. `para mod add dotfiles` brings a zsh/tmux/Neovim/Claude
-Code environment and the hooks that install it. See [Mods](./mods.md).
+If someone has already packaged the set you want, add it instead of writing
+this by hand. `para add dotfiles` provides a zsh/tmux/Neovim/Claude Code
+environment and the hooks that install it. Its layer stays under `node_modules`
+and updates with the package. See [Layers](./layers.md).
 
 ## Pre-pull images so the first boot is fast
 
 `para` forwards every `PARA_*` to your image build, so a key it has never heard
-of gets there anyway. Declare the tags in your `Parafile`:
+of gets there anyway. Declare the tags in your `.paraspace/env`:
 
 ```sh
 : "${PARA_PREPULL_IMAGES:=postgres:17-alpine redis:8-alpine}"
@@ -83,19 +85,20 @@ instead of downloading in every workspace:
 
 ```sh
 for img in $PARA_PREPULL_IMAGES; do
-  docker pull -q "$img" || echo "warn: could not pre-pull $img" >&2
+  docker pull -q "$img" || echo "warn: could not pre-pull $img" >&2 &
 done
+wait
 ```
 
-The bundled `docker` mod ships that loop already.
+The bundled `docker` layer ships that loop already.
 
 ## Seed a database
 
-Boot the stack, then load a dump the workspace can reach. Keep the dump on the
-shared volume so you download it once per project, not once per workspace:
+Boot the services, then load a dump the workspace can reach. Keep the dump on
+the shared volume so you download it once per project, not once per workspace:
 
 ```sh
-# .paraspace/hooks/boot
+# .paraspace/layers/project/hooks/boot
 docker compose up -d --wait
 
 if [ ! -f "$PARA_SHARED/seed.sql" ]; then
@@ -143,7 +146,8 @@ site, and `para ls` shows no URL.
 
 ## Add a `para` verb
 
-Anything your team types often. Drop an executable in `.paraspace/commands/`:
+Anything your team types often. Drop an executable in
+`.paraspace/layers/project/commands/`:
 
 ```sh
 #!/usr/bin/env bash
@@ -155,7 +159,7 @@ exec "$PARA_BIN" sh "$1" -c 'docker compose logs -f --tail=100'
 `chmod +x` it and `para logs ws1` works. It runs on the host with every
 `PARA_*` exported. See [Commands](./commands.md#project-commands).
 
-## A monorepo with more than one stack
+## A monorepo with more than one service set
 
 If you don't want every sub-project booting in every workspace, there are two
 ways to avoid it.
@@ -170,7 +174,7 @@ cd apps/docs && para up docs-ws    # apps/docs/.paraspace
 ```
 
 ```sh
-# apps/docs/.paraspace/Parafile
+# apps/docs/.paraspace/env
 : "${PARA_PROJECT_NAME:=acme-docs}"    # "docs" alone is too generic to identify a project
 ```
 
@@ -183,27 +187,28 @@ Keep a single `.paraspace/` and let a variable decide which services `boot`
 starts. The hooks store it in the workspace, so you pass it once:
 
 ```sh
-# .paraspace/hooks/provision
-STACK_FILE="$HOME/.para-stack"
-if [ -n "${PARA_STACK:-}" ]; then printf '%s\n' "$PARA_STACK" > "$STACK_FILE"; fi
-if [ -f "$STACK_FILE" ]; then PARA_STACK="$(cat "$STACK_FILE")"; fi
-: "${PARA_STACK:=web}"
+# .paraspace/layers/project/hooks/provision
+PROFILE_FILE="$HOME/.para-profile"
+if [ -n "${PARA_PROFILE:-}" ]; then printf '%s\n' "$PARA_PROFILE" > "$PROFILE_FILE"; fi
+if [ -f "$PROFILE_FILE" ]; then PARA_PROFILE="$(cat "$PROFILE_FILE")"; fi
+: "${PARA_PROFILE:=web}"
 ```
 
 ```sh
-# .paraspace/hooks/boot
-docker compose --profile "$PARA_STACK" up -d --wait
+# .paraspace/layers/project/hooks/boot
+docker compose --profile "$PARA_PROFILE" up -d --wait
 ```
 
-`PARA_STACK=docs para up ws1` sets that workspace's stack, and a later
+`PARA_PROFILE=docs para up ws1` sets that workspace's profile, and a later
 `para up ws1` reconverges the same one.
 
-For a verb rather than an env var, a `.paraspace/commands/docs` that exports
-`PARA_STACK=docs` and runs `exec "$PARA_BIN" up "$@"` gives you `para docs ws1`.
+For a verb rather than an env var, a
+`.paraspace/layers/project/commands/docs` that exports `PARA_PROFILE=docs` and
+runs `exec "$PARA_BIN" up "$@"` gives you `para docs ws1`.
 
 ## Point two projects at one credential store
 
 Give them the same volume name (`: "${PARA_VOLUME:=para-home-acme}"`) and both
 projects' workspaces mount the same `/para/shared`. Only do that where you'd be
 happy with either project's workspaces holding the other's credentials; see
-[Shared authentication](./shared-auth.md#what-sharing-costs).
+[Shared authentication](./shared-auth.md).

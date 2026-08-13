@@ -23,9 +23,11 @@ The command is base-agnostic plumbing:
 
 1. launches a builder from **`$PARA_IMAGE_BASE`** with `security.nesting=true`;
 2. runs **`$PARA_IMAGE_BOOTSTRAP`** in it via `sh -c`, if there is one;
-3. pushes your whole **`.paraspace/`** to `/opt/.paraspace` in the builder;
-4. runs **`hooks/image-build`** as root, with no tty and no stdin: yours first,
-   then any mods under `.paraspace/mods/*/hooks/image-build`;
+3. pushes the composed layer stack to `/opt/.paraspace` in the builder, with
+   each layer at `/opt/.paraspace/stack/<layer name>`, the same layout a
+   workspace gets at `~/.paraspace`;
+4. runs `hooks/image-build` from every layer that defines it, in stack order,
+   as root, with no tty and no stdin;
 5. removes `/opt/.paraspace` and publishes the result as **`$PARA_IMAGE_NAME`**.
 
 Two caveats:
@@ -37,10 +39,10 @@ Two caveats:
   you're tuning the hook; it assumes your hook is idempotent, and you should do
   one clean build before relying on the result.
 
-The templates'
-[`hooks/image-build`](https://github.com/paraspace-dev/paraspace/blob/main/templates/void/.paraspace/hooks/image-build)
+The bundled base layer's
+[`hooks/image-build`](https://github.com/paraspace-dev/paraspace/blob/main/layers/base/void/hooks/image-build)
 is the reference: Void packages, a workspace user, and the zsh extension paths
-bundled mods use. Docker lives in its own mod.
+bundled layers use. Docker lives in its own layer.
 
 ## Checking it with `para image status`
 

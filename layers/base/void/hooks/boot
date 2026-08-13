@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# The base starts nothing. A later layer (or the project layer) supplies the
+# boot. Return only after every service behind PARA_ROUTES is ready.

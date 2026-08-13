@@ -1,0 +1,47 @@
+#!/usr/bin/env bash
+set -euo pipefail
+# para provision hook, run INSIDE the workspace before boot (in the clone if it
+# already exists, else $HOME, so use absolute paths), as the
+# $PARA_USER user (uid $PARA_UID). Idempotent: para re-runs it on every `para up`.
+#
+# The hello fixture has no repo to clone and no toolchain to install (that's baked
+# into the image). Provision does just enough to exercise the shared volume:
+# it drops a one-time marker on the per-project shared volume and links it into
+# $HOME, so the e2e suite can prove the volume is mounted and shared across a
+# project's workspaces.
+
+# shellcheck source=helpers
+. "$PARA_LAYER_DIR/hooks/helpers"
+
+shared="$PARA_SHARED"
+
+# `para sh <ws> -c` (and the interactive shell) cd into ~/$PARA_CLONE_DIR, and para's
+# working-copy convention. A real project's clone hook creates it by cloning; this
+# fixture has no repo, so make the dir exist or every `para sh -c` would `cd || exit`
+# into nothing and run as a silent no-op.
+mkdir -p "$HOME/$PARA_CLONE_DIR"
+
+# Record that the project layer's hook ran. It sits last in the stack, so
+# this lands after everything the e2e-mod layer wrote; the suite reads the
+# file back to prove the resolution order.
+printf 'project-provision\n' >> "$HOME/owners-seen"
+
+# Seed the shared volume once. Whatever lands here is visible to EVERY workspace
+# of this project (para attaches para-home-<project> at /para/shared to all of
+# them), which is exactly what test_shared asserts.
+if [ ! -f "$shared/.seeded" ]; then
+  stage "Seeding shared volume (one-time)"
+  mkdir -p "$shared"
+  echo "shared-volume-ok" > "$shared/marker"
+  touch "$shared/.seeded"
+fi
+
+# Link the shared marker into $HOME so a `para sh <ws> -c 'cat ~/marker'` sees it.
+[ -f "$shared/marker" ] && ln -sfn "$shared/marker" "$HOME/marker"
+
+# Record the routes para injected. PARA_ROUTES arrives space-separated whatever
+# spelling the env file used, so a hook can just `for r in $PARA_ROUTES`. Written
+# where the e2e suite can read it back.
+printf '%s\n' "${PARA_ROUTES-<unset>}" > "$HOME/routes-seen"
+
+stage "Provisioned (hello fixture)"

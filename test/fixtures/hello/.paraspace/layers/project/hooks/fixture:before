@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+set -euo pipefail
+# The project layer filling a point another layer opened, the direction the
+# bundled gh layer fills the git layer's git:before. Together with the
+# opener's own file at this name, it makes an ad-hoc point resolve to more
+# than one script.
+
+printf 'project-point-before\n' >> "$HOME/owners-seen"

@@ -48,7 +48,7 @@ new root to trust each time.
 
 `para`'s Caddy binds `:8443` by default because any user can. For clean,
 port-less URLs (`https://my-feature.paraspace.dev`), move it to `:443` in your
-[user config](./parafile.md#user-config-not-parafile):
+[user config](./env.md#user-config-vs-the-env-file):
 
 ```sh
 para config edit    # uncomment: : "${PARA_HTTPS_PORT:=443}"
@@ -72,7 +72,7 @@ wildcards to `127.0.0.1`, which is why it works with zero setup. To serve under
 your own domain instead:
 
 1. Point a wildcard `*.<your-domain> → 127.0.0.1` in your DNS.
-2. Set `PARA_DOMAIN` in the project's `Parafile`, or in your user config if
+2. Set `PARA_DOMAIN` in the project's env file, or in your user config if
    it's a personal domain you want across every project.
 
 `para doctor` checks that the wildcard actually resolves to `127.0.0.1`, which

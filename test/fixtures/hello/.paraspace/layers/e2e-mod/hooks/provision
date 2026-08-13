@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+set -euo pipefail
+# A layer's provision hook. First in the fixture's stack, so it runs before
+# the project layer's, and it owns the owners-seen trace the suite reads back
+# to prove resolution order.
+#
+# It is written identically to any layer's hook: $PARA_LAYER_DIR names THIS
+# layer's directory, so the source line below reaches its own helpers copy
+# and not another layer's. That is the whole point of the layout.
+
+# shellcheck source=helpers
+. "$PARA_LAYER_DIR/hooks/helpers"
+
+# Fresh on every provision, so the suite reads one run's order, not history.
+: > "$HOME/owners-seen"
+printf 'e2e-mod-provision\n' >> "$HOME/owners-seen"
+
+# A provider-owned point. The engine has never heard of this name; this layer
+# and the project layer both fill it, in stack order.
+"$PARA_RUN_HOOK" fixture:before
+
+stage "Provisioned (e2e-mod)"

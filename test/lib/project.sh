@@ -42,10 +42,10 @@ scratch_cleanup() {
   : > "$_SCRATCH_LIST"
 }
 
-# a_project [PARAFILE_LINE]...: a throwaway project whose Parafile declares the
-# given lines. PARA_CONTRACT and PARA_PROJECT_NAME are supplied first, so a caller can
-# override either by passing its own (plain assignments: last wins). Echoes the
-# project dir.
+# a_project [ENV_LINE]...: a throwaway project whose env declares the given
+# lines, over a one-layer stack (the project layer). PARA_CONTRACT and
+# PARA_PROJECT_NAME are supplied first, so a caller can override either by
+# passing its own (plain assignments: last wins). Echoes the project dir.
 #
 #   p="$(a_project PARA_ROUTES='"3000"' PARA_IMAGE_BASE=images:alpine/edge)"
 #
@@ -54,38 +54,63 @@ scratch_cleanup() {
 # pass the `: "${KEY:=value}"` form instead. See test_cli.sh.
 a_project() {
   local d line; d="$(scratch)"
-  mkdir -p "$d/.paraspace"
+  mkdir -p "$d/.paraspace/layers/project"
   {
     printf 'PARA_CONTRACT=1\n'
     printf 'PARA_PROJECT_NAME=fixture\n'
     for line in "$@"; do printf '%s\n' "$line"; done
-  } > "$d/.paraspace/Parafile"
+  } > "$d/.paraspace/env"
+  printf '.paraspace/layers/project\n' > "$d/.paraspace/stack"
   printf '%s\n' "$d"
 }
 
+# a_layer <project> <name>: another project-owned layer, inserted into the
+# stack before the project layer, which stays last so its files win.
+a_layer() {
+  mkdir -p "$1/.paraspace/layers/$2"
+  if grep -qxF ".paraspace/layers/$2" "$1/.paraspace/stack"; then return 0; fi
+  awk -v line=".paraspace/layers/$2" '
+    !done && $0 == ".paraspace/layers/project" { print line; done = 1 }
+    { print }
+    END { if (!done) print line }
+  ' "$1/.paraspace/stack" > "$1/.paraspace/stack.new"
+  mv "$1/.paraspace/stack.new" "$1/.paraspace/stack"
+}
+
 # a_project_command <project> <verb> <body>: drop an executable into the
-# project's .paraspace/commands/, which is how a project extends para.
+# project layer's commands/, which is how a project extends para.
 a_project_command() {
-  mkdir -p "$1/.paraspace/commands"
-  printf '%s\n' "$3" > "$1/.paraspace/commands/$2"
-  chmod +x "$1/.paraspace/commands/$2"
+  mkdir -p "$1/.paraspace/layers/project/commands"
+  printf '%s\n' "$3" > "$1/.paraspace/layers/project/commands/$2"
+  chmod +x "$1/.paraspace/layers/project/commands/$2"
 }
 
-# a_mod_command <project> <mod> <verb> <body>: the same, from a vendored mod.
-# The twin of a_project_command, so a test about which one wins reads as two
-# lines that differ only in the owner.
-a_mod_command() {
-  mkdir -p "$1/.paraspace/mods/$2/commands"
-  printf '%s\n' "$4" > "$1/.paraspace/mods/$2/commands/$3"
-  chmod +x "$1/.paraspace/mods/$2/commands/$3"
+# a_layer_command <project> <layer> <verb> <body>: the same, from another
+# layer earlier in the stack. The twin of a_project_command, so a test about
+# which one wins reads as two lines that differ only in the owner.
+a_layer_command() {
+  a_layer "$1" "$2"
+  mkdir -p "$1/.paraspace/layers/$2/commands"
+  printf '%s\n' "$4" > "$1/.paraspace/layers/$2/commands/$3"
+  chmod +x "$1/.paraspace/layers/$2/commands/$3"
 }
 
-# a_scaffolded_project [<template>]: what `para init` actually produces, for
-# tests that must exercise the shipped templates rather than a hand-written
-# Parafile. Echoes the project dir.
+# a_linked_package <project> [<npm-name>]: "install" this repo (or another
+# package root, via PARA_PKG_ROOT) into the project as a symlink, which is
+# all stack resolution ever needs. Defaults to the paraspace package itself.
+a_linked_package() {
+  local repo="${PARA_PKG_ROOT:-$(cd "$(dirname "$PARA")/.." && pwd)}"
+  mkdir -p "$1/node_modules"
+  ln -sfn "$repo" "$1/node_modules/${2:-paraspace}"
+}
+
+# a_scaffolded_project: what a bare `para init` actually produces, for tests
+# that must exercise the shipped default base rather than a hand-written
+# project. Echoes the project dir.
 a_scaffolded_project() {
   local d; d="$(scratch)"
-  ( cd "$d" && env -u PARA_PROJECT_DIR "$PARA" init ${1:+"$1"} >/dev/null 2>&1 )
+  a_linked_package "$d"
+  ( cd "$d" && env -u PARA_PROJECT_DIR "$PARA" init >/dev/null 2>&1 )
   printf '%s\n' "$d"
 }
 

@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# shellcheck source=/dev/null
+. "$PARA_HELPERS"
+
+# The base owns only its small shell seed. Later layers add their own state
+# and a project may replace this link later without overwriting the seed.
+mkdir -p "$PARA_SHARED"
+if [ ! -e "$PARA_SHARED/zshrc" ]; then
+  stage "Seeding the shared zshrc"
+  cp "$PARA_LAYER_DIR/skel/zshrc" "$PARA_SHARED/zshrc"
+fi
+ln -sfn "$PARA_SHARED/zshrc" ~/.zshrc

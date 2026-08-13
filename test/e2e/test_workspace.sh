@@ -38,30 +38,29 @@ test_routes_reach_the_provision_hook() {
 
 # shellcheck disable=SC2016  # the guest expands these, not us
 test_guest_paths_are_injected() {
-  # PARA_HOOKS/PARA_SKEL are guest-only, so para appends them to ~/.paraspace/env
-  # so a hook names what it reads instead of rebuilding the layout out of $HOME.
-  # Assert each value AND that para's shared helpers resolve: an export pointing
-  # at nothing would still read as "set".
-  local hooks; hooks="$("$PARA" sh "$PARA_WS" -c 'echo "$PARA_HOOKS"' 2>/dev/null)"
-  assert_eq "/home/$PARA_USER/.paraspace/hooks" "$hooks" "PARA_HOOKS names the guest hooks dir" || return 1
+  # The stack materializes under ~/.paraspace/stack/, and PARA_STACK names it
+  # in guest paths, in stack order, so a hook or a shell can walk the same
+  # composition the runner does. Assert the value AND that para's shared
+  # helpers resolve: an export pointing at nothing would still read as "set".
+  local stack; stack="$("$PARA" sh "$PARA_WS" -c 'echo "$PARA_STACK"' 2>/dev/null)"
+  assert_eq "/home/$PARA_USER/.paraspace/stack/e2e-mod
+/home/$PARA_USER/.paraspace/stack/project" "$stack" "PARA_STACK names the guest layers in order" || return 1
   local helpers; helpers="$("$PARA" sh "$PARA_WS" -c 'echo "$PARA_HELPERS"' 2>/dev/null)"
   assert_eq "/home/$PARA_USER/.paraspace/helpers" "$helpers" "PARA_HELPERS names para's guest library" || return 1
   local found; found="$("$PARA" sh "$PARA_WS" -c '[ -f "$PARA_HELPERS" ] && echo ok' 2>/dev/null)"
   assert_eq "ok" "$found" "the helpers every hook sources is reachable" || return 1
-
-  # Exported even though the hello fixture ships no skel/, because the variable names
-  # the path either way, which is what lets a hook guard with a plain [ -f ].
-  local skel; skel="$("$PARA" sh "$PARA_WS" -c 'echo "$PARA_SKEL"' 2>/dev/null)"
-  assert_eq "/home/$PARA_USER/.paraspace/skel" "$skel" "PARA_SKEL names the guest skel dir" || return 1
 
   # The one that names a file on BOTH sides: push_project overrides the host's
   # value so the copy in here is what a hook reads.
   local hostenv; hostenv="$("$PARA" sh "$PARA_WS" -c 'echo "$PARA_HOST_ENV"' 2>/dev/null)"
   assert_eq "/home/$PARA_USER/.paraspace/host.env" "$hostenv" "PARA_HOST_ENV names the guest copy" || return 1
 
-  # The host-only paths stay unset in here, so a hook can't reach a host file.
+  # The host-only paths stay unset in here, so a hook can't reach a host file,
+  # and the retired per-owner path vars stay gone.
   local host; host="$("$PARA" sh "$PARA_WS" -c 'echo "${PARA_PROJECT_DIR-unset}"' 2>/dev/null)"
-  assert_eq "unset" "$host" "PARA_PROJECT_DIR is not leaked into the guest"
+  assert_eq "unset" "$host" "PARA_PROJECT_DIR is not leaked into the guest" || return 1
+  local hooks; hooks="$("$PARA" sh "$PARA_WS" -c 'echo "${PARA_HOOKS-unset}"' 2>/dev/null)"
+  assert_eq "unset" "$hooks" "PARA_HOOKS is no longer part of the contract"
 }
 
 # shellcheck disable=SC2016  # the guest expands this, not us
@@ -75,35 +74,31 @@ test_image_carries_no_project_tree() {
   assert_eq "" "$found" "the published image has no /opt/.paraspace"
 }
 
-test_a_stray_hook_stack_does_not_stop_the_hooks() {
+test_a_stray_hook_chain_does_not_stop_the_hooks() {
   # para_env forwards every PARA_* the caller exported, including one that only
-  # the runner is supposed to set. Inherited, PARA_HOOK_STACK reads as "we are
+  # the runner is supposed to set. Inherited, PARA_HOOK_CHAIN reads as "we are
   # already inside that hook", so the cycle guard fires on the first hook of
   # every `up` and the workspace converges having run nothing.
   #
   # Exporting it for the `up` is the whole test: without it this asserts nothing,
   # because the suite's own environment never has the variable set.
   local out
-  out="$(PARA_HOOK_STACK=provision "$PARA" up "$PARA_WS" 2>&1)" \
-    || { echo "  'para up' failed with a stray PARA_HOOK_STACK exported" >&2
+  out="$(PARA_HOOK_CHAIN=provision "$PARA" up "$PARA_WS" 2>&1)" \
+    || { echo "  'para up' failed with a stray PARA_HOOK_CHAIN exported" >&2
          echo "$out" | tail -5 >&2; return 1; }
-  assert_not_contains "$out" "hook cycle" "no bogus cycle from an inherited stack" || return 1
-  assert_contains     "$out" "hook: hooks/provision" "the provision hook still ran"
+  assert_not_contains "$out" "hook cycle" "no bogus cycle from an inherited chain" || return 1
+  assert_contains     "$out" "hook: e2e-mod/hooks/provision" "the provision hooks still ran"
 }
 
-test_a_mod_fills_the_same_hooks_the_project_does() {
-  # The multi-owner rule, end to end: one hook name resolves to the project's
-  # hook and then each mods/*/hooks/<name>. The fixture ships one mod, and the
-  # runner is the only thing that makes any of this happen.
+test_the_layers_fill_one_hook_in_stack_order() {
+  # The composition rule, end to end: one hook name resolves to every layer's
+  # hook in stack order, and a point one layer opens is filled by every layer
+  # too. The trace is EXACT, so a dropped owner or a reordering fails loudly.
   local seen; seen="$("$PARA" sh "$PARA_WS" -c 'cat ~/owners-seen' 2>/dev/null)"
-  assert_eq "project-provision" "$(head -n1 <<<"$seen")" "the project's hook ran first" || return 1
-  assert_contains "$seen" "mod-provision e2e-mod" "the mod's provision ran too" || return 1
-
-  # And a point the MOD opened, which para never learns the name of. It runs
-  # mid-provision, so both fills land between the two lines above, the project's
-  # first, the way the bundled gh mod fills the git mod's git:before.
-  assert_contains "$seen" "project-point-before" "the project filled the mod's hook point" || return 1
-  assert_contains "$seen" "mod-point-before"     "and so did the mod that opened it"
+  assert_eq "e2e-mod-provision
+e2e-mod-point-before
+project-point-before
+project-provision" "$seen" "both layers ran, point fills between, stack order throughout"
 }
 
 test_workspace_is_listed_and_running() {
@@ -166,53 +161,51 @@ test_project_commands_extend_para() {
   assert_fails "$PARA" definitely-not-a-verb
 }
 
-test_a_mods_command_extends_para_too() {
-  # The other half of the mod contract, and the half the CLI tier can only test
-  # against hand-written mods: a vendored mod's commands/ becomes a real verb on
-  # a real project, resolved past the project's own commands/ and past the
-  # push_paraspace round trip. The fixture mod ships `modhello`.
+test_a_layers_command_extends_para_too() {
+  # The other half of the layer contract, and the half the CLI tier can only
+  # test against hand-written layers: a package layer's commands/ becomes a
+  # real verb on a real project. The fixture's e2e-mod layer ships `modhello`.
   local out
   out="$("$PARA" modhello "$PARA_WS" 2>/dev/null)"
-  assert_contains "$out" "mod-command-ok"                 "the mod's verb ran on the host" || return 1
-  assert_contains "$out" "dir=$FIXTURE_DIR/.paraspace/mods/e2e-mod" \
-    "PARA_MOD_DIR names the mod's own directory, not the project's" || return 1
-  assert_contains "$out" "skel=unset"                     "and guest paths stay unset out here" || return 1
-  assert_contains "$out" "mod-command-reached-the-guest"  "PARA_BIN composes from a mod's command" || return 1
+  assert_contains "$out" "layer-command-ok"               "the layer's verb ran on the host" || return 1
+  assert_contains "$out" "dir=$FIXTURE_DIR/.paraspace/layers/e2e-mod" \
+    "PARA_LAYER_DIR names the layer's own directory, not the project's" || return 1
+  assert_contains "$out" "layer-command-reached-the-guest" "PARA_BIN composes from a layer's command" || return 1
 
-  # Listed, and credited to the mod, so a verb you didn't write says where it came from.
+  # Listed, and credited to the layer, so a verb you didn't write says where it came from.
   assert_contains "$("$PARA" commands 2>/dev/null)" "modhello" "para commands lists it" || return 1
-  assert_contains "$("$PARA" --help 2>&1)" "[e2e-mod]" "para --help names the owning mod"
+  assert_contains "$("$PARA" --help 2>&1)" "[e2e-mod]" "para --help names the owning layer"
 }
 
 # shellcheck disable=SC2016  # the guest expands this, not us
 test_the_pushed_env_stays_private() {
-  # push_paraspace widens the tree so a build hook can read $PARA_SKEL after a
+  # push_stack widens the tree so a build hook can read its layer after a
   # `su -`, and pushes env at 0600 afterwards. Swap those two and every PARA_*
-  # the Parafile carries, tokens included, goes world-readable in the guest.
+  # the project env carries, tokens included, goes world-readable in the guest.
   local mode; mode="$("$PARA" sh "$PARA_WS" -c 'stat -c %a ~/.paraspace/env' 2>/dev/null)"
   assert_eq "600" "$mode" "the generated env is readable only by its owner"
 }
 
 # shellcheck disable=SC2016  # the builder expands these, not us
 test_image_build_reads_skel_after_a_restrictive_umask() {
-  # push_paraspace hands the builder the host checkout's own modes, so a tree
+  # push_stack hands the builder the host checkout's own modes, so a tree
   # written under `umask 077` lands 0700 and the $PARA_USER a build hook steps
-  # down to cannot read $PARA_SKEL through it, which is the whole stated reason
-  # the tree goes to /opt rather than root's 0700 $HOME.
+  # down to cannot read its layer's skel/ through it, which is the whole
+  # stated reason the tree goes to /opt rather than root's 0700 $HOME.
   local img="para-umasktest-$$" proj rc=0
   proj="$(scratch)/hello"
   ( umask 077
     cp -R "$FIXTURE_DIR" "$proj"
-    mkdir -p "$proj/.paraspace/skel"
-    printf 'skel-readable\n' > "$proj/.paraspace/skel/marker" )
+    mkdir -p "$proj/.paraspace/layers/project/skel"
+    printf 'skel-readable\n' > "$proj/.paraspace/layers/project/skel/marker" )
   # The su - spelling docs/hooks.md teaches, appended after the fixture's hook
   # has created the user. Single-quoted: these expand in the builder, not here.
-  { printf '%s\n' 'echo "==> PARA_SKEL readable after su -"'
-    printf '%s\n' 'su - "$PARA_USER" -c "cat $PARA_SKEL/marker" >/dev/null'
-  } >> "$proj/.paraspace/hooks/image-build"
+  { printf '%s\n' 'echo "==> the layer skel is readable after su -"'
+    printf '%s\n' 'su - "$PARA_USER" -c "cat $PARA_LAYER_DIR/skel/marker" >/dev/null'
+  } >> "$proj/.paraspace/layers/project/hooks/image-build"
 
   env PARA_PROJECT_DIR="$proj" PARA_IMAGE_NAME="$img" "$PARA" image build >/dev/null 2>&1 \
-    || { echo "  a build hook could not read \$PARA_SKEL as \$PARA_USER" >&2; rc=1; }
+    || { echo "  a build hook could not read its skel as \$PARA_USER" >&2; rc=1; }
   incus image delete "$img" >/dev/null 2>&1 || true
   return "$rc"
 }
@@ -222,7 +215,7 @@ test_image_build_status_and_rm_lifecycle() {
   # the shared 'alpine-minimal' the other tests ride on. One build, cheap here
   # because the fixture is Docker-free (no stack images to pre-pull), so it's the
   # tiny-Alpine build, not the multi-minute Docker case. Only the published alias
-  # is overridden; base/bootstrap/payload still come from the fixture's Parafile.
+  # is overridden; base/bootstrap/payload still come from the fixture's env.
   local img="para-imgtest-$$"
   local rc=0 out
 
@@ -242,19 +235,19 @@ test_image_build_status_and_rm_lifecycle() {
   assert_contains "$out" "images:alpine/edge" "status reports the stamped base" || rc=1
   assert_not_contains "$out" "unknown"        "status resolved built and base"  || rc=1
 
-  # The mod's image-build hook ran in the builder, resolved the same way a
+  # The layer's image-build hook ran in the builder, resolved the same way a
   # workspace's are. Asserted against THIS image, not the shared alpine-minimal:
-  # that one is cached across runs and can predate the fixture's mods/.
+  # that one is cached across runs and can predate the fixture's layers/.
   local ct="imgtest-$$" marker=""
   if incus launch "$img" "$ct" >/dev/null 2>&1; then
     eventually 30 incus exec "$ct" -- true || rc=1
-    marker="$(incus exec "$ct" -- cat /etc/para-mod-marker 2>/dev/null)"
+    marker="$(incus exec "$ct" -- cat /etc/para-layer-marker 2>/dev/null)"
     incus delete -f "$ct" >/dev/null 2>&1 || true
   else
     echo "  could not launch a container from '$img'" >&2
     rc=1
   fi
-  assert_eq "e2e-mod-was-here" "$marker" "the mod's image-build hook reached the image" || rc=1
+  assert_eq "e2e-mod-was-here" "$marker" "the layer's image-build hook reached the image" || rc=1
 
   # rm deletes it, so verify the image is actually gone afterwards.
   env PARA_IMAGE_NAME="$img" "$PARA" image rm >/dev/null 2>&1 \

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# CLI-tier tests, no incus. Dispatch, project commands, configuration
+# CLI-tier tests, no incus. Dispatch, layer commands, configuration
 # precedence, `para init`. Fast enough to run on every push in CI.
 #
 # Fixtures come from test/lib/project.sh: `a_project` builds a throwaway project,
@@ -118,19 +118,19 @@ echo SHADOWED-THE-ENGINE'
 
 # ------------------------------------------------------------- configuration
 
-test_the_environment_overrides_the_parafile() {
-  # The whole precedence model: a Parafile written with the `:=` idiom yields to
-  # a real environment variable. Nothing in para implements this (bash does),
-  # so the test exists to prove the idiom is what the templates should use.
+test_the_environment_overrides_the_project_env() {
+  # The whole precedence model: an env file written with the `:=` idiom yields
+  # to a real environment variable. Nothing in para implements this (bash
+  # does), so the test exists to prove the idiom is what layers should use.
   local p out
-  # shellcheck disable=SC2016  # a literal Parafile line, not an expansion
-  p="$(a_project ': "${PARA_DOMAIN:=from-parafile}"')"
+  # shellcheck disable=SC2016  # a literal env line, not an expansion
+  p="$(a_project ': "${PARA_DOMAIN:=from-project-env}"')"
   out="$(_para_env "$p" PARA_DOMAIN=from-the-environment doctor)"
   assert_contains     "$out" "from-the-environment" "the environment won"      || return 1
-  assert_not_contains "$out" "from-parafile"        "the Parafile default lost"
+  assert_not_contains "$out" "from-project-env"     "the env file default lost"
 }
 
-test_a_plain_parafile_assignment_insists() {
+test_a_plain_env_assignment_insists() {
   # The other half of the model, and a deliberate feature: a project that must
   # pin a value writes a plain assignment, and the environment does not win.
   local p out; p="$(a_project 'PARA_DOMAIN=insisted.example')"
@@ -226,7 +226,7 @@ test_a_declared_origin_beats_the_one_in_the_checkout() {
   a_project_command "$p" resolved '#!/bin/sh
 echo "origin=[$PARA_ORIGIN]"'
   para_in "$p" resolved
-  assert_contains "$PARA_OUT" "origin=[git@github.com:acme/other.git]" "the Parafile won"
+  assert_contains "$PARA_OUT" "origin=[git@github.com:acme/other.git]" "the env file won"
 }
 
 test_the_ready_host_defaults_to_paras_own_domain() {
@@ -248,16 +248,11 @@ echo "ready=[$PARA_READY_HOST]"'
   assert_contains "$PARA_OUT" "ready=[]" "an explicit empty skips the wait"
 }
 
-test_a_scaffolded_parafile_is_one_line() {
-  # The scaffold pins only its contract. Capabilities may add optional settings
+test_a_scaffolded_env_is_one_line() {
+  # The scaffold pins only its contract. Layers may propose optional settings
   # later, and a project with no routes is valid.
-  local d active; d="$(scratch)"
-  mkdir -p "$d/void"
-  ( cd "$d/void" && env -u PARA_PROJECT_DIR -u PARA_PROJECT_NAME "$PARA" init void >/dev/null 2>&1 )
-  active="$(grep -vE '^[[:space:]]*(#|$)' "$d/void/.paraspace/Parafile")"
-  assert_eq 1 "$(printf '%s\n' "$active" | wc -l | tr -d ' ')" "void is one line: $active" || return 1
-  assert_contains "$active" "PARA_CONTRACT" "…the contract" || return 1
-  assert_not_contains "$active" "PARA_ROUTES" "routes are left for the project or Docker inference"
+  local d; d="$(a_scaffolded_project)"
+  assert_eq "PARA_CONTRACT=1" "$(cat "$d/.paraspace/env")" "a fresh env pins only the contract"
 }
 
 test_routes_are_canonicalized() {
@@ -311,62 +306,17 @@ test_doctor_checks_incus_can_do_what_para_needs() {
   assert_not_contains "$out" "cannot select device columns" "…nor fail"
 }
 
-test_init_resolves_the_project_into_the_scaffolded_parafile() {
-  # The scaffolded Parafile's commented defaults are meant to READ as what para
-  # already resolved here, so ${PARA_PROJECT_NAME} is substituted on the way in.
-  # It cannot be left for bash: para resolves PARA_PROJECT_NAME after sourcing
-  # the Parafile, so an unsubstituted one is an unbound variable, not a default.
-  # Both values come off $PWD, which an exported PARA_PROJECT_NAME must not
-  # redirect, so this passes one in and expects the directory to win.
-  local d out; d="$(scratch)"
-  mkdir -p "$d/Acme.Web"
-  git -C "$d/Acme.Web" init -q
-  git -C "$d/Acme.Web" remote add origin git@github.com:acme/acme.git
-  ( cd "$d/Acme.Web" && env -u PARA_PROJECT_DIR PARA_PROJECT_NAME=inherited "$PARA" init void >/dev/null 2>&1 )
-  out="$(cat "$d/Acme.Web/.paraspace/Parafile")"
-  assert_contains     "$out" 'PARA_VOLUME:=para-home-acme-web'  "the volume default names this project" || return 1
-  assert_contains     "$out" 'PARA_IMAGE_NAME:=acme-web'        "so does the image default"             || return 1
-  assert_contains     "$out" 'PARA_ORIGIN:=git@github.com:acme/acme' "and the origin is this checkout's" || return 1
-  assert_not_contains "$out" 'inherited'                        "an exported name did not redirect it"  || return 1
-  # $PARA_PROJECT_DIR is a different variable, and para DOES set it before
-  # sourcing, so the substitution must not eat its prefix.
-  # shellcheck disable=SC2016  # literal Parafile text, not an expansion
-  assert_contains     "$out" 'PARA_HOST_ENV:=$PARA_PROJECT_DIR/.env' "PARA_PROJECT_DIR survived intact" || return 1
-  # shellcheck disable=SC2016  # ditto
-  assert_not_contains "$out" '${PARA_PROJECT_NAME}'             "no placeholder was left behind"        || return 1
-
-  # With nowhere to read an origin from, the line names an app you can clone.
-  mkdir -p "$d/no-repo"
-  ( cd "$d/no-repo" && env -u PARA_PROJECT_DIR -u PARA_PROJECT_NAME "$PARA" init void >/dev/null 2>&1 )
-  out="$(cat "$d/no-repo/.paraspace/Parafile")"
-  assert_contains     "$out" 'PARA_ORIGIN:=https://github.com/paraspace-dev' "it falls back to the example app" || return 1
-  # shellcheck disable=SC2016  # ditto
-  assert_not_contains "$out" '${PARA_ORIGIN}'                                "and resolves that placeholder too"
-}
-
-test_init_refuses_to_clobber_an_existing_project() {
-  # The guard between `para init` and a user's own Parafile and hooks. Untested,
-  # it can be deleted outright and the whole tier stays green, while the first
-  # command a new user runs eats their work.
-  local d out; d="$(scratch)"
-  mkdir -p "$d/.paraspace/hooks"
-  printf 'MINE=yes\n'  > "$d/.paraspace/Parafile"
-  printf '# my hook\n' > "$d/.paraspace/hooks/provision"
-
-  out="$(cd "$d" && env -u PARA_PROJECT_DIR -u PARA_PROJECT_NAME "$PARA" init void 2>&1)"
-  assert_eq "MINE=yes"  "$(cat "$d/.paraspace/Parafile")"        "the Parafile was left alone" || return 1
-  assert_eq "# my hook" "$(cat "$d/.paraspace/hooks/provision")" "the hook was left alone"     || return 1
-  assert_contains "$out" "skip (exists)" "it says what it skipped" || return 1
-
-  # …and --force is how you say you meant it, for what the template owns. Not
-  # the Parafile: refreshing a template's hooks is the whole point of --force,
-  # and taking PARA_ROUTES with them would make it unusable for that.
-  out="$(cd "$d" && env -u PARA_PROJECT_DIR -u PARA_PROJECT_NAME "$PARA" init void --force 2>&1)"
-  assert_not_contains "$(cat "$d/.paraspace/hooks/provision")" "# my hook" "--force refreshed the hook" || return 1
-  assert_eq "MINE=yes" "$(cat "$d/.paraspace/Parafile")"                   "…and spared the Parafile"   || return 1
-  # A scratch dir has no git origin, but the Parafile it kept is the user's, so
-  # the origin advice would be naming a file this run never wrote.
-  assert_not_contains "$out" "names an example app" "…and says nothing about a Parafile it kept"
+test_init_converges_on_an_existing_project() {
+  # init and add are one convergent verb, so re-running it on a project edits
+  # nothing that already exists and eats nothing the user wrote.
+  local p out; p="$(a_project)"
+  mkdir -p "$p/.paraspace/layers/project/hooks"
+  printf '# my hook\n' > "$p/.paraspace/layers/project/hooks/provision"
+  out="$(env PARA_PROJECT_DIR="$p" "$PARA" init 2>&1)" \
+    || { echo "  init failed on an existing project:" >&2; printf '    %s\n' "$out" >&2; return 1; }
+  assert_eq "# my hook" "$(cat "$p/.paraspace/layers/project/hooks/provision")" "the hook was left alone" || return 1
+  assert_eq ".paraspace/layers/project" "$(cat "$p/.paraspace/stack")" "the stack was left alone" || return 1
+  assert_contains "$(cat "$p/.paraspace/env")" "PARA_PROJECT_NAME=fixture" "the env was left alone"
 }
 
 test_up_allocates_an_ip_that_is_not_already_taken() {
@@ -418,7 +368,7 @@ test_image_defaults_to_the_project_slug() {
 }
 
 test_the_image_base_and_its_bootstrap_default_together() {
-  # A Parafile that names no distro gets Void, and the one `sh -c` line that
+  # An env file that names no distro gets Void, and the one `sh -c` line that
   # leaves bash in the builder follows from whatever the base is. The oracle is a
   # project command, since para exports every resolved PARA_* to one.
   local p; p="$(a_project)"
@@ -464,12 +414,13 @@ test_image_build_refuses_without_an_image_build_hook() {
   assert_backend_untouched
 }
 
-test_image_build_accepts_a_hook_from_a_mod() {
-  # ...and it has to span mods, or vendoring the hook that builds your image
-  # would be refused by the very check that exists to catch its absence.
+test_image_build_accepts_a_hook_from_any_layer() {
+  # ...and it has to span the stack, or adding the layer that builds your
+  # image would be refused by the very check that exists to catch its absence.
   local p; p="$(a_project 'PARA_IMAGE_BASE=images:alpine/edge')"
-  mkdir -p "$p/.paraspace/mods/tools/hooks"
-  printf 'true\n' > "$p/.paraspace/mods/tools/hooks/image-build"
+  a_layer "$p" tools
+  mkdir -p "$p/.paraspace/layers/tools/hooks"
+  printf 'true\n' > "$p/.paraspace/layers/tools/hooks/image-build"
   para_in "$p" image build
   assert_not_contains "$PARA_OUT" "no 'image-build' hook" "a mod's hook was counted" || return 1
   # Reaching the daemon is the positive half: have_hook runs before
@@ -489,51 +440,39 @@ test_image_rejects_an_unknown_subcommand() {
 
 # --------------------------------------------------------------------- init
 
-test_init_scaffolds_a_paraspace_dir() {
-  local d; d="$(a_scaffolded_project void)"
-  assert test -f "$d/.paraspace/Parafile"        || return 1
-  assert test -f "$d/.paraspace/hooks/provision" || return 1
-  assert test -f "$d/.paraspace/hooks/boot"      || return 1
-  assert test -x "$d/.paraspace/hooks/provision"
+test_init_scaffolds_a_project() {
+  local d; d="$(a_scaffolded_project)"
+  assert test -f "$d/.paraspace/env"   || return 1
+  assert test -f "$d/.paraspace/stack" || return 1
+  assert test -f "$d/.paraspace/layers/project/hooks/provision" || return 1
+  assert test -f "$d/.paraspace/layers/project/hooks/boot"      || return 1
+  # The default stack: the bundled base first, the project's own layer last.
+  assert_eq "node_modules/paraspace/layers/base/void
+.paraspace/layers/project" "$(cat "$d/.paraspace/stack")" "base then project"
 }
 
-test_init_lists_bundled_templates() {
-  local out; out="$(env -u PARA_PROJECT_DIR "$PARA" init --list 2>&1)"
-  assert_eq "void" "$out" "void is the one bundled template"
-}
-
-test_void_template_establishes_zsh_extension_paths() {
+test_void_base_establishes_zsh_extension_paths() {
   local repo hook
   repo="$(cd "$(dirname "$PARA")/.." && pwd)"
-  hook="$repo/templates/void/.paraspace/hooks/image-build"
+  hook="$repo/layers/base/void/hooks/image-build"
   assert_contains "$(cat "$hook")" "pkgs=\"zsh" "the base installs zsh" || return 1
   assert_contains "$(cat "$hook")" "/etc/zsh/zshrc.d" "the base creates zsh drop-ins" || return 1
   assert_contains "$(cat "$hook")" "/usr/share/zsh/site-functions" \
     "the base creates the completion path"
 }
 
-test_init_refuses_a_path_as_a_template_name() {
-  # Without containment, `para init ../..` scaffolds an arbitrary tree into $PWD.
-  # Asserted on the MESSAGE: `para init ../..` would fail anyway once the path
-  # missed, so an exit-status-only check would pass with the guard removed.
-  local d out rc=0; d="$(scratch)"
-  out="$(cd "$d" && env -u PARA_PROJECT_DIR "$PARA" init ../.. 2>&1)" || rc=$?
-  [ "$rc" -ne 0 ] || { echo "  init accepted a path traversal" >&2; return 1; }
-  assert_contains "$out" "plain directory name" "the refusal is the containment check" || return 1
-  [ ! -e "$d/.paraspace" ] || { echo "  init scaffolded something anyway" >&2; return 1; }
-}
-
 test_a_scaffolded_project_takes_its_identity_from_the_directory() {
-  # A template ships with no project name in its ACTIVE config: the engine
-  # derives PARA_PROJECT_NAME from the directory name. (Scaffolding resolves the name
-  # into the Parafile's commented defaults, which is a different test.)
-  # PARA_PROJECT_NAME is unset for the same reason PARA_PROJECT_DIR is: the e2e
-  # sandbox exports one, and an inherited value is exactly what this test must
-  # not see. (It passed under `--cli` and failed under `--all` before this.)
+  # The scaffold ships no project name in its ACTIVE config: the engine
+  # derives PARA_PROJECT_NAME from the directory name. PARA_PROJECT_NAME is
+  # unset for the same reason PARA_PROJECT_DIR is: the e2e sandbox exports
+  # one, and an inherited value is exactly what this test must not see.
   local d out; d="$(scratch)"
   mkdir -p "$d/My.App"
-  ( cd "$d/My.App" && env -u PARA_PROJECT_DIR -u PARA_PROJECT_NAME "$PARA" init void >/dev/null 2>&1 )
-  out="$(cd "$d/My.App" && env -u PARA_PROJECT_DIR -u PARA_PROJECT_NAME "$PARA" doctor 2>&1)"
+  a_linked_package "$d/My.App"
+  ( cd "$d/My.App" && env -u PARA_PROJECT_DIR -u PARA_PROJECT_NAME "$PARA" init >/dev/null 2>&1 )
+  # Fenced, like every doctor run here: a real incus would be probed otherwise.
+  [ -n "$PARA_FENCE" ] || PARA_FENCE="$(a_fenced_backend)"
+  out="$(cd "$d/My.App" && env -u PARA_PROJECT_DIR -u PARA_PROJECT_NAME PATH="$PARA_FENCE:$PATH" "$PARA" doctor 2>&1)"
   assert_contains "$out" "my-app" "the directory name became the project slug"
 }
 

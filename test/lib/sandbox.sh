@@ -38,7 +38,7 @@ sandbox_base() {
   #     (e.g. the docs-recommended shared name para-home) must not have it leak in
   #     and get their real volume deleted by a `--cli` run;
   #   - the image keys are just as destructive one step over. The fixture's
-  #     Parafile declares them with `: "${X:=…}"`, which yields to the
+  #     env declares them with `: "${X:=…}"`, which yields to the
   #     environment, so an exported PARA_IMAGE_NAME (say, a real project's alias)
   #     means a PARA_TEST_REBUILD=1 run PUBLISHES the Alpine fixture payload over
   #     that real alias. Without the rebuild it's merely confusing: workspaces
@@ -77,18 +77,18 @@ sandbox_e2e() {
   export PARA_PROJECT_NAME="paratest-$$"
   export PARA_VOLUME="para-home-$PARA_PROJECT_NAME"
   # The fixture's base image, built through para itself, so `para image build`
-  # reads the fixture's Parafile (PARA_PROJECT_DIR above) for the Alpine base,
+  # reads the fixture's env (PARA_PROJECT_DIR above) for the Alpine base,
   # the bash bootstrap, and the payload. Doing it this way means an e2e run also
   # exercises image build against a non-Void, Docker-free consumer, but only on
   # the run that actually builds. An existing alias is REUSED, because the
   # rebuild is by far the slow part, so in steady state most runs skip
   # image build entirely. Nothing detects that you edited the fixture's payload:
-  # if you touched hooks/image-build, the Parafile's base/bootstrap, or
+  # if you touched hooks/image-build, the env's base/bootstrap, or
   # cmd_image_build itself, rebuild explicitly with PARA_TEST_REBUILD=1.
   # --no-build skips even the existence check.
   # Hardcoded, not "${PARA_IMAGE_NAME:-…}": sandbox_base unset PARA_IMAGE_NAME precisely so
   # the caller's environment can't redirect the build, which leaves the fixture
-  # Parafile's own `: "${PARA_IMAGE_NAME:=alpine-minimal}"` as the single source of the
+  # env's own `: "${PARA_IMAGE_NAME:=alpine-minimal}"` as the single source of the
   # alias. Keep this string in step with that line.
   local img=alpine-minimal
   if [ "${PARA_TEST_NO_BUILD:-0}" != 1 ]; then

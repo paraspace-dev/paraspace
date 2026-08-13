@@ -5,7 +5,8 @@ isolated copy of a project, so several coding agents can work at once without
 stepping on each other's branch, database, or half-finished edits.
 
 Each workspace is a local unprivileged system container with its own clone, its
-own stack, a static bridge IP, and its own `https://<name>.<domain>` URL.
+own running services, a static bridge IP, and its own `https://<name>.<domain>`
+URL.
 
 [Incus](https://linuxcontainers.org/incus/) runs the containers.
 [Caddy](https://caddyserver.com/) runs on your host and points each workspace's
@@ -27,9 +28,10 @@ a workspace lives in a `.paraspace/` directory at your repo root.
 
 - [Add ParaSpace to a project](./project-setup.md) starts at `para init`, then
   walks the pieces that make a project para-enabled, the
-  [Parafile](./parafile.md), the [hooks](./hooks.md), the [image](./image.md),
-  and any [commands](./commands.md#project-commands) you want to add
-- [Mods](./mods.md) are how you vendor a ready-made piece of that instead of
+  [env file](./env.md), the [layers](./layers.md), the [hooks](./hooks.md), the
+  [image](./image.md), and any [commands](./commands.md#project-commands) you
+  want to add
+- [Layers](./layers.md) are how you add a ready-made piece of that instead of
   writing it
 - [The Cookbook](./cookbook.md) has recipes for the common ones
 - [Prior art](./prior-art.md) compares the alternatives, including when to pick
@@ -42,13 +44,16 @@ a workspace lives in a `.paraspace/` directory at your repo root.
 
 - [Commands](./commands.md) covers the full CLI surface, project commands, and
   shell completion.
-- [The Parafile](./parafile.md) lists every key `para` reads from a project.
+- [The env file](./env.md) lists every key `para` reads from a project's
+  `.paraspace/env`.
 - [Hooks](./hooks.md) defines the `provision`/`boot`/`image-build` contract and
   the environment `para` injects.
 - [Hook points](./hook-points.md) shows how to run a hook point of your own,
   and how one name resolves to more than one script.
-- [Mods](./mods.md) covers vendoring a reusable piece of `.paraspace/` with
-  `para mod add`, and writing one that plays well with others.
+- [Layers](./layers.md) covers the layer shape, the stack file, `para add`, and
+  customizing a packaged layer.
+- [Publishing plugins](./plugins.md) is for authors who want to ship layers as
+  an npm package (`paraspace-plugin-*`).
 - [The image contract](./image.md) says what a base image must provide, and how
   `para image build` builds one.
 - [Workspace URLs](./urls.md) covers dropping the `:8443`, using your own

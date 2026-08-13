@@ -5,7 +5,7 @@ your provision hook links out of it, every workspace inherits, so you sign in
 once per project instead of once per workspace.
 
 That covers anything with a credential on disk: your VCS, `gh` or `glab`, an
-agent CLI's session, an npm or PyPI token, a cloud CLI's profile.
+agent CLI's session, an npm or PyPI token, or a cloud CLI profile.
 
 ## How it works
 
@@ -13,7 +13,7 @@ agent CLI's session, an npm or PyPI token, a cloud CLI's profile.
 hook's job, and it's usually a handful of symlinks:
 
 ```sh
-# .paraspace/hooks/provision
+# .paraspace/layers/project/hooks/provision
 mkdir -p "$PARA_SHARED/git/ssh" "$PARA_SHARED/gh"
 ln -sfn "$PARA_SHARED/gh"             ~/.config/gh     # gh login
 ln -sfn "$PARA_SHARED/claude"         ~/.claude        # agent session
@@ -29,7 +29,7 @@ Recipes for the common ones are in the [Cookbook](./cookbook.md).
 ## Version control over SSH
 
 Workspaces clone and push over the network, so your host has to trust a key.
-The bundled `git` mod generates **one key per project**, on that project's
+The bundled `git` layer generates **one key per project**, on that project's
 shared volume and labelled `para-<hostname>`. This way it's individually
 revocable, and allows you to cleanly scope the access granted to the project
 workspaces.
@@ -40,8 +40,14 @@ tool reads linked into `$HOME`.
 
 ### First run
 
-If your project adopts the `git` mod, it automatically generates a fresh
-key, prints it, and **pauses** so you can authorize it:
+Add the `git` layer to your project:
+
+```sh
+para add git
+```
+
+During the project's first `para up`, the layer generates a fresh key, prints
+it, and **pauses** so you can authorize it:
 
 1. Copy the printed key and add it at your host (e.g.
    [github.com/settings/keys](https://github.com/settings/keys)).
@@ -50,9 +56,9 @@ key, prints it, and **pauses** so you can authorize it:
 `para up` is idempotent, so if a first clone fails with
 `Permission denied (publickey)`, authorize the key and re-run.
 
-The `git` mod also ships a [project command](./commands.md#project-commands)
-that re-prints it, a file in the mod's `commands/` rather than a `para`
-built-in:
+The `git` layer also ships a [project command](./commands.md#project-commands)
+that re-prints it. It is a file in the layer's `commands/`, rather than a
+`para` built-in:
 
 ```sh
 para key
@@ -60,7 +66,12 @@ para key
 
 ### Login with `gh`
 
-If your project adopts the `gh` mod, it will guide you through the `gh login`
-flow during first boot. This enables your project workspaces to have CLI access
-to GitHub to create PRs, etc.
+Add the `gh` layer to guide you through the `gh login` flow during the
+project's first `para up`:
 
+```sh
+para add gh
+```
+
+This enables your project workspaces to have CLI access to GitHub to create
+PRs, etc.

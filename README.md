@@ -7,7 +7,8 @@
 
 `para` runs any number of full, isolated copies of your project side by side on
 your own machine. Each workspace is an unprivileged [Incus] system container
-with its own clone, its own stack, and its own `https://<name>.<domain>` URL, so
+with its own clone, its own running services, and its own
+`https://<name>.<domain>` URL, so
 several coding agents (or you) can build, run and break things in parallel
 without colliding.
 
@@ -21,8 +22,9 @@ without colliding.
 - [How it works](./docs/how-it-works.md) ·
   [Running coding agents](./docs/agents.md)
 - [Project setup](./docs/project-setup.md) · [Cookbook](./docs/cookbook.md)
-- [Commands](./docs/commands.md) · [The Parafile](./docs/parafile.md) ·
-  [Hooks](./docs/hooks.md) · [Mods](./docs/mods.md) ·
+- [Commands](./docs/commands.md) · [The env file](./docs/env.md) ·
+  [Hooks](./docs/hooks.md) · [Layers](./docs/layers.md) ·
+  [Publishing plugins](./docs/plugins.md) ·
   [The image contract](./docs/image.md) ·
   [Contract versioning](./docs/versioning.md)
 - [Troubleshooting](./docs/troubleshooting.md)

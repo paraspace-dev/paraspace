@@ -29,7 +29,7 @@ as the substring match it looks like.
 ## What each tier covers
 
 **CLI tier** (`test/cli/`) needs no incus. Argument handling, `para --help`, and
-`para init` (pure filesystem). This is what runs on every push
+`para init`/`para add` (pure filesystem). This is what runs on every push
 ([`.github/workflows/test.yml`](../.github/workflows/test.yml)), alongside the
 ShellCheck gate ([`bin/lint`](../bin/lint)).
 
@@ -52,14 +52,15 @@ commands against a live Incus workspace:
 ## The fixture
 
 `test/fixtures/hello/` is the smallest real para project: an Alpine box that
-serves a fixed sentinel over HTTP with busybox `httpd`. It is **not** a template
-(it never ships in the npm package) and it does **not** use Docker, which keeps
-the published image ~5.5 MB and the whole path Docker-free.
+serves a fixed sentinel over HTTP with busybox `httpd`. It is **not bundled
+content** (it never ships in the npm package) and it does **not** use Docker,
+which keeps the published image ~5.5 MB and the whole path Docker-free.
 
 The image is built by **`para image build`**, from the fixture's own
-[`.paraspace/hooks/image-build`](fixtures/hello/.paraspace/hooks/image-build)
+[`.paraspace/layers/project/hooks/image-build`](fixtures/hello/.paraspace/layers/project/hooks/image-build)
 (`apk add bash busybox-extras sudo`, plus a `$PARA_USER` user) on the
-`PARA_IMAGE_BASE`/`PARA_IMAGE_BOOTSTRAP` its Parafile declares
+`PARA_IMAGE_BASE`/`PARA_IMAGE_BOOTSTRAP` its
+[`.paraspace/env`](fixtures/hello/.paraspace/env) declares
 (`images:alpine/edge` + `apk add --no-cache bash`), published as the
 `alpine-minimal` alias. That's deliberate: the fixture is the non-Void,
 Docker-free second consumer, so building it is also the only coverage
@@ -70,18 +71,20 @@ But the build is **cached**, and nothing invalidates that cache: an existing
 `alpine-minimal` alias is reused as-is. So in steady state most runs skip
 `para image build` entirely and prove nothing about it. **Rebuild explicitly with
 `PARA_TEST_REBUILD=1 test/run --e2e` whenever you touch the fixture's
-`hooks/image-build`, its Parafile's base/bootstrap, or `cmd_image_build` itself.**
+`hooks/image-build`, its env file's base/bootstrap, or `cmd_image_build` itself.**
 Otherwise you're testing the image you built last time. `--no-build` skips even
 the existence check.
 
-The fixture also ships **one mod**, `.paraspace/mods/e2e-mod/`, committed rather
-than installed at test time, because `PARA_PROJECT_DIR` points at the tracked fixture,
-so a test that vendored one would dirty the working tree and fail on a second
-run. It fills `provision`, `image-build`, and `boot`, opens a `fixture:before`
-point the project fills too, and adds a `commands/` verb. That gives the tier
-coverage of a provider-owned point, one owner filling another's, and a
-mod-owned boot hook. Its `image-build` half is
-baked into the cached image, so it is one more reason
+The fixture also ships **one extra layer**, `.paraspace/layers/e2e-mod/`, listed
+in [`.paraspace/stack`](fixtures/hello/.paraspace/stack) before the project layer,
+rather than creating it at test time, because `PARA_PROJECT_DIR` points at the
+tracked fixture, so a test that scaffolded one would dirty the working tree and
+fail on a second run. Layers and their order are described in
+[`docs/layers.md`](../docs/layers.md). It fills `provision`, `image-build`, and
+`boot`, opens a `fixture:before` point the project layer fills too, and adds a
+`commands/` verb. That gives the tier coverage of a provider-owned point, one
+layer filling another's point, and a non-project-layer boot hook. Its
+`image-build` half is baked into the cached image, so it is one more reason
 `PARA_TEST_REBUILD=1` matters.
 
 ## Isolation
@@ -135,7 +138,8 @@ throwaway XDG tree can fence off:
   container through whatever incus the CLI reaches.)
 - **Interactive `para sh` is not covered.** A pty path needs util-linux `su
   --pty`, and the Alpine fixture ships busybox. Exercise it by hand against a
-  real template.
+  real project whose image ships util-linux, such as the bundled `base/void`
+  layer's.
 
 ## Writing a test
 

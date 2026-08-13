@@ -10,7 +10,7 @@ test_set_env_var_respects_existing_assignment_forms() {
   for form in 'PARA_ROUTES=8080' 'PARA_ROUTES=""' ': "${PARA_ROUTES:=3000}"' 'PARA_ROUTES="${PARA_ROUTES-4000}"'; do
     p="$(a_project "$form")"; before="$(cat "$p/.paraspace/env")"
     assert env PARA_PROJECT_DIR="$p" PARA_HELPERS="$root/libexec/helpers" bash -c \
-      '. "$PARA_HELPERS"; maybe_write_env PARA_ROUTES 9000' || return 1
+      '. "$PARA_HELPERS"; maybe_write_env PARA_ROUTES 9000 2>/dev/null' || return 1
     assert_eq "$before" "$(cat "$p/.paraspace/env")" "existing form wins: $form" || return 1
   done
 }
@@ -20,7 +20,7 @@ test_set_env_var_ignores_comments_and_similar_names_and_escapes() {
   root="$(helpers_repo)"; p="$(a_project '# PARA_ROUTES=8080' 'PARA_ROUTE=7000')"
   value="one two'\"\$three"
   assert env PARA_PROJECT_DIR="$p" PARA_HELPERS="$root/libexec/helpers" VALUE="$value" bash -c \
-    '. "$PARA_HELPERS"; maybe_write_env PARA_ROUTES "$VALUE"' || return 1
+    '. "$PARA_HELPERS"; maybe_write_env PARA_ROUTES "$VALUE" 2>/dev/null' || return 1
   resolved="$(env -i bash -c '. "$1"; printf "%s" "$PARA_ROUTES"' bash "$p/.paraspace/env")"
   assert_eq "$value" "$resolved" "the appended assignment round-trips through bash" || return 1
   assert_eq 1 "$(grep -c '^PARA_ROUTES=' "$p/.paraspace/env")" "exactly one declaration"

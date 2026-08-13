@@ -29,7 +29,8 @@ cd "$root"
 # bash 3.2-safe (no mapfile), matching para's own portability bar.
 files=()
 while IFS= read -r f; do
-  case "$(head -n1 "$f" 2>/dev/null)" in
+  # tr: a binary file's first "line" holds NULs, which bash warns about
+  case "$(head -n1 "$f" 2>/dev/null | tr -d '\0')" in
     '#!'*bash*) files+=("$f") ;;
   esac
 done < <(git ls-files --cached --others --exclude-standard | sort)

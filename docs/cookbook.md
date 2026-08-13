@@ -85,8 +85,9 @@ instead of downloading in every workspace:
 
 ```sh
 for img in $PARA_PREPULL_IMAGES; do
-  docker pull -q "$img" || echo "warn: could not pre-pull $img" >&2
+  docker pull -q "$img" || echo "warn: could not pre-pull $img" >&2 &
 done
+wait
 ```
 
 The bundled `docker` layer ships that loop already.

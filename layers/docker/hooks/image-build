@@ -26,9 +26,12 @@ esac
 
 if [ -n "${PARA_PREPULL_IMAGES:-}" ]; then
   stage "Pre-pulling Docker images"
+  # In parallel: the daemon serves concurrent pulls, and the slowest image
+  # bounds the wall clock instead of the sum.
   for image in $PARA_PREPULL_IMAGES; do
-    docker pull -q "$image" || warn "failed to pre-pull $image; the workspace will retry"
+    docker pull -q "$image" || warn "failed to pre-pull $image; the workspace will retry" &
   done
+  wait
 fi
 
 stage "Docker shell integration"

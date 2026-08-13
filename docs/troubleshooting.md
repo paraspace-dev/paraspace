@@ -116,6 +116,39 @@ every `caddy` upgrade), or stay on the default `:8443`:
 sudo setcap cap_net_bind_service=+ep "$(readlink -f "$(command -v caddy)")"
 ```
 
+### A workspace has no outbound network access
+
+`ping` is not a connectivity test inside a workspace. Unprivileged containers
+cannot open raw sockets, so it fails with `ping: socket: Operation not permitted`
+and `missing cap_net_raw+p capability or setuid?` even when networking works.
+
+Test DNS and outbound TCP from the workspace instead:
+
+```sh
+getent hosts github.com
+curl -m5 -sI https://github.com
+```
+
+Docker on the host commonly blocks the `incusbr0` bridge. Confirm it with:
+
+```sh
+sudo iptables -S FORWARD | head -3
+```
+
+If it shows `-P FORWARD DROP` and has a `DOCKER-USER` chain, allow the bridge:
+
+```sh
+sudo iptables -I DOCKER-USER -i incusbr0 -j ACCEPT
+sudo iptables -I DOCKER-USER -o incusbr0 -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
+```
+
+Persist these rules because Docker rebuilds its chains on restart. For hosts
+using ufw, run `sudo ufw route allow in on incusbr0` and
+`sudo ufw route allow out on incusbr0`; with firewalld, add `incusbr0` to the
+trusted zone. If a literal-IP `curl` works but `getent` fails, the same firewall
+is blocking dnsmasq on port 53. See [Prevent connectivity issues with Incus and
+Docker](https://linuxcontainers.org/incus/docs/main/howto/network_bridge_firewalld/).
+
 ### macOS: `incus daemon unreachable`
 
 Incus runs inside a Colima VM there. `colima start --runtime incus`, then

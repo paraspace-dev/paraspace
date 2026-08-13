@@ -64,9 +64,22 @@ test_hands_off_to_the_projects_own_para() {
   printf '#!/bin/sh\necho "the .bin shim ran"\n' > "$p/node_modules/.bin/para"
   chmod +x "$p/node_modules/.bin/para"
   para_in "$p" ls --names
-  assert_contains "$PARA_OUT" "project para got: ls --names" "the package's bin receives the argv" || return 1
-  assert_contains "$PARA_OUT" "project's own para" "the handoff is announced" || return 1
+  assert_eq "project para got: ls --names" "$PARA_OUT" \
+    "the package's bin receives the argv, and the handoff itself says nothing" || return 1
   assert_not_contains "$PARA_OUT" "the .bin shim ran" "the .bin shim is never probed"
+}
+
+test_which_names_the_para_that_answers() {
+  # The handoff is silent, and this verb is how you see it WITHOUT trusting
+  # the checkout: it names the project's para but never executes it, so it is
+  # safe to run in a clone you have not read yet.
+  local p; p="$(a_project)"
+  para_in "$p" which
+  assert test "$PARA_OUT" -ef "$PARA" || return 1
+  a_project_para "$p"
+  para_in "$p" which
+  assert_eq "$p/node_modules/paraspace/bin/para" "$PARA_OUT" \
+    "the project's install is named, not executed"
 }
 
 test_a_hoisted_paraspace_is_found() {
@@ -87,7 +100,8 @@ test_a_linked_paraspace_is_already_the_projects_para() {
   local p; p="$(a_scaffolded_project)"
   para_in "$p" commands
   [ "$PARA_RC" -eq 0 ] || { printf '  para commands failed:\n    %s\n' "$PARA_OUT" >&2; return 1; }
-  assert_not_contains "$PARA_OUT" "project's own para" "a linked install is not handed off to"
+  para_in "$p" which
+  assert test "$PARA_OUT" -ef "$PARA" || return 1
 }
 
 test_warns_when_a_project_pins_no_paraspace() {

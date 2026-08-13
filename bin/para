@@ -1491,7 +1491,7 @@ doctor_shadowed() { # doctor_shadowed <verb>
 # ---- help ------------------------------------------------------------------
 is_engine_verb() {
   case "$1" in
-    up|down|rm|ls|sh|caddy|config|image|init|add|doctor|commands|completions|exec) return 0 ;;
+    up|down|rm|ls|sh|caddy|config|image|init|add|doctor|commands|completions|which|exec) return 0 ;;
     # Every spelling main dispatches, or doctor stays silent about a command
     # named for one and the reader never learns why theirs does nothing.
     help|-h|--help|--version) return 0 ;;
@@ -1522,6 +1522,8 @@ usage() {
 	  image <build|status|rm>   the base image workspaces launch from
 	  commands                  the verbs this project's layers add
 	  completions <bash|zsh>    source <(para completions bash)
+	  which                     the para that would run here, found without
+	                            executing the project's copy
 	  --version                 the installed paraspace version
 	EOF
   usage_project_commands
@@ -1563,7 +1565,7 @@ cmd_completions() {
   cat <<-'EOF'
 	_para() {
 	  local cur="${COMP_WORDS[COMP_CWORD]}" cmd="${COMP_WORDS[1]:-}"
-	  local verbs="up down rm ls sh caddy config image init add doctor commands completions help"
+	  local verbs="up down rm ls sh caddy config image init add doctor commands completions which help"
 
 	  if [ "$COMP_CWORD" -eq 1 ]; then
 	    COMPREPLY=( $(compgen -W "$verbs $(para commands 2>/dev/null)" -- "$cur") )
@@ -1613,15 +1615,25 @@ project_para_bin() { # project_para_bin <project-dir>
 
 # Hand the invocation to the project's para, unless -ef says we already are
 # that file through whatever symlinks, which is what stops the handed-off
-# copy from handing off again.
+# copy from handing off again. Silent; `para which` is how you see it.
 reexec_project_para() { # reexec_project_para "$@"
   local bin
   PARA_PROJECT_DIR="${PARA_PROJECT_DIR:-$(find_project_root || true)}"
   [ -n "$PARA_PROJECT_DIR" ] || return 0
   bin="$(project_para_bin "$PARA_PROJECT_DIR")" || return 0
   if [ "$bin" -ef "$0" ]; then return 0; fi
-  info "using the project's own para (${bin#"$PARA_PROJECT_DIR"/})"
   exec "$bin" "$@"
+}
+
+# What a verb here would run, without running it: which is exempt from the
+# reexec, so you can inspect a checkout's para before anything in it executes.
+cmd_which() {
+  local bin
+  if [ -n "$PARA_PROJECT_DIR" ] && bin="$(project_para_bin "$PARA_PROJECT_DIR")"; then
+    printf '%s\n' "$bin"
+  else
+    printf '%s\n' "$PARA_BIN"
+  fi
 }
 
 # The other half of the handoff, said by require_project so it lands on the
@@ -1649,10 +1661,11 @@ main() {
   case "${1:-}" in
     init|add) PARA_PROJECT_DIR="${PARA_PROJECT_DIR:-$(find_project_root || pwd)}" ;;
   esac
-  # Shell rcs source completions at startup, from whatever directory the shell
-  # opens in, so that one verb answers from the copy invoked, silently.
+  # Two verbs never hand off: completions, because shell rcs source it at
+  # startup from whatever directory the shell opens in, and which, whose point
+  # is naming what would run without executing anything from the checkout.
   case "${1:-}" in
-    completions) ;;
+    completions|which) ;;
     *) reexec_project_para "$@" ;;
   esac
   local cmd="${1:-}"
@@ -1671,6 +1684,7 @@ main() {
     doctor)      cmd_doctor "$@" ;;
     commands)    project_commands ;;
     completions) cmd_completions "$@" ;;
+    which)       cmd_which ;;
     ""|-h|--help|help) usage ;;
     --version)   cmd_version ;;
     # para wraps `incus exec`, so container muscle memory reaches for this.

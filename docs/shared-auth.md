@@ -30,7 +30,7 @@ Recipes for the common ones are in the [Cookbook](./cookbook.md).
 
 Workspaces clone and push over the network, so your host has to trust a key.
 The bundled `git` layer generates **one key per project**, on that project's
-shared volume and labelled `para-<hostname>`. This way it's individually
+shared volume and labelled `para-<project>-<hostname>`. This way it's individually
 revocable, and allows you to cleanly scope the access granted to the project
 workspaces.
 

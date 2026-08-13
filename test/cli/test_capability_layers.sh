@@ -24,9 +24,12 @@ test_git_layer_clones_and_converges() {
     PARA_CLONE_DIR=app PARA_CLONE_BRANCH=main PARA_HOST_ENV="$host_env" \
     PARA_RUN_HOOK="$fake/run-hook" PARA_NAME=feat GIT_CALLS="$root/git-calls" \
     POINT_CALLS="$root/points" PARA_GIT_NAME=Acme PARA_GIT_EMAIL=dev@example.com \
+    PARA_PROJECT_NAME=acme PARA_HOSTNAME=host1 \
     bash "$repo/layers/git/hooks/provision" >/dev/null 2>&1
 
   assert test -f "$shared/git/ssh/id_ed25519.pub" || return 1
+  assert_contains "$(cat "$shared/git/ssh/id_ed25519.pub")" "para-acme-host1" \
+    "the key names its project and machine" || return 1
   assert test -d "$home/app/.git" || return 1
   assert_eq "TOKEN=one" "$(cat "$home/app/.env")" "the host env reached the clone" || return 1
   assert_eq "git:before" "$(cat "$root/points")" "the layer opened its hook point" || return 1
@@ -104,7 +107,7 @@ test_git_layer_trusts_the_ssh_host_it_will_clone_from() {
     env HOME="$2" PATH="$fake:$PATH" PARA_HELPERS="$repo/libexec/helpers" \
       PARA_SHARED="$shared" PARA_ORIGIN="$1" PARA_CLONE_DIR=app \
       PARA_HOST_ENV="$root/absent.env" PARA_RUN_HOOK="$fake/run-hook" \
-      PARA_NAME=feat SCAN_CALLS="$root/scan-calls" \
+      PARA_NAME=feat PARA_PROJECT_NAME=acme SCAN_CALLS="$root/scan-calls" \
       bash "$repo/layers/git/hooks/provision" >/dev/null 2>&1
   }
 
@@ -117,6 +120,40 @@ test_git_layer_trusts_the_ssh_host_it_will_clone_from() {
   a_git_provision ssh://git@git.example.com:2222/acme/app.git "$root/url" || return 1
   assert_eq "-H -p 2222 git.example.com" "$(cat "$root/scan-calls")" \
     "and an ssh:// origin keeps the port it names"
+}
+
+test_git_layer_points_a_github_origin_at_key_settings() {
+  # The authorize pause prints where the key goes, but only GitHub has a URL
+  # the layer knows; any other host gets just the key.
+  local repo root home shared fake out
+  repo="$(capability_repo)"; root="$(scratch)"; home="$root/home"
+  shared="$root/shared"; fake="$root/bin"; out="$root/out"
+  mkdir -p "$home" "$shared" "$fake"
+  printf '%s\n' '#!/usr/bin/env bash' 'exit 1' > "$fake/git"
+  printf '%s\n' '#!/usr/bin/env bash' 'exit 0' > "$fake/run-hook"
+  printf '%s\n' '#!/usr/bin/env bash' \
+    'case " $* " in *" -F "*) exit 1 ;; esac' \
+    'while [ "$#" -gt 0 ]; do' \
+    '  if [ "$1" = -f ]; then : > "$2"; printf "ssh-ed25519 AAAA test\n" > "$2.pub"; fi' \
+    '  shift' \
+    'done' > "$fake/ssh-keygen"
+  printf '%s\n' '#!/usr/bin/env bash' 'exit 0' > "$fake/ssh-keyscan"
+  chmod +x "$fake"/*
+
+  a_failed_provision() { # a_failed_provision <origin>
+    env HOME="$home" PATH="$fake:$PATH" PARA_HELPERS="$repo/libexec/helpers" \
+      PARA_SHARED="$shared" PARA_ORIGIN="$1" PARA_CLONE_DIR=app \
+      PARA_HOST_ENV="$root/absent.env" PARA_RUN_HOOK="$fake/run-hook" \
+      PARA_NAME=feat PARA_PROJECT_NAME=acme PARA_NONINTERACTIVE=1 \
+      bash "$repo/layers/git/hooks/provision" >/dev/null 2>"$out" || true
+  }
+
+  a_failed_provision git@github.com:acme/app.git
+  assert_contains "$(cat "$out")" "https://github.com/settings/keys" \
+    "a GitHub origin prints the key settings URL" || return 1
+  a_failed_provision git@git.example.com:acme/app.git
+  assert_not_contains "$(cat "$out")" "settings/keys" \
+    "another host does not get GitHub's URL"
 }
 
 a_gh_hook() { # a_gh_hook <hook> <repo> <home> <shared> <fake> <calls>

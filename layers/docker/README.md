@@ -34,12 +34,13 @@ adding the layer for a manual override. Re-adding the layer reruns inspection bu
 does not duplicate declarations.
 
 During boot it runs `docker compose up -d --wait --wait-timeout 300` when the
-clone contains a Compose file. It then opens the `docker:boot:after` [hook
-point](https://paraspace.dev/docs/hook-points) on every boot, whether or not a
-stack came up, so a `hooks/docker:boot:after` of yours runs after the stack is
-answering and still runs for a clone that has no Compose file. Routes are
-ordinary Caddy-to-workspace-port mappings and do not otherwise depend on
-Docker.
+clone contains a Compose file. To run something once the stack is answering,
+add `hooks/boot:after` to a layer. `para` runs this hook point after every
+layer's `boot` hook on every boot, whether or not this layer found a Compose
+file. See [hook points](https://paraspace.dev/docs/hook-points).
+
+Routes are ordinary Caddy-to-workspace-port mappings and do not otherwise
+depend on Docker.
 
 Set `PARA_PREPULL_IMAGES` in the project's .paraspace/env to a space-separated list of
 images to bake into the workspace image. Nested Docker needs an Incus `dir`

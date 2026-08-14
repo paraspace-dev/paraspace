@@ -8,9 +8,10 @@ of the stack first.
 ## The three official hooks
 
 Name a hook anything you like. These three are the ones `para` runs for you.
-`para init` writes stubs for them into `.paraspace/layers/project/hooks/`. To
-let other hooks slot into the middle of one, open a
-[hook point](./hook-points.md).
+`para init` writes stubs for them into `.paraspace/layers/project/hooks/`.
+Every plain hook runs between automatic `:before` and `:after` points; see
+[Hook points](./hook-points.md) to run hooks around one or open a point in its
+middle.
 
 ### `provision`
 

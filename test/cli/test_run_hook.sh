@@ -135,7 +135,7 @@ test_run_hook_reports_an_absent_hook_without_failing() {
   local root; root="$(a_stack project)"
   run_the_hook "$root" provision project
   assert_eq 0 "$HOOK_RC" "an absent hook is not a failure" || return 1
-  assert_contains "$HOOK_OUT" "no 'provision' hook" "and it says so"
+  assert_contains "$HOOK_OUT" "hook: provision (none)" "and it says so"
 }
 
 test_run_hook_treats_an_empty_stack_as_no_hooks() {
@@ -144,7 +144,7 @@ test_run_hook_treats_an_empty_stack_as_no_hooks() {
   local root; root="$(a_stack)"
   run_the_hook "$root" provision
   assert_eq 0 "$HOOK_RC" "an empty stack is not a failure" || return 1
-  assert_contains "$HOOK_OUT" "no 'provision' hook" "and it says so"
+  assert_contains "$HOOK_OUT" "hook: provision (none)" "and it says so"
 }
 
 # ------------------------------------------------- what a hook can see
@@ -260,6 +260,65 @@ test_run_hook_allows_the_same_point_twice_in_sequence() {
   run_the_hook "$root" provision project
   assert_eq 0 "$HOOK_RC" "calling one point twice in a row is fine" || return 1
   assert_eq 2 "$(grep -c seeded <<<"$HOOK_OUT")" "and it ran both times"
+}
+
+test_run_hook_wraps_a_name_in_its_before_and_after_points() {
+  # Every plain name runs between its :before and :after points, so a layer
+  # can slot in around another layer's hook without that hook opening a thing.
+  local root; root="$(a_stack alpha project)"
+  a_hook "$root/stack/alpha"   provision:before 'echo before >> "$PWD/order"'
+  a_hook "$root/stack/project" provision        'echo main >> "$PWD/order"'
+  a_hook "$root/stack/alpha"   provision:after  'echo after >> "$PWD/order"'
+  ( cd "$(dirname "$root")" && run_the_hook "$root" provision alpha project
+    assert_eq 0 "$HOOK_RC" "the wrapped run succeeded" || exit 1
+    assert_eq "before
+main
+after" "$(cat order)" "the points ran around the name, in order" )
+}
+
+test_run_hook_gives_a_point_no_points_of_its_own() {
+  # :before and :after names are terminal. Wrapping them too would open
+  # provision:before:before without end, past any cycle guard, since the name
+  # changes at every level.
+  local root; root="$(a_stack project)"
+  a_hook "$root/stack/project" provision               'true'
+  a_hook "$root/stack/project" provision:before        'echo point >> "$PWD/order"'
+  a_hook "$root/stack/project" provision:before:before 'echo too-deep >> "$PWD/order"'
+  ( cd "$(dirname "$root")" && run_the_hook "$root" provision project
+    assert_eq 0 "$HOOK_RC" "the run terminated" || exit 1
+    assert_eq "point" "$(cat order)" "only the point itself ran" )
+}
+
+test_run_hook_says_nothing_for_an_empty_point() {
+  # A point is optional by nature, so an unfilled one runs nothing and says
+  # nothing, whether para opened it or a hook did. Without this every up
+  # prints four lines of noise around provision and boot.
+  local root; root="$(a_stack project)"
+  a_hook "$root/stack/project" provision '"$PARA_RUN_HOOK" clone:before'
+  run_the_hook "$root" provision project
+  assert_eq 0 "$HOOK_RC" "empty points are not failures" || return 1
+  assert_not_contains "$HOOK_OUT" "provision:before" "the auto point stayed silent" || return 1
+  assert_not_contains "$HOOK_OUT" "clone:before" "and so did the opened one"
+}
+
+test_run_hook_lets_a_failing_before_point_stop_the_run() {
+  # :before exists to put things in place for the name it wraps, so a failure
+  # there means the hook itself must not run, and the status is the point's.
+  local root; root="$(a_stack project)"
+  a_hook "$root/stack/project" provision:before "$(printf '%s\n' '#!/usr/bin/env bash' 'exit 5')"
+  a_hook "$root/stack/project" provision 'echo main >> "$PWD/order"'
+  ( cd "$(dirname "$root")" && run_the_hook "$root" provision project
+    assert_eq 5 "$HOOK_RC" "the point's status reached the caller" || exit 1
+    if [ -f order ]; then echo "  the hook ran after its :before failed" >&2; exit 1; fi
+    assert_contains "$HOOK_OUT" "chain: provision > provision:before" "the chain names the route" )
+}
+
+test_run_hook_reports_a_failing_after_point() {
+  local root; root="$(a_stack project)"
+  a_hook "$root/stack/project" provision 'true'
+  a_hook "$root/stack/project" provision:after "$(printf '%s\n' '#!/usr/bin/env bash' 'exit 6')"
+  run_the_hook "$root" provision project
+  assert_eq 6 "$HOOK_RC" "the :after point's status reached the caller"
 }
 
 test_run_hook_leaves_stdin_with_the_hook() {

@@ -16,6 +16,3 @@ if has_compose "$HOME/$PARA_CLONE_DIR"; then
   stage "docker compose up"
   docker compose up -d --wait --wait-timeout 300
 fi
-
-"$PARA_RUN_HOOK" docker:boot:after
-

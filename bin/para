@@ -725,7 +725,16 @@ cmd_down() {
     warn "workspace '$name' is already stopped"
     return
   fi
-  incus stop "$CT_PREFIX$name"
+  local ct="$CT_PREFIX$name"
+  # runit (the shipped Void base) ignores the halt signal `incus stop` sends,
+  # so ask the guest's own init to power off, and use the stop as the bounded
+  # wait. The signal still serves images whose init does listen for it.
+  incus exec "$ct" -- poweroff 2>/dev/null || true
+  if ! incus stop --timeout 60 "$ct" 2>/dev/null; then
+    if ws_load "$name" && [ "$ws_state" = RUNNING ]; then
+      die "workspace '$name' is ignoring the shutdown request. Force it with: incus stop -f $ct"
+    fi
+  fi
   stage "Workspace '$name' stopped. Data is kept, and 'para up $name' resumes it."
 }
 

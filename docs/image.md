@@ -10,7 +10,11 @@ para's own mechanism needs very little:
   (`app` and `1000`/`1000` by default). para runs hooks and `para sh` as that
   user and chowns every pushed file to those ids;
 - **bash**, because para invokes hooks and shells via `su -s /bin/bash`;
-- **util-linux `su`**, if you run `para sh <ws> -c '<cmd>'` from a terminal.
+- **util-linux `su`**, if you run `para sh <ws> -c '<cmd>'` from a terminal;
+- a **shutdown path**. Provide either a `poweroff` command that the guest's init
+  acts on, or an init that responds to LXC's halt signal (`SIGPWR` by default).
+  Without either, `para down` waits 60 seconds and fails with an error naming
+  `incus stop -f <container>`.
 
 Everything else is your project's choice.
 

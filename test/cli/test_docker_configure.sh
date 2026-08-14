@@ -23,8 +23,8 @@ test_docker_configure_infers_one_apex_route_and_explicit_images() {
   local repo p fake out
   repo="$(docker_config_repo)"; p="$(a_project)"; fake="$(scratch)"; fake_compose "$fake"
   out="$(docker_add_model "$p" "$repo/test/fixtures/compose/single.json" "$fake")" || return 1
-  assert_contains "$(cat "$p/.paraspace/env")" 'PARA_PREPULL_IMAGES=example/web:latest' "explicit image inferred" || return 1
-  assert_contains "$(cat "$p/.paraspace/env")" 'PARA_ROUTES=8080' "one port uses the apex" || return 1
+  assert_contains "$(cat "$p/.paraspace/env")" "PARA_PREPULL_IMAGES='example/web:latest'" "explicit image inferred" || return 1
+  assert_contains "$(cat "$p/.paraspace/env")" "PARA_ROUTES='8080'" "one port uses the apex" || return 1
   assert_not_contains "$(cat "$p/.paraspace/env")" 'worker' "build-only service has no generated image" || return 1
   assert_contains "$out" 'Set PARA_ROUTES' "the additive edit is reported"
 }
@@ -34,9 +34,9 @@ test_docker_configure_resolves_multiple_routes_and_skips_unsafe_ports() {
   repo="$(docker_config_repo)"; p="$(a_project)"; fake="$(scratch)"; fake_compose "$fake"
   out="$(docker_add_model "$p" "$repo/test/fixtures/compose/multiple.json" "$fake")" || return 1
   parafile="$(cat "$p/.paraspace/env")"
-  assert_contains "$parafile" 'PARA_PREPULL_IMAGES=registry.example/app:ready' "resolved duplicate images are removed" || return 1
+  assert_contains "$parafile" "PARA_PREPULL_IMAGES='registry.example/app:ready'" "resolved duplicate images are removed" || return 1
   assert_eq 1 "$(grep -c '^PARA_PREPULL_IMAGES=' "$p/.paraspace/env")" "one image declaration" || return 1
-  assert_contains "$parafile" 'PARA_ROUTES=web-app-http-main:8080\ web-app-8081:8081\ api:4000' "service and port names are DNS-safe" || return 1
+  assert_contains "$parafile" "PARA_ROUTES='web-app-http-main:8080 web-app-8081:8081 api:4000'" "service and port names are DNS-safe" || return 1
   assert_contains "$out" "unpublished or ranged" "ranges/random publishing are explained" || return 1
   assert_contains "$out" "loopback" "loopback is explained" || return 1
   assert_contains "$out" "application protocol is mqtt" "non-HTTP is explained"
@@ -50,7 +50,7 @@ test_docker_configure_keeps_existing_values_independently_and_is_idempotent() {
   docker_add_model "$p" "$repo/test/fixtures/compose/single.json" "$fake" >/dev/null || return 1
   assert_eq "$before" "$(cat "$p/.paraspace/env")" "re-adding creates no duplicate declarations" || return 1
   assert_contains "$before" 'PARA_ROUTES=""' "an empty route remains authoritative" || return 1
-  assert_contains "$before" 'PARA_PREPULL_IMAGES=example/web:latest' "the other setting is still inferred"
+  assert_contains "$before" "PARA_PREPULL_IMAGES='example/web:latest'" "the other setting is still inferred"
 }
 
 test_docker_configure_skips_all_routes_on_duplicate_normalized_hosts() {
@@ -58,7 +58,7 @@ test_docker_configure_skips_all_routes_on_duplicate_normalized_hosts() {
   repo="$(docker_config_repo)"; p="$(a_project)"; fake="$(scratch)"; fake_compose "$fake"
   out="$(docker_add_model "$p" "$repo/test/fixtures/compose/duplicate.json" "$fake")" || return 1
   assert_not_contains "$(cat "$p/.paraspace/env")" 'PARA_ROUTES=' "ambiguous routes are not guessed" || return 1
-  assert_contains "$(cat "$p/.paraspace/env")" 'PARA_PREPULL_IMAGES=one:1\ two:2' "image inference is independent" || return 1
+  assert_contains "$(cat "$p/.paraspace/env")" "PARA_PREPULL_IMAGES='one:1 two:2'" "image inference is independent" || return 1
   assert_contains "$out" "unique DNS-safe" "the skipped route is explained"
 }
 

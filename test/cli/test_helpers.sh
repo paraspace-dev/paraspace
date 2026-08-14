@@ -23,6 +23,8 @@ test_set_env_var_ignores_comments_and_similar_names_and_escapes() {
     '. "$PARA_HELPERS"; maybe_write_env PARA_ROUTES "$VALUE" 2>/dev/null' || return 1
   resolved="$(env -i bash -c '. "$1"; printf "%s" "$PARA_ROUTES"' bash "$p/.paraspace/env")"
   assert_eq "$value" "$resolved" "the appended assignment round-trips through bash" || return 1
+  assert_contains "$(cat "$p/.paraspace/env")" "PARA_ROUTES='one two" \
+    "the value is single-quoted, not backslash-escaped" || return 1
   assert_eq 1 "$(grep -c '^PARA_ROUTES=' "$p/.paraspace/env")" "exactly one declaration"
 }
 

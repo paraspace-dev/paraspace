@@ -21,6 +21,14 @@ interactive() { [ -z "${PARA_NONINTERACTIVE:-}" ] && [ -t 0 ] && [ -t 1 ]; }
 # Print a prompt and wait for Enter, only when someone can answer.
 pause() { if interactive; then printf '%s ' "$*" >&2; read -r _ || true; fi; }
 
+# One value, quoted so sourcing it reads back the same bytes. Single quotes
+# pass everything but themselves; each embedded quote becomes '\'' (close the
+# string, one escaped quote outside it, reopen), and concatenation rejoins it.
+quote() { # quote <value>
+  local sq="'\\''"
+  printf "'%s'" "${1//\'/$sq}"
+}
+
 # Add one project setting without taking ownership from the project: both env
 # assignment spellings count as existing, an explicit empty value included.
 # Host-side, for a layer's configure; guest hooks have no project env to edit.
@@ -38,7 +46,7 @@ maybe_write_env() { # maybe_write_env <PARA_NAME> <value>
     return 0
   fi
 
-  printf '\n%s=%q\n' "$name" "$value" >> "$envfile"
+  printf '\n%s=%s\n' "$name" "$(quote "$value")" >> "$envfile"
   info "Set $name in .paraspace/env."
 }
 

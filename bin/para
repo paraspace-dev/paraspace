@@ -270,7 +270,7 @@ Run 'npm install' if these live under node_modules/, else fix .paraspace/stack."
 # image builder. A key you invent in your env file reaches all three.
 para_env() {
   local var
-  for var in "${!PARA_@}"; do printf 'export %s=%q\n' "$var" "${!var}"; done
+  for var in "${!PARA_@}"; do printf 'export %s=%s\n' "$var" "$(quote "${!var}")"; done
 }
 
 validate_name() {

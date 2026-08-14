@@ -445,6 +445,42 @@ test_refuses_a_contract_version_mismatch() {
   assert_backend_untouched
 }
 
+# ---------------------------------------------------------------- lifecycle
+
+# A stub incus for the multi-name verbs: both workspaces exist, owned by this
+# project, in <state>, and every delete/stop lands in "$1/calls".
+a_two_workspace_incus() { # a_two_workspace_incus <dir> <state>
+  cat > "$1/incus" <<STUB
+#!/bin/sh
+case "\$*" in
+  "info")     exit 0 ;;
+  info\ *)    exit 0 ;;
+  list\ *)    printf '%s\\n' 'para-a,$2,fixture,,,' 'para-b,$2,fixture,,,'; exit 0 ;;
+  delete\ *|stop\ *) echo "\$*" >> "$1/calls"; exit 0 ;;
+  *)          exit 0 ;;
+esac
+STUB
+  chmod +x "$1/incus"
+}
+
+test_rm_removes_every_named_workspace() {
+  local d p; d="$(scratch)"; p="$(a_project)"
+  a_two_workspace_incus "$d" STOPPED
+  env PARA_PROJECT_DIR="$p" PATH="$d:$PATH" "$PARA" rm a b >/dev/null 2>&1 \
+    || { echo "  'para rm a b' failed" >&2; return 1; }
+  assert_contains "$(cat "$d/calls")" "delete -f para-a" "the first name was deleted" || return 1
+  assert_contains "$(cat "$d/calls")" "delete -f para-b" "the second name was deleted"
+}
+
+test_down_stops_every_named_workspace() {
+  local d p; d="$(scratch)"; p="$(a_project)"
+  a_two_workspace_incus "$d" RUNNING
+  env PARA_PROJECT_DIR="$p" PATH="$d:$PATH" "$PARA" down a b >/dev/null 2>&1 \
+    || { echo "  'para down a b' failed" >&2; return 1; }
+  assert_contains "$(cat "$d/calls")" "stop --timeout 60 para-a" "the first name was stopped" || return 1
+  assert_contains "$(cat "$d/calls")" "stop --timeout 60 para-b" "the second name was stopped"
+}
+
 # -------------------------------------------------------------------- image
 
 test_image_defaults_to_the_project_slug() {

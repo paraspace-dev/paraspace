@@ -15,8 +15,8 @@ Everything else works from anywhere.
 | Command | What it does |
 |---|---|
 | `para up <name>` | create or reconverge a workspace, then boot it: launch, attach the shared volume, push the composed layer stack, run the hooks, publish the routes. Idempotent |
-| `para down <name>` | stop the container. Data is kept; `para up` resumes it |
-| `para rm <name>` | delete the workspace. The shared volume is untouched |
+| `para down <name>...` | stop the container(s). Data is kept; `para up` resumes each |
+| `para rm <name>...` | delete the workspace(s). The shared volume is untouched |
 | `para ls [-a\|--all] [--names]` | list this project's workspaces; `--all` spans every project, `--names` prints bare names (this is what completion reads) |
 | `para sh <name> [-c <command>]` | a shell in the clone, or [one command in it](#running-one-command) |
 

@@ -714,9 +714,14 @@ cmd_up() {
 }
 
 cmd_down() {
-  local name="${1:-}"
-  [ -n "$name" ] || die "usage: para down <name>"
+  [ "$#" -gt 0 ] || die "usage: para down <name>..."
   require_incus
+  local name
+  for name in "$@"; do down_one "$name"; done
+}
+
+down_one() { # down_one <name>
+  local name="$1"
   ws_load "$name" || die "no such workspace '$name' (see: para ls)"
   if [ -n "$ws_project" ] && [ "$ws_project" != "$PARA_PROJECT_NAME" ]; then
     die "workspace '$name' belongs to project '$ws_project'. Stop it from there, or run: PARA_PROJECT_NAME=$ws_project para down $name"
@@ -739,10 +744,18 @@ cmd_down() {
 }
 
 cmd_rm() {
-  local name="${1:-}"
-  [ -n "$name" ] || die "usage: para rm <name>"
-  validate_name "$name"
+  [ "$#" -gt 0 ] || die "usage: para rm <name>..."
   require_incus
+  local name
+  for name in "$@"; do rm_one "$name"; done
+  # Only if it is already up: starting Caddy is `up`'s job, and a `rm` should
+  # neither resurrect one you stopped nor fail on a host without caddy at all.
+  if caddy_running; then caddy_sync; fi
+}
+
+rm_one() { # rm_one <name>
+  local name="$1"
+  validate_name "$name"
   local ct="$CT_PREFIX$name"
   # Names are machine-global and `para ls` is project-scoped, so without this a
   # workspace you cannot even see is one typo away from being destroyed. `up`
@@ -761,9 +774,6 @@ cmd_rm() {
   fi
   stage "Deleting ${ct}…"
   incus delete -f "$ct"
-  # Only if it is already up: starting Caddy is `up`'s job, and a `rm` should
-  # neither resurrect one you stopped nor fail on a host without caddy at all.
-  if caddy_running; then caddy_sync; fi
   stage "Removed workspace '$name'. The shared volume is untouched."
 }
 
@@ -1514,8 +1524,8 @@ usage() {
 
 	WORKSPACES
 	  up <name>                 create or reconverge a workspace, then boot it
-	  down <name>               stop it (data kept)
-	  rm <name>                 delete it
+	  down <name>...            stop it (data kept)
+	  rm <name>...              delete it
 	  ls [-a|--all] [--names]   list workspaces, this project's by default
 	  sh <name> [-c <command>]  a shell in the clone, or one command in it
 
@@ -1588,6 +1598,8 @@ cmd_completions() {
 	    # The catalog rows are "checkmark name"; the name is the last field.
 	    init|add)    COMPREPLY=( $(compgen -W "--list --new $(para add --list 2>/dev/null | awk '{print $NF}')" -- "$cur") ) ;;
 	    ls)          COMPREPLY=( $(compgen -W "--all --names" -- "$cur") ) ;;
+	    # down and rm take any number of workspaces, so complete at every position.
+	    down|rm)     COMPREPLY=( $(compgen -W "$(para ls --names 2>/dev/null)" -- "$cur") ) ;;
 	    # Everything else, including every project command, takes a workspace.
 	    *)           [ "$COMP_CWORD" -eq 2 ] \
 	                   && COMPREPLY=( $(compgen -W "$(para ls --names 2>/dev/null)" -- "$cur") ) ;;

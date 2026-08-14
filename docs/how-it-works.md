@@ -1,8 +1,8 @@
 # How it works
 
 `para` is a thin wrapper around [Incus] for the containers, [Caddy] for the
-URLs, and the project's `.paraspace/` directory for everything else. Here is
-the mental model to understand how workspaces are organized and which part owns
+URLs, and the project's `.paraspace/` directory for everything else. This page
+is the mental model for how a workspace is put together and which part owns
 what.
 
 For the argument about *why* this shape, see [Why ParaSpace](./why.md).

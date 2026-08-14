@@ -1,8 +1,7 @@
 # Running coding agents
 
-ParaSpace is designed to help you run a coding agent per workspace, several
-workspaces at a time, each with its own working copy, real services running, and
-a URL you can open.
+Run one coding agent per workspace, several workspaces at a time, each with its
+own working copy, its services actually running, and a URL you can open.
 
 ## One workspace per task
 
@@ -73,11 +72,12 @@ They stay one-liners because `para sh` owns the terminal handling. See
 one-liners with the argument quoting filled in, so `para claude ws -p 'write a
 test'` reaches Claude Code as one argument instead of four.
 
-For the agent to feel like home, put your dotfiles in your project layer's
-`skel/` (`.paraspace/layers/project/skel/`) and have your provision hook link
-them in, or add a layer that brings its own (`para add dotfiles` installs Claude
-Code, an editor and a shell in one step). The agent's own config (`CLAUDE.md`,
-`AGENTS.md`) travels with the repo, so it's already in the clone.
+To make a workspace feel like your own machine, put your dotfiles in your
+project layer's `skel/` (`.paraspace/layers/project/skel/`) and have your
+provision hook link them in, or add a layer that brings its own (`para add
+dotfiles` installs Claude Code, an editor and a shell in one step). The agent's
+own config (`CLAUDE.md`, `AGENTS.md`) travels with the repo, so it's already in
+the clone.
 
 ## Working across several
 

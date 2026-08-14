@@ -169,7 +169,7 @@ project dependencies:
 npm install
 ```
 
-If the layer path is simply wrong, fix its line in `.paraspace/stack`. See
+If the layer path is just wrong, fix its line in `.paraspace/stack`. See
 [Layers](./layers.md).
 
 ### `no image 'myapp'. Build it with: para image build`

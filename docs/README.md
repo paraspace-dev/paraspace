@@ -31,8 +31,8 @@ a workspace lives in a `.paraspace/` directory at your repo root.
   [env file](./env.md), the [layers](./layers.md), the [hooks](./hooks.md), the
   [image](./image.md), and any [commands](./commands.md#project-commands) you
   want to add
-- [Layers](./layers.md) are how you add a ready-made piece of that instead of
-  writing it
+- [Layers](./layers.md) let you add a ready-made piece of that setup instead of
+  writing it yourself
 - [The Cookbook](./cookbook.md) has recipes for the common ones
 - [Prior art](./prior-art.md) compares the alternatives, including when to pick
   something else

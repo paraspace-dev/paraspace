@@ -1,6 +1,6 @@
 # Cookbook
 
-Recipes for things projects actually need. Each one is a fragment for your
+Recipes for the things projects keep needing. Each one is a fragment for your
 `.paraspace/`. See [Project setup](./project-setup.md) for how the pieces fit
 together, and [Hooks](./hooks.md) for the contract they run under.
 

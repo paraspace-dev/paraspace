@@ -8,9 +8,8 @@
 `para` runs any number of full, isolated copies of your project side by side on
 your own machine. Each workspace is an unprivileged [Incus] system container
 with its own clone, its own running services, and its own
-`https://<name>.<domain>` URL, so
-several coding agents (or you) can build, run and break things in parallel
-without colliding.
+`https://<name>.<domain>` URL, so several coding agents (or you) can build, run
+and break things in parallel without colliding.
 
 ## Documentation
 

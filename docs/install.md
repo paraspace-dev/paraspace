@@ -9,17 +9,18 @@ para --version
 ```
 
 You install `para` globally once, but inside a project the project's copy runs.
-When `paraspace` is installed under the project's `node_modules` (or a
-workspace root above it), `para` hands the invocation to that copy, which
-keeps workspaces on the version the project's lockfile pins rather than
-whatever this machine has. `para which` prints the file that would answer,
-without executing anything from the checkout, so you can inspect a fresh
-clone's para before the first verb hands off to it. In a project that pins
-none, the commands that
-depend on the project warn and run the global copy. The exception is
-`para completions`, which always answers from the copy you invoked, so
-sourcing it from a shell rc stays quiet in any directory. Pinning is part of
+When `paraspace` is installed under the project's `node_modules` (or a workspace
+root above it), `para` hands the invocation to that copy, which keeps workspaces
+on the version the project's lockfile pins rather than whatever this machine
+has. In a project that pins none, the commands that depend on the project warn
+and run the global copy. Pinning is part of
 [Add ParaSpace to a project](./project-setup.md).
+
+`para which` prints the file that would answer, without executing anything from
+the checkout, so you can inspect a fresh clone's para before the first verb
+hands off to it. One verb never hands off: `para completions` always answers
+from the copy you invoked, so sourcing it from a shell rc stays quiet in any
+directory.
 
 ## Install the host dependencies
 

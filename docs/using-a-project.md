@@ -1,7 +1,7 @@
 # Use a ParaSpace project
 
-This path is for repositories that already contain a `.paraspace/` directory.
-From the repository root, the whole loop is four commands:
+This is the loop for a repository that already has a `.paraspace/` directory.
+From the repository root, four commands get you a running workspace:
 
 ```sh
 npm install
@@ -10,10 +10,17 @@ para up ws1
 para sh ws1
 ```
 
-Projects usually provide their setup layers through `node_modules/`, so install
-the project's dependencies before running a para command that touches a
-workspace. Projects that vendor their layers by path do not need this step; the
-stack file decides. If layers are missing, para's error names the fix.
+## Install the dependencies
+
+```sh
+npm install
+```
+
+Most projects ship their setup layers as npm dependencies, so run this before
+any command that touches a workspace. Skip it if this project keeps its layers
+in the repository instead; read `.paraspace/stack` to see which way it goes. If
+you get it wrong, your first `para` command stops and lists the layer paths it
+could not find.
 
 ## Build the project image
 
@@ -21,9 +28,10 @@ stack file decides. If layers are missing, para's error names the fix.
 para image build
 ```
 
-This builds the base image the project defines. The first build can take
-several minutes. Images are per project and per architecture, and para rebuilds
-them only when their source changes.
+Every workspace you create is a clone of one base image, so build it once before
+your first `para up`, and give it several minutes. Build again when the
+project's image hooks change, and once more if you move to a machine with a
+different CPU architecture. See [The image contract](./image.md).
 
 ## Launch a workspace
 
@@ -31,12 +39,13 @@ them only when their source changes.
 para up ws1
 ```
 
-This creates an isolated workspace named `ws1` and runs the project's hooks in
-it, which is what clones the repository, provisions the environment, and starts
-the project's services.
+You now have an isolated workspace named `ws1`, with the repository cloned
+inside it, the environment provisioned, and the project's services running. All
+three are the project's own hooks, so what you get is whatever this repository
+decided a workspace should be.
 
-On a fresh machine the first launch may pause after printing an SSH public key.
-Add that key to your Git host, then continue. See
+On a fresh machine, the first launch may print an SSH public key and pause. Add
+that key to your Git host and continue. See
 [Shared authentication](./shared-auth.md).
 
 ## Enter the workspace
@@ -45,37 +54,37 @@ Add that key to your Git host, then continue. See
 para sh ws1
 ```
 
-That opens a shell in the workspace's clone, where you can run your editor,
-coding agent, tests, and the project's own commands.
+You land in a shell in the clone, where you can run your editor, your coding
+agent, the tests, and the project's own commands.
 
 ## Open the application
-
-List the active workspaces and their URLs:
 
 ```sh
 para ls
 ```
 
-Opening one in a browser is a
-[project command](./commands.md#project-commands) rather than something para
-knows how to do. The bundled base layer ships this command:
+That lists your workspaces with their URLs, so you can paste one into a browser.
+Opening it for you is a [project command](./commands.md#project-commands) rather
+than an engine verb, and the bundled base layer ships one:
 
 ```sh
 para web ws1
 ```
 
-Which commands exist depends on the project. `para --help` lists them.
+Run `para --help` to see which commands this project gives you.
 
 ## Create more workspaces
 
-Each workspace gets its own clone, IP address, running services, and URLs:
+Each one gets its own clone, IP address, services, and URLs, so you can leave
+`ws1` running while you work in another:
 
 ```sh
 para up another-feature
 para sh another-feature
 ```
 
-Use `para ls` to inspect them and `para rm` when one is finished with:
+Use `para ls` to see everything you have running, and delete the ones you have
+finished with:
 
 ```sh
 para rm ws1

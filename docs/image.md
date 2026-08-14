@@ -1,6 +1,6 @@
 # The image contract
 
-Your project has total control over the base image used to create workspaces.
+Your project decides everything about the base image its workspaces come from.
 
 ## What the image must have
 
@@ -18,8 +18,8 @@ para's own mechanism needs very little:
 
 Everything else is your project's choice.
 
-For full ergonomics also include a login shell like `zsh`, nicer dotfiles, and
-whatever agent harness you use.
+For a workspace that is pleasant to work in, also include a login shell like
+`zsh`, your dotfiles, and whatever agent harness you use.
 
 ## Building with `para image build`
 

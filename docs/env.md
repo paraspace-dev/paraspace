@@ -2,8 +2,8 @@
 
 `.paraspace/env` is your project's config, the few `PARA_*` variables
 `para` itself reads. It is **sourced as bash** and follows the
-[precedence](#precedence) rules. Most vars default sensibly and can be left out
-for a lean and simple config.
+[precedence](#precedence) rules. Most vars have a sensible default, so leave out
+the ones you don't need.
 
 Every value is a **scalar**. An array is not forwarded to your hooks (it
 arrives as its first element), so write a list as a delimited string. See
@@ -75,10 +75,10 @@ normalized space-separated list.
 fail loudly.
 
 Empty means this workspace serves no HTTP, which is what a worker or a bare box
-wants. `para ls`
-shows no URL, `$PARA_URL` is empty in your hooks, and `para doctor` mentions it
-in case you didn't mean it. Note that only a **bare port** creates
-`https://<name>.$PARA_DOMAIN`; a subdomain-only list has no apex site.
+wants. `para ls` shows no URL, `$PARA_URL` is empty in your hooks, and
+`para doctor` mentions it in case you didn't mean it. Only a **bare port**
+creates `https://<name>.$PARA_DOMAIN`, so a subdomain-only list has no apex
+site.
 
 ### `PARA_STACK`
 

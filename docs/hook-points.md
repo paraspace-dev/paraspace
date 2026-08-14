@@ -1,6 +1,8 @@
 # Hook points
 
-Your `provision` hook clones the repo. Put an SSH config, credential helper, or `insteadOf` rewrite in place before it runs by adding a `provision:before` hook to a layer:
+Your `provision` hook clones the repo. To put an SSH config, credential helper,
+or `insteadOf` rewrite in place before it runs, add a `provision:before` hook to
+a layer:
 
 ```sh
 cat > .paraspace/layers/project/hooks/provision:before <<'EOF'

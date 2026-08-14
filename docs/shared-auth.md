@@ -30,9 +30,8 @@ Recipes for the common ones are in the [Cookbook](./cookbook.md).
 
 Workspaces clone and push over the network, so your host has to trust a key.
 The bundled `git` layer generates **one key per project**, on that project's
-shared volume and labelled `para-<project>-<hostname>`. This way it's individually
-revocable, and allows you to cleanly scope the access granted to the project
-workspaces.
+shared volume and labelled `para-<project>-<hostname>`, so you can grant it only
+what this project needs and revoke it without touching anything else.
 
 Nothing about this is git-specific. A Mercurial, Fossil or Subversion project
 wants the same thing: a key on the shared volume, and whatever config file that
@@ -73,5 +72,5 @@ project's first `para up`:
 para add gh
 ```
 
-This enables your project workspaces to have CLI access to GitHub to create
-PRs, etc.
+Workspaces can then use `gh` to open pull requests and anything else the CLI
+does.

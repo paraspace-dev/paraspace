@@ -3,7 +3,7 @@
 `para --help` is always current for the build you're running; this page is the
 same surface with room to explain. It comes in two halves: the **engine verbs**
 below, which are fixed, and the **project commands** your repo's layers add,
-including any a layer you added brought with it.
+including any that came with a layer you added.
 
 Only `para up`, `para image …`, and project commands must run inside a project
 (a `.paraspace/` directory, found from `$PWD` upward). `para init` and

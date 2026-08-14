@@ -1,8 +1,8 @@
 # Prior art
 
 Isolated-workspace-per-task is a crowded idea, and it got more crowded during
-2026. This page is where ParaSpace sits among the alternatives, and, more
-usefully, which of them you should pick instead.
+2026. This page places ParaSpace among the alternatives and, more usefully,
+names the ones you should pick instead.
 
 > Descriptions here come from each project's own docs at the time of writing.
 > This is a categorisation, not a feature audit. The space moves fast, so check
@@ -159,7 +159,7 @@ written for your laptop boots unchanged, and why the storage-driver question in
 [Troubleshooting](./troubleshooting.md#everything-inside-the-workspace-is-slow)
 exists at all, since nesting is doing real work.
 
-## What's actually distinct
+## What's distinct
 
 No single row above is unique to ParaSpace. The combination is unusual:
 

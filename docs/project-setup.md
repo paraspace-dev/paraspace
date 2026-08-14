@@ -4,9 +4,9 @@ This guide adds ParaSpace to a repository you maintain. Finish
 [Install ParaSpace](./install.md) first, so that `para doctor` reports your
 machine is ready.
 
-Install ParaSpace as a project development dependency. The lockfile pins the
-engine and the layer code that provision workspaces, contributors receive both
-with `npm install`, and a globally installed `para`
+Install ParaSpace as a project development dependency, so the lockfile pins both
+the engine and the layer code that provisions workspaces. Contributors get both
+from `npm install`, and a globally installed `para`
 [hands off to this copy](./install.md).
 
 ```sh
@@ -49,8 +49,8 @@ para add --list
 
 The `git` layer owns cloning, `docker` boots a Compose file when present, and
 `gh` provides optional GitHub key authorization. The Docker layer also tries to
-infer image pre-pulls and routes from `docker compose config`; if either Compose
-or Node is unavailable, it simply warns and leaves configuration to you.
+infer image pre-pulls and routes from `docker compose config`; without Compose
+or Node it warns and leaves that configuration to you.
 
 Layers remain under `node_modules/paraspace/layers/` and update with the
 package rather than being copied into the repository. A layer's host-side
@@ -101,8 +101,9 @@ hooks. See [The env file](./env.md) for every pre-defined setting.
 para image build
 ```
 
-The first build usually takes a couple minutes. Images are per project and per
-architecture, then reused until their source changes.
+Expect a couple of minutes the first time. Every workspace you create afterwards
+is a clone of that image, so you build again only when you change what goes into
+it, or move to a machine with a different CPU architecture.
 
 ```sh
 para up my-feature
@@ -138,11 +139,11 @@ contributors run `npm install` and then `para up`.
 
 ## What is in `.paraspace/`
 
-| Entry     | Used by                                  | Purpose                                                                    |
-| --------- | ---------------------------------------- | -------------------------------------------------------------------------- |
-| `env`     | `para` on the host                       | Project settings and the [contract version](./versioning.md) pin           |
-| `stack`   | `para` on the host                       | Ordered layer list, with one path per line                                 |
-| `layers/` | The host, workspace, and image builder   | Project-owned layers, each with `hooks/`, `skel/`, and `commands/`        |
+| Entry     | Used by                                | Purpose                                                             |
+| --------- | -------------------------------------- | ------------------------------------------------------------------- |
+| `env`     | `para` on the host                     | Project settings and the [contract version](./versioning.md) pin    |
+| `stack`   | `para` on the host                     | Ordered layer list, with one path per line                          |
+| `layers/` | The host, workspace, and image builder | Project-owned layers, each with `hooks/`, `skel/`, and `commands/`  |
 
 To go further:
 

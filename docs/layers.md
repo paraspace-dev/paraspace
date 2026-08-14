@@ -1,13 +1,13 @@
 # Layers
 
 A layer is a directory that contributes project setup to a ParaSpace workspace.
-It may contain `hooks/`, `skel/`, `commands/`, and a `configure` script. Every
+It may hold `hooks/`, `skel/`, `commands/`, and a `configure` script, and every
 part is optional.
 
-Hooks run in stack order. See [Hooks](./hooks.md) for the hook contract. A
-layer can keep seed files in `skel/`; its hooks can copy them from
-`$PARA_LAYER_DIR/skel`. Files in `commands/` provide project commands as
-described in [Commands](./commands.md).
+Its hooks run in stack order, against the contract in [Hooks](./hooks.md). Its
+seed files sit in `skel/`, where its own hooks reach them at
+`$PARA_LAYER_DIR/skel`, and anything in `commands/` becomes a
+[project command](./commands.md).
 
 On every `para up`, the resolved layers are pushed into the workspace fresh at
 `~/.paraspace/stack/<layer name>`. Symlinks are followed on the push, so a
@@ -33,15 +33,14 @@ cat .paraspace/stack
 ${EDITOR:-vi} .paraspace/stack
 ```
 
-The list composes from top to bottom. `para` resolves each nonblank,
-noncomment line against the project root. Leading and trailing whitespace and
-trailing slashes are ignored. Each resolved path must already be a directory
-before `para` performs an operation. Blank lines and lines beginning with `#`
-are ignored, so comments can document a non-obvious choice.
+The list composes from top to bottom, and each line resolves against the project
+root. Blank lines and `#` comments are skipped, and surrounding whitespace and
+trailing slashes are trimmed, so you can document a non-obvious entry in place.
+Every path in the list has to be a directory that already exists.
 
-The paths are literal. `para` does not search for layer names, resolve
-packages at runtime, or normalize equivalent paths. In a hoisted monorepo,
-write the path that is true for this project, such as `../../node_modules/...`.
+The paths are literal. Nothing searches for layer names, resolves packages at
+runtime, or normalizes equivalent paths, so in a hoisted monorepo write the path
+that is true for this project, such as `../../node_modules/...`.
 
 Check the resolved stack order with:
 
@@ -68,28 +67,20 @@ After changing the list by hand, run:
 para init
 ```
 
-This rechecks the list and reruns layer configuration without recreating
-entries already present.
+That rechecks the list and reruns each layer's configure script, without
+recreating what is already there.
 
 ## Start a project
-
-Install `para` as a project dependency, then create the `.paraspace/`
-directory:
 
 ```sh
 npm install --save-dev paraspace
 para init
 ```
 
-A bare `para init` writes a stack with `node_modules/paraspace/layers/base/void`
-first and `.paraspace/layers/project` last. It creates the env file, the layer
-list, and the project-owned layer with `image-build`, `provision`, and `boot`
-hook stubs. Use that layer for setup specific to this repository.
-
-A bare `para init` refuses when `node_modules/paraspace` is absent. Install it
-first, or name a layer or path when initializing. When the first `para init`
-names layers, the default base is not added; the explicit list is exactly what
-the stack contains.
+[Add ParaSpace to a project](./project-setup.md) covers the rest of the setup. A
+bare `para init` refuses when `node_modules/paraspace` is absent, so install it
+first, or name a layer or path when initializing. Naming layers on that first
+run skips the default base, so the stack holds exactly the list you gave.
 
 ## Add a layer
 
@@ -114,8 +105,8 @@ If a name matches more than one candidate, such as both a directory and a
 plugin layer, `para add` refuses and names each candidate. Use the full path
 for the layer you mean.
 
-List bundled, installed plugin, and project-owned layers with the entries
-already in use marked:
+See the catalog of bundled, plugin, and project-owned layers, with the entries
+already in your stack marked:
 
 ```sh
 para add --list
@@ -133,16 +124,16 @@ Create a new layer owned by this project and add it to the layer list:
 para add --new local-tools
 ```
 
-This creates `.paraspace/layers/local-tools/` with `image-build`, `provision`,
-and `boot` hook stubs and places it before the project layer. Add hooks, seed
-files, commands, or a `configure` script as the layer needs.
+You get `.paraspace/layers/local-tools/` with `image-build`, `provision`, and
+`boot` hook stubs, placed before the project layer. Fill in the hooks, seed
+files, commands, or a `configure` script the layer needs.
 
 ## Base layers
 
-By convention, the first layer is a base. It establishes the image, bootstrap,
-and workspace user. A base is identified by a `base/` component in its stack
-path. `para` composes base layers like any other layer, but `para doctor` warns
-when the list has no base or more than one.
+By convention, the first layer is a base, and it establishes the image,
+bootstrap, and workspace user. A base is any layer with a `base/` component in
+its stack path. It composes like any other layer, but `para doctor` warns when
+the list has no base or more than one.
 
 ## Customize a packaged layer
 
@@ -172,11 +163,10 @@ maybe_write_env PARA_ROUTES "3000"
 ```
 
 Existing declarations in `.paraspace/env` take precedence; see
-[The env file](./env.md) for its rules. The bundled docker layer uses
-configuration to derive `PARA_ROUTES` and `PARA_PREPULL_IMAGES` from a
-resolved Compose model.
+[The env file](./env.md) for its rules. The bundled docker layer's configure
+script derives `PARA_ROUTES` and `PARA_PREPULL_IMAGES` from a resolved Compose
+model.
 
-A failing configure script stops the chain with that layer's exit status.
-After fixing the layer, rerun `para add` to converge. Configuration does not
-run during `para up`, so routine workspace startup does not change committed
-project files.
+A failing configure script stops the chain with that layer's exit status. Fix
+the layer, then rerun `para add` to converge. Configure scripts never run during
+`para up`, so starting a workspace never rewrites files you committed.

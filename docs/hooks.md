@@ -1,9 +1,8 @@
 # Hooks
 
-Hooks are where all your provisioning lives. They live in layers. A project's own
-hooks are in `.paraspace/layers/project/hooks/`; when `para` runs a hook name,
-it runs that hook from every layer that defines it, in stack order with the top
-of the stack first.
+All your provisioning lives in hooks, and hooks live in layers. A project's own
+are in `.paraspace/layers/project/hooks/`. When `para` runs a hook name, every
+layer that defines it runs in turn, from the top of the stack down.
 
 ## The three official hooks
 

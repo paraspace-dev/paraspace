@@ -7,12 +7,8 @@ set -euo pipefail
 # Each workspace is an unprivileged Incus container with its own clone, its own
 # stack, a static bridge IP, and an https:// URL served by a para-owned Caddy.
 #
-# This file is the generic mechanism and nothing else: everything a project
-# needs done lives in that project's .paraspace/ dir (env, stack, layers/),
-# which para runs but never contains.
-#
-# The prose lives in docs/ (env.md, layers.md, hooks.md, commands.md,
-# image.md, urls.md, how-it-works.md, versioning.md). It is not restated here.
+# Project configuration and hooks live in .paraspace/ (env, stack, layers/).
+# See docs/ for configuration, commands, and the hook contract.
 # ============================================================================
 
 CT_PREFIX=para-
@@ -22,13 +18,10 @@ CT_PREFIX=para-
 # layer commands. A project pins PARA_CONTRACT. Bump rules: docs/versioning.md.
 CONTRACT=1
 
-# The oldest incus para is known to work with. It reads every workspace out of
-# incus in one query, using config keys and device keys as `incus list` columns;
-# an incus too old for that rejects the column outright. Ubuntu's apt repos
-# still ship 6.2, which is too old.
+# Minimum Incus version with config and device keys as `incus list` columns.
 MIN_INCUS=6.22
 
-# The columns every workspace reader below expects, in order. Routes go LAST:
+# The columns every workspace reader below expects, in order. Routes go last:
 # they are space-separated by construction, but a stamp left by an older para
 # may hold commas, and `read` puts whatever remains of the line in the final
 # field, so a legacy value arrives intact instead of shifting the others.
@@ -52,11 +45,11 @@ need() { command -v "$1" >/dev/null 2>&1 || die "missing required command: $1"; 
 # ---- configuration ---------------------------------------------------------
 # Two sourced bash files, one idiom:
 #
-#   : "${PARA_X:=value}"   yields to the environment
-#   PARA_X=value           insists
+#   : "${PARA_X:=value}"   defaults an unset or empty value
+#   PARA_X=value           overrides the value
 #
-# so precedence is environment > user config > project env > the defaults at
-# the bottom of load_config. Nothing below implements that; bash does.
+# With default assignments, precedence is environment > user config > project
+# env > load_config defaults. Bash applies these assignments as files are sourced.
 load_config() {
   PARA_CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/para"
   PARA_CONFIG="$PARA_CONFIG_DIR/config"
@@ -120,9 +113,8 @@ load_config() {
   : "${PARA_HOST_ENV:=$PARA_PROJECT_DIR/.env}"
   PARA_ROUTES="$(normalize_routes "${PARA_ROUTES:-}")"
   PARA_SHARED=/para/shared
-  # What the project targets, if it said. Never para's own number: by the time a
-  # hook runs, require_project has already refused a mismatch, so the two are
-  # equal and injecting ours would say nothing a hook doesn't know.
+  # Preserve the project's declared contract. require_project rejects a mismatch
+  # before running hooks.
   : "${PARA_CONTRACT:=}"
   # Derived from the stack file on every invocation, so a declaration in env
   # cannot override it: host paths here, guest paths in the guest.
@@ -354,10 +346,8 @@ stamp_ct() { # stamp_ct <ct>
     "user.para.routes=$PARA_ROUTES"
 }
 
-# NOTE, and it applies to every helper reached from inside a $( ): bash strips
-# `set -e` there, so a `die` in one of them kills only the substitution and the
-# caller sails on with an empty value. Such helpers RETURN non-zero and the
-# caller checks. See alloc_ip.
+# Bash clears `set -e` inside command substitutions. `die` exits only the
+# substitution, so callers must check its exit status. See alloc_ip.
 bridge_prefix() { # "192.168.100.1/24" -> "192.168.100"
   local addr
   addr="$(incus network get "$PARA_BRIDGE" ipv4.address 2>/dev/null)" || return 1
@@ -401,7 +391,7 @@ attach_volume() { # attach_volume <ct>
   incus storage volume attach "$PARA_POOL" "$PARA_VOLUME" "$1" parahome "$PARA_SHARED"
 }
 
-# Block until the guest can actually be provisioned: the incus agent answers,
+# Wait until the guest is ready for provisioning: the Incus agent answers,
 # and guest DNS resolves $PARA_READY_HOST, unless that is empty.
 wait_ready() { # wait_ready <ct>
   stage "Waiting for $1…"
@@ -416,7 +406,7 @@ wait_ready() { # wait_ready <ct>
 }
 
 # ---- Caddy -----------------------------------------------------------------
-# True only if OUR Caddy is running. The pidfile survives a reboot, so kill -0
+# Check that the PID belongs to para's Caddy. The pidfile survives a reboot, so kill -0
 # alone can match an unrelated process that inherited the PID.
 caddy_running() {
   [ -f "$CADDY_PID" ] || return 1
@@ -426,10 +416,8 @@ caddy_running() {
   case "$(ps -p "$pid" -o comm= 2>/dev/null)" in *caddy*) return 0 ;; *) return 1 ;; esac
 }
 
-# Caddy narrates every invocation in structured JSON on stderr, success or
-# not, so its output goes to a log and is surfaced only when something failed.
-# The started daemon inherits the same file, which is what makes $CADDY_LOG
-# worth keeping around rather than a temp file.
+# Capture Caddy's JSON stderr and show it on failure. Keep $CADDY_LOG because
+# the daemon continues writing to it after startup.
 caddy_run() { # caddy_run <args>…
   if caddy "$@" >>"$CADDY_LOG" 2>&1; then return; fi
   tail -n 20 "$CADDY_LOG" >&2
@@ -466,8 +454,7 @@ https://localhost$(url_port), https://local.$PARA_DOMAIN$(url_port) {
 EOF
 }
 
-# One site per route, for every para workspace on this machine, each served by
-# ITS OWN recorded domain and routes, so one Caddy is correct across projects.
+# Generate one site per route using each workspace's recorded domain and routes.
 caddy_sites() {
   local rows name state project domain ip routes route ws
   # Captured, not piped in from a process substitution: a failed query there is
@@ -513,7 +500,7 @@ caddy_sync() {
   warn "If browsers distrust the certificates, run once:  caddy trust"
 }
 
-# ---- the one door into a workspace -----------------------------------------
+# ---- guest execution -------------------------------------------------------
 # Every guest execution goes through here (`para sh`, hooks, and, via `para
 # sh`, project commands), so the terminal handling is stated once:
 #
@@ -618,16 +605,13 @@ push_project() { # push_project <name>
   incus exec "$ct" -- chown -R "$PARA_UID:$PARA_GID" "$home/.paraspace"
 }
 
-# Run <hook> from every layer that defines it, in stack order. The runner
-# announces what it finds, because only it knows how many that is. Hooks own
-# all provisioning; para only decides when they run. docs/hooks.md.
+# Run <hook> from each layer in stack order. The runner logs each hook it finds.
+# See docs/hooks.md.
 run_hook() { # run_hook <hook> <name>
   ws_exec "$2" "exec ~/.paraspace/run-hook '$1'" || die "the '$1' hook failed (above)."
 }
 
-# Does any layer fill <hook>? Resolution is the runner's job, but refusing is
-# the host's: the runner's note prints inside a container, minutes in, and the
-# caller has already committed by then.
+# Check for a required hook before creating a container or starting a build.
 have_hook() { # have_hook <hook>
   local dir
   while IFS= read -r dir; do
@@ -648,7 +632,7 @@ workspace_context() { # workspace_context <name>
 }
 
 # ---- workspace lifecycle ---------------------------------------------------
-# On a failed `up`, point at the one command that knows how a host misbehaves.
+# Suggest host diagnostics after a failed `up`.
 up_hint() { [ "$1" -eq 0 ] || warn "if that reads like a host problem rather than a project one, run: para doctor"; }
 
 cmd_up() {
@@ -766,8 +750,8 @@ rm_one() { # rm_one <name>
   if ws_load "$name" && [ -n "$ws_project" ] && [ "$ws_project" != "$PARA_PROJECT_NAME" ]; then
     die "workspace '$name' belongs to project '$ws_project'. Remove it from there, or run: PARA_PROJECT_NAME=$ws_project para rm $name"
   fi
-  # Converging on "gone", so an already-absent workspace is a no-op. Teardown
-  # scripts rely on that, and it is still said out loud in case of a typo.
+  # Teardown scripts rely on removing an absent workspace succeeding.
+  # Warn so users can spot a mistyped name.
   if ! instance_exists "$ct"; then
     warn "no workspace '$name' to remove (see: para ls)"
     return
@@ -1038,9 +1022,9 @@ pkg_root() {
   cd -P "$(dirname "$self")/.." && pwd
 }
 
-# `para init` and `para add` are one convergent verb with two names: scaffold
-# .paraspace/ if needed, insert named layers before the project's own, and
-# rerun the (idempotent) configure chain every time. docs/layers.md.
+# `para init` and `para add` share setup: scaffold .paraspace/ if needed,
+# insert named layers before the project layer, and rerun the idempotent
+# configure chain. See docs/layers.md.
 cmd_add() {
   local usage="usage: para add [<name>...] [--list] [--new <name>]"
   local names="" new="" list=0 name
@@ -1164,9 +1148,7 @@ stack_insert() { # stack_insert <line>
   info "add: $1 (.paraspace/stack)"
 }
 
-# Stub .paraspace/layers/<name>: the shape para composes, with nothing in it
-# but three hook stubs, since what a hook DOES is the project's to say.
-# Convergent, so an existing layer is left alone.
+# Create .paraspace/layers/<name> with three hook stubs. Keep existing layers.
 layer_stub() { # layer_stub <name>
   case "/$1/" in
     //*|*/../*|*/./*) die "a layer name is a relative path under .paraspace/layers/; got '$1'." ;;
@@ -1183,8 +1165,7 @@ layer_stub() { # layer_stub <name>
   done
 }
 
-# What layer_stub writes: para's shape and nothing else. Each stub says when
-# it runs, because that is the part a reader cannot see from the file.
+# Generate hook stubs with comments explaining when each hook runs.
 hook_stub() { # hook_stub <hook>
   local when=""
   case "$1" in
@@ -1315,18 +1296,14 @@ run_project_command() {
 }
 
 # ---- diagnosis -------------------------------------------------------------
-# Everything para knows about how a host can be wrong lives here, so that the
-# commands you use every day don't carry it. Run it when something is off.
+# Check host dependencies and project configuration.
 DOCTOR_FAILED=0
 d_ok()   { printf '  \033[32m✓\033[0m %s\n' "$*"; }
 d_warn() { printf '  \033[33m!\033[0m %s\n' "$*"; }
 d_bad()  { printf '  \033[31m✗\033[0m %s\n' "$*"; DOCTOR_FAILED=1; }
 
 cmd_doctor() {
-  # Every check below reads something that may be absent or broken, which IS the
-  # job, so this one command does not inherit `set -e`. Without it a diagnostic
-  # stops at the first thing it cannot read, which is the moment you most need
-  # the rest of the report.
+  # Disable `set -e` so a failed check does not prevent the remaining diagnostics.
   set +e
   printf '\nconfig\n'
   doctor_config
@@ -1351,9 +1328,8 @@ doctor_config() {
   printf '    PARA_POOL          %s\n' "$PARA_POOL"
   printf '    PARA_VOLUME        %s\n' "${PARA_PROJECT_NAME:+$PARA_VOLUME}"
   printf '    Caddy port         %s\n' "$PARA_HTTPS_PORT"
-  # Caddy site addresses are whitespace-separated, so a domain with a space in
-  # it becomes TWO addresses and `caddy validate` accepts the result happily,
-  # the one bad value the generated Caddyfile cannot catch for itself.
+  # Caddy accepts a domain containing spaces as multiple site addresses,
+  # so `caddy validate` cannot catch this invalid setting.
   case "$PARA_DOMAIN" in
     *[[:space:]]*) d_bad "PARA_DOMAIN contains whitespace, so Caddy reads '<workspace>.$PARA_DOMAIN' as two site addresses and none of your URLs will resolve" ;;
   esac
@@ -1498,8 +1474,7 @@ doctor_stack() {
   fi
 }
 
-# Everything that defines a verb the engine already owns. All of them, not
-# the one that would have run: none of them will.
+# List all layer commands whose names conflict with built-in commands.
 doctor_shadowed() { # doctor_shadowed <verb>
   local path
   while IFS= read -r path; do
@@ -1552,8 +1527,7 @@ usage() {
 	EOF
 }
 
-# A project's own verbs, listed so nothing a layer added runs invisibly,
-# which is why each row names the layer it resolved to.
+# List project commands and their source layers.
 usage_project_commands() {
   local list verb path
   list="$(project_commands)"

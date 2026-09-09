@@ -17,8 +17,8 @@ if ! command -v gh >/dev/null 2>&1; then
   warn "gh is not in the workspace image. Run 'para image build' for automatic key authorization."
   exit 0
 fi
-# The git layer writes this before it opens the point. Without it there is no key
-# to upload, and an empty one would match every line gh lists back.
+# The git layer writes the key before opening this point. Reject an empty key,
+# which would match every line in gh's key list.
 if [ ! -s ~/.ssh/id_ed25519.pub ]; then
   warn "no shared SSH key at ~/.ssh/id_ed25519.pub. Add the git layer, which creates one: para add git"
   exit 0
@@ -30,8 +30,7 @@ authorize_key() {
     gh auth login --hostname github.com --git-protocol ssh \
       --skip-ssh-key --scopes admin:public_key
   fi
-  # GitHub 422s on a key it already holds, and "already authorized" is the state
-  # this hook exists to reach, so ask before adding rather than fail on it.
+  # Check for an existing key to avoid GitHub's 422 response for duplicates.
   local key title
   key="$(cut -d' ' -f1,2 < ~/.ssh/id_ed25519.pub)"
   case "$(gh ssh-key list 2>/dev/null || true)" in *"$key"*) return 0 ;; esac

@@ -15,14 +15,14 @@ case " $chain " in
 esac
 export PARA_HOOK_CHAIN="${chain:+$chain > }$name"
 
-# A point is terminal, or provision:before would open provision:before:before
-# without end. It is also optional by nature, so an empty one says nothing.
+# Skip nested before/after calls to prevent infinite recursion.
+# Log nothing for optional points with no matching hooks.
 point=
 case "$name" in *:before|*:after) point=1 ;; esac
 
 if [ -z "$point" ]; then "$PARA_RUN_HOOK" "$name:before" || exit; fi
 
-# The list rides fd 3 so the hooks keep the caller's stdin (provision prompts).
+# Read the layer list on fd 3 to preserve stdin for hook prompts.
 while IFS= read -r layer <&3; do
   [ -n "$layer" ] || continue
   hook="$layer/hooks/$name"

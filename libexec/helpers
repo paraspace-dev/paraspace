@@ -14,8 +14,8 @@ info()  { printf '    %s\n'        "$*"               >&2; }  # indented detail
 warn()  { printf '%swarn:%s %s\n'  "$_wn" "$_off" "$*" >&2; }
 die()   { printf '%serror:%s %s\n' "$_er" "$_off" "$*" >&2; exit 1; }
 
-# Is there a human to prompt? (Set PARA_NONINTERACTIVE=1 in CI/cron; para
-# reads it too, and gives a hook no tty when it is set.)
+# Require terminal input and output for prompts. PARA_NONINTERACTIVE=1
+# disables prompts and hook TTY allocation.
 interactive() { [ -z "${PARA_NONINTERACTIVE:-}" ] && [ -t 0 ] && [ -t 1 ]; }
 
 # Print a prompt and wait for Enter, only when someone can answer.
@@ -29,9 +29,8 @@ quote() { # quote <value>
   printf "'%s'" "${1//\'/$sq}"
 }
 
-# Add one project setting without taking ownership from the project: both env
-# assignment spellings count as existing, an explicit empty value included.
-# Host-side, for a layer's configure; guest hooks have no project env to edit.
+# Add a missing project setting. Preserve both assignment spellings, including
+# explicit empty values. Used by host-side configure scripts.
 maybe_write_env() { # maybe_write_env <PARA_NAME> <value>
   [ "$#" -eq 2 ] || die "usage: maybe_write_env <PARA_NAME> <value>"
   local name="$1" value="$2" envfile="${PARA_PROJECT_DIR:-}/.paraspace/env"
@@ -62,6 +61,5 @@ xbps_install() { # xbps_install <package>...
   if [ -n "$missing" ]; then xbps-install -Sy $missing; fi
 }
 
-# No route helpers here on purpose: para injects $PARA_ROUTES space-separated,
-# so a hook that wants them writes `for r in $PARA_ROUTES` and one that wants
-# ports writes `${r##*:}`.
+# Iterate space-separated routes with `for r in $PARA_ROUTES` and extract
+# each port with `${r##*:}`.

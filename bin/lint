@@ -3,17 +3,15 @@ set -euo pipefail
 # ============================================================================
 # lint - shellcheck every bash script in the package.
 #
-# para is pure shell, so this is its STATIC gate: shellcheck over the CLI, the
-# templates' hooks, and the test/ suite. The behavioral gate
-# is test/run (see test/README.md). skel/zshrc is zsh, which shellcheck can't
-# parse, and is skipped (it has no bash shebang, so discovery drops it).
+# Check the CLI, hooks, and tests. Files without Bash shebangs, including zsh
+# configuration, are skipped. Run behavioral tests with test/run.
 #
 # Discovers targets by shebang (every tracked file whose first line names bash),
 # so a new hook is linted automatically with no list to maintain. Runs from
 # anywhere, since it resolves the package root from its own location.
 #
 # Needs `shellcheck` on PATH; if it's absent but docker is, it falls back to the
-# pinned koalaman/shellcheck image, so a bare checkout and CI both just work.
+# pinned koalaman/shellcheck image.
 #   Usage: bin/lint
 # ============================================================================
 
@@ -22,11 +20,8 @@ SHELLCHECK_IMAGE="koalaman/shellcheck:v0.10.0"
 root="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$root"
 
-# Collect bash scripts by shebang, over the files git tracks plus the ones you
-# have not added yet, so a brand-new hook is linted before it is committed,
-# while build output and dependencies (which are ignored) are not. A plain
-# `find` walked .vitepress/dist and read fonts looking for shebangs.
-# bash 3.2-safe (no mapfile), matching para's own portability bar.
+# Include tracked and untracked files, excluding ignored build output and
+# dependencies. Use an array without mapfile for Bash 3.2 compatibility.
 files=()
 while IFS= read -r f; do
   # tr: a binary file's first "line" holds NULs, which bash warns about

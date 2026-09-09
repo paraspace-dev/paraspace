@@ -1,7 +1,7 @@
 # Contract versioning
 
-The `para`↔project interface is versioned. It covers everything a project's
-`.paraspace/` directory depends on:
+The interface between `para` and a project is versioned. It covers everything
+a project's `.paraspace/` directory depends on:
 
 - the [environment para injects](./hooks.md#the-environment-para-injects),
 - the [hook names and semantics](./hooks.md),
@@ -11,9 +11,8 @@ The `para`↔project interface is versioned. It covers everything a project's
 - the [project-command](./commands.md#project-commands) mechanism,
 - bundled layer entry points and `$PARA_HELPERS` functions.
 
-`para` implements a contract version, currently **1**. It is always a plain
-incrementing integer, never a range, a semver string, or a `>=`. Comparing it
-is `=`, and that will not change.
+`para` implements contract version 1. Contract versions are integers and must
+match exactly; ranges and semver strings are not supported.
 
 `para init` writes the pin into the scaffolded env file:
 
@@ -21,18 +20,16 @@ is `=`, and that will not change.
 PARA_CONTRACT=1
 ```
 
-It is an ordinary env key, so it reaches your hooks like any other. You touch
-it once, when you migrate your own `.paraspace/` to a new contract.
+Hooks receive it as an environment variable. Update it when you migrate
+your `.paraspace/` to a new contract.
 
-If the two don't match, para **refuses with a clear error** instead of silently
-misbehaving, so a globally-updated `para` shared across projects can't break
-yours without saying so. Declaring nothing works, and `para doctor` suggests
-adding it.
+If the versions don't match, `para` stops with an error. Projects without a
+declared version still run, but `para doctor` suggests adding one.
 
 The rules:
 
-- A **breaking** change to the interface bumps `PARA_CONTRACT` by one.
-- **Additive** changes (a new variable, a new optional key) don't.
+- A breaking change to the interface bumps `PARA_CONTRACT` by one.
+- Additive changes (a new variable, a new optional key) don't.
 - A project bumps its own `PARA_CONTRACT` when it migrates its `.paraspace/`.
 - There is no range syntax and no compatibility window: one integer, compared
   for equality.

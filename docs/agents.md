@@ -1,7 +1,7 @@
 # Running coding agents
 
-Run one coding agent per workspace, several workspaces at a time, each with its
-own working copy, its services actually running, and a URL you can open.
+Run one coding agent per workspace. Each workspace has a working copy,
+running services, and a URL you can open.
 
 ## One workspace per task
 
@@ -13,44 +13,38 @@ para up dark-mode
 para up flaky-tests
 ```
 
-Each gets its own clone, its own database, its own services on its own IP. Two
-agents editing the same file in different workspaces never see each other's
-edits, so the diffs stay separable and each one becomes its own PR.
+Agents in separate workspaces can edit the same file without affecting each
+other's checkout. Review and submit their changes as separate PRs.
 
-## Let the agent off the leash
+## Agent permissions
 
-The reason to run an agent with permissions wide open is that the workspace is
-the boundary. It's an unprivileged container with none of your host mounted, so
-the agent can install packages, rewrite the tree, and run whatever it likes;
-`para rm` resets it.
+The agent runs in an unprivileged container with no host directories mounted.
+You can let it install packages and change files inside the workspace, then
+delete the workspace with `para rm`.
 
-Two things are *not* isolated:
+The agent still has access to the network and shared credentials:
 
-- **the network.** Workspaces have ordinary outbound access. para does no
-  egress filtering; that's an Incus network ACL if you want it.
-- **the git key.** The [shared volume](./internals.md#the-shared-home-volume)
+- Workspaces have outbound network access. Configure an Incus network ACL
+  if you need egress filtering.
+- The [shared volume](./internals.md#the-shared-home-volume)
   holds the project's key, so an agent can push to whatever that key is
   authorized for. Scope it narrowly if that matters; see
   [Shared authentication](./shared-auth.md).
 
-Everything else (your home directory, your host SSH keys, your cloud
-credentials) isn't reachable from inside a workspace, because it was never
-mounted there.
+Your host home directory, including SSH keys and cloud credentials stored
+there, is not mounted in the workspace.
 
 ## Driving one
 
-Agents are not a para feature. `para sh` gives you a real pty in the clone, and
-a project command wraps whatever you actually run:
+Use `para sh` to run an agent or another command in the clone with a PTY:
 
 ```sh
 para sh fix-login                      # a shell in the clone
 para sh fix-login -c 'npm test'        # one command, exits with its status
 ```
 
-A one-line project command turns that into a verb. `para add dotfiles`
-brings both of the ones below with it; the bundled base layer does not ship
-them, so write them into your own `.paraspace/layers/project/commands/` if
-you'd rather not take the [layer](./layers.md):
+`para add dotfiles` provides `para claude` and `para run`. To define them
+yourself, add scripts under `.paraspace/layers/project/commands/`:
 
 ```sh
 # .paraspace/layers/project/commands/claude ("para claude <ws>")
@@ -67,10 +61,9 @@ exec "$PARA_BIN" sh "$1" -c "
 "
 ```
 
-They stay one-liners because `para sh` owns the terminal handling. See
-[Commands](./commands.md#project-commands). The layer's copies are the same
-one-liners with the argument quoting filled in, so `para claude ws -p 'write a
-test'` reaches Claude Code as one argument instead of four.
+`para sh` handles the terminal. The layer's scripts also quote and forward
+arguments, so `para claude ws -p 'write a test'` passes the prompt to Claude
+Code as one argument. See [Commands](./commands.md#project-commands).
 
 To make a workspace feel like your own machine, put your dotfiles in your
 project layer's `skel/` (`.paraspace/layers/project/skel/`) and have your
@@ -93,13 +86,12 @@ dark-mode            RUNNING   10.62.14.202     myapp          https://dark-mode
 
 One workspace per window-manager desktop works well: each desktop holds that
 task's terminal and its browser tab, and you switch tasks with the keybindings
-you already use. `para ls --all` spans every project on the machine, which is
-how you find the one you forgot.
+you already use. `para ls --all` lists workspaces across all projects on the
+machine.
 
 ## Reviewing and landing
 
-The workspace is a full checkout with a booted environment, so review happens
-where the work happened:
+Review changes and run tests inside the workspace:
 
 ```sh
 para sh fix-login -c 'git diff'        # or: git log --oneline main..

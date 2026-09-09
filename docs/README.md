@@ -1,8 +1,7 @@
 # What is ParaSpace?
 
-ParaSpace ships the `para` cli tool, which gives every task its own full,
-isolated copy of a project, so several coding agents can work at once without
-stepping on each other's branch, database, or half-finished edits.
+ParaSpace gives every task its own full, isolated copy of a project's entire
+stack, so several coding agents can work at once without stepping on each other.
 
 Each workspace is a local unprivileged system container with its own clone, its
 own running services, a static bridge IP, and its own `https://<name>.<domain>`

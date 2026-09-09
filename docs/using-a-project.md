@@ -1,7 +1,7 @@
 # Use a ParaSpace project
 
-This is the loop for a repository that already has a `.paraspace/` directory.
-From the repository root, four commands get you a running workspace:
+For a repository that already has a `.paraspace/` directory, run these commands
+from the repository root:
 
 ```sh
 npm install
@@ -18,9 +18,8 @@ npm install
 
 Most projects ship their setup layers as npm dependencies, so run this before
 any command that touches a workspace. Skip it if this project keeps its layers
-in the repository instead; read `.paraspace/stack` to see which way it goes. If
-you get it wrong, your first `para` command stops and lists the layer paths it
-could not find.
+in the repository; check the paths in `.paraspace/stack`. If layers are missing,
+`para` stops and lists the paths it could not find.
 
 ## Build the project image
 
@@ -39,10 +38,9 @@ different CPU architecture. See [The image contract](./image.md).
 para up ws1
 ```
 
-You now have an isolated workspace named `ws1`, with the repository cloned
-inside it, the environment provisioned, and the project's services running. All
-three are the project's own hooks, so what you get is whatever this repository
-decided a workspace should be.
+The project's hooks clone the repository, provision the environment, and start
+services in an isolated workspace named `ws1`. The exact setup depends on the
+repository's hooks.
 
 On a fresh machine, the first launch may print an SSH public key and pause. Add
 that key to your Git host and continue. See
@@ -63,9 +61,8 @@ agent, the tests, and the project's own commands.
 para ls
 ```
 
-That lists your workspaces with their URLs, so you can paste one into a browser.
-Opening it for you is a [project command](./commands.md#project-commands) rather
-than an engine verb, and the bundled base layer ships one:
+Copy a workspace URL into your browser, or open it with the bundled base
+layer's [project command](./commands.md#project-commands):
 
 ```sh
 para web ws1

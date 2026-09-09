@@ -63,8 +63,7 @@ Edit `.paraspace/layers/project/hooks/image-build` to add what your image
 needs, such as a toolchain or resources prefetched once instead of on every
 provision.
 
-> [!TIP]
-> The hooks are just bash.
+Write hooks in Bash.
 
 ### 2. Set up the provisioner
 
@@ -123,9 +122,8 @@ See [Shared authentication](./shared-auth.md).
 
 ## Iterate on the setup
 
-`para up` is idempotent. Run it against an existing or stopped workspace and it
-restarts and reconverges that workspace instead of failing, which makes the
-setup loop:
+Run `para up` again after changing hooks or configuration. It starts the
+workspace if needed and reruns setup:
 
 ```sh
 # edit a hook or the env file

@@ -1,11 +1,10 @@
 # How it works
 
-`para` is a thin wrapper around [Incus] for the containers, [Caddy] for the
-URLs, and the project's `.paraspace/` directory for everything else. This page
-is the mental model for how a workspace is put together and which part owns
-what.
+`para` uses [Incus] to run containers and [Caddy] to route workspace URLs.
+The project's `.paraspace/` directory defines the environment inside each
+workspace.
 
-For the argument about *why* this shape, see [Why ParaSpace](./why.md).
+See [Why ParaSpace](./why.md) for the reasons behind this design.
 
 ## The shape
 
@@ -35,28 +34,28 @@ the Incus bridge. Whatever the project runs inside (bare processes or nested
 containers) binds its usual ports on that IP, so workspaces never collide with
 each other or with the host, and nothing gets remapped.
 
-A workspace has two doors: its URL, and `para sh`.
+Open the workspace URL in a browser or use `para sh` to enter its shell.
 
 ## The pieces
 
-- **Host-level Caddy** terminates TLS for the `*.<domain>` wildcard and
-  reverse-proxies each workspace's routes to its container IP. It is generated
-  from Incus, so a single Caddy is correct across every project on the machine.
+- Caddy runs on the host, terminates TLS for the `*.<domain>` wildcard, and
+  reverse-proxies each workspace's routes to its container IP. `para` generates
+  its configuration from Incus metadata for all projects on the machine.
   See [Workspace URLs](./urls.md).
-- **One Incus container per workspace** (`para-<name>`), holding the clone and
-  running everything the project runs inside, nested containers included.
-- **One shared home volume per project**, attached to every workspace of that
+- One Incus container per workspace (`para-<name>`) holds the clone and
+  runs the project's services, including nested containers.
+- One shared home volume per project attaches to every workspace of that
   project at `/para/shared`. Authenticate once (git, `gh`, dotfiles) and every
   workspace of the project inherits it.
-- **The project's hooks do all the provisioning.** Hooks live in an ordered list
+- The project's hooks do all the provisioning. Hooks live in an ordered list
   of layers. The project's `.paraspace/` directory holds the env file, the
   stack file that lists layers in order, and the project's own layers. Layers
   added from the paraspace package or a plugin resolve under `node_modules/`.
   Nothing project-specific lives in `para` itself. See the [hook
   contract](./hooks.md) and [Layers](./layers.md).
 
-There is no ParaSpace daemon or database. A workspace records its own identity
-on its container, so `incus` is the only thing that has to remember anything.
+There is no ParaSpace daemon or database. `para` stores workspace identity
+in Incus container metadata.
 `para up` starts what it needs, including Caddy. Besides the Incus daemon, that
 Caddy is the only para-related process on your host.
 

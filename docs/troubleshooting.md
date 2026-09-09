@@ -2,8 +2,7 @@
 
 ## Start with `para doctor`
 
-Everything `para` knows about how a machine can be misconfigured lives in one
-command, so the commands you use every day don't carry it:
+Run `para doctor` to check host dependencies and project configuration:
 
 ```
 $ para doctor
@@ -40,8 +39,8 @@ project
 ```
 
 `✓` passed, `!` is advice, and `✗` is a failure that exits non-zero. The
-`config` block is also the answer to "what did para actually resolve", so check
-it whenever a setting doesn't seem to be taking effect.
+`config` block shows the resolved settings. Check it if a configuration change
+doesn't take effect.
 
 ## The host
 
@@ -101,7 +100,7 @@ The wildcard has to point at your machine. The default `paraspace.dev` already
 does; a custom `PARA_DOMAIN` needs a wildcard record of your own. See
 [Workspace URLs](./urls.md#using-your-own-domain).
 
-If DNS is fine, check Caddy is actually up (`para caddy status`) and that the
+If DNS is fine, check Caddy is running (`para caddy status`) and that the
 browser trusts its CA. A first-run `caddy trust` covers most browsers, and
 [Workspace URLs](./urls.md#trusting-the-certificate) covers the rest.
 
@@ -186,8 +185,8 @@ authentication](./shared-auth.md).
 
 ### `up` succeeds but the URL returns 502
 
-Caddy is proxying to a port nothing is listening on. Almost always a `boot` hook
-that returned zero before its services were actually up. The
+Caddy is proxying to a port with no listener. Check whether a `boot` hook
+returned zero before its services started. The
 [readiness contract](./hooks.md#boot) requires that it return only once every
 routed service is listening (`docker compose up -d --wait` does that for a
 Compose project; anything else needs its own wait). Check from inside:

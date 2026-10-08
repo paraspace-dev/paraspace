@@ -21,10 +21,9 @@ CONTRACT=1
 # Minimum Incus version with config and device keys as `incus list` columns.
 MIN_INCUS=6.22
 
-# The columns every workspace reader below expects, in order. Routes go last:
-# they are space-separated by construction, but a stamp left by an older para
-# may hold commas, and `read` puts whatever remains of the line in the final
-# field, so a legacy value arrives intact instead of shifting the others.
+# The columns every workspace reader below expects, in order. Routes go last
+# because a stamp left by an older para may hold commas, and `read` keeps the
+# rest of the line in the final field, so a legacy value arrives intact.
 WS_COLS='n,s,user.para.project,user.para.domain,devices:eth0.ipv4.address,user.para.routes'
 
 # Prefixed to every command para runs inside a workspace. Everything the guest
@@ -57,14 +56,6 @@ load_config() {
   CADDYFILE="$PARA_STATE_DIR/Caddyfile"
   CADDY_PID="$PARA_STATE_DIR/caddy.pid"
   CADDY_LOG="$PARA_STATE_DIR/caddy.log"
-  # shellcheck disable=SC2034  # read by para_env's ${!PARA_@}, so a project
-  # command can call back into para without relying on $PATH.
-  PARA_BIN="$(cd "$(dirname "$0")" && pwd)/${0##*/}"
-
-  # The project para operates on: the nearest .paraspace/ from $PWD upward,
-  # like git and compose find theirs. Only a file locator, because a project's
-  # identity is PARA_PROJECT_NAME, so moving the checkout never orphans a workspace.
-  PARA_PROJECT_DIR="${PARA_PROJECT_DIR:-$(find_project_root || true)}"
   # shellcheck source=/dev/null  # a per-user and a per-project file, both runtime
   if [ -f "$PARA_CONFIG" ]; then . "$PARA_CONFIG"; fi
   # shellcheck source=/dev/null
@@ -119,6 +110,23 @@ load_config() {
   # Derived from the stack file on every invocation, so a declaration in env
   # cannot override it: host paths here, guest paths in the guest.
   PARA_STACK="$(stack_load)"
+}
+
+# The project para operates on: PARA_PROJECT_DIR made absolute, since every
+# name derives from it and the install probe climbs from it, else the nearest
+# .paraspace/ from $PWD upward. A locator only; identity is PARA_PROJECT_NAME.
+set_project_dir() { # set_project_dir <verb>
+  local dir="${PARA_PROJECT_DIR:-}"
+  if [ -n "$dir" ]; then
+    PARA_PROJECT_DIR="$(cd "$dir" 2>/dev/null && pwd)" \
+      || die "PARA_PROJECT_DIR='$dir' is not a directory. Point it at the project checkout, or unset it."
+    return
+  fi
+  # init and add may be creating the project here, so they fall back to $PWD.
+  case "$1" in
+    init|add) PARA_PROJECT_DIR="$(find_project_root || pwd)" ;;
+    *)        PARA_PROJECT_DIR="$(find_project_root || true)" ;;
+  esac
 }
 
 find_project_root() {
@@ -347,7 +355,7 @@ stamp_ct() { # stamp_ct <ct>
 }
 
 # Bash clears `set -e` inside command substitutions. `die` exits only the
-# substitution, so callers must check its exit status. See alloc_ip.
+# substitution, so callers must check its exit status.
 bridge_prefix() { # "192.168.100.1/24" -> "192.168.100"
   local addr
   addr="$(incus network get "$PARA_BRIDGE" ipv4.address 2>/dev/null)" || return 1
@@ -356,23 +364,24 @@ bridge_prefix() { # "192.168.100.1/24" -> "192.168.100"
   printf '%s' "${addr%.*}"
 }
 
-# A free static IP in the bridge's <prefix>.$PARA_IP_LO-$PARA_IP_HI band. Reads
-# the addresses incus has actually pinned, across all incus projects, since the
-# bridge is machine-global, so anything else fails open onto a live container.
+# Sets $ip to a free static address in the bridge's .$PARA_IP_LO-.$PARA_IP_HI
+# band, from what incus has actually pinned across all its projects, since the
+# bridge is machine-global and anything less fails open onto a live container.
 alloc_ip() {
-  local prefix used n
+  local prefix rows used n
   prefix="$(bridge_prefix)" \
     || die "cannot read $PARA_BRIDGE ipv4.address. Is the bridge up? ('para doctor')"
   # Two sources, because neither is complete: the runtime address (empty while an
   # instance is stopped) and the pinned device address (absent on instances para
-  # did not create). Reduced to bare addresses, because incus annotates the runtime
-  # column as "10.0.0.5 (eth0)", and a whole-line match would miss every one.
-  used="$(incus list --all-projects -f csv -c '4,devices:eth0.ipv4.address' \
-    | grep -oE '([0-9]{1,3}\.){3}[0-9]{1,3}')"
+  # did not create). Captured first: a failed query must not read as "none in use".
+  rows="$(incus list --all-projects -f csv -c '4,devices:eth0.ipv4.address')" \
+    || die "cannot read the addresses in use from incus. Refusing to pick one a live workspace may hold."
+  # Bare addresses, because incus annotates the runtime column as "10.0.0.5 (eth0)".
+  used="$(grep -oE '([0-9]{1,3}\.){3}[0-9]{1,3}' <<<"$rows" || true)"
   for n in $(seq "$PARA_IP_LO" "$PARA_IP_HI"); do
-    if ! grep -qxF "$prefix.$n" <<<"$used"; then printf '%s' "$prefix.$n"; return; fi
+    if ! grep -qxF "$prefix.$n" <<<"$used"; then ip="$prefix.$n"; return; fi
   done
-  return 1   # the caller dies; a die here is inside a $( ). See bridge_prefix
+  die "no free IP in the .$PARA_IP_LO-.$PARA_IP_HI band on $PARA_BRIDGE. Remove a workspace, or widen PARA_IP_LO/HI."
 }
 
 # The shared home volume: one authenticated home per project, attached to every
@@ -412,7 +421,7 @@ caddy_running() {
   [ -f "$CADDY_PID" ] || return 1
   local pid
   pid="$(cat "$CADDY_PID")"
-  [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null || return 1
+  if [ -z "$pid" ] || ! kill -0 "$pid" 2>/dev/null; then return 1; fi
   case "$(ps -p "$pid" -o comm= 2>/dev/null)" in *caddy*) return 0 ;; *) return 1 ;; esac
 }
 
@@ -501,22 +510,9 @@ caddy_sync() {
 }
 
 # ---- guest execution -------------------------------------------------------
-# Every guest execution goes through here (`para sh`, hooks, and, via `para
-# sh`, project commands), so the terminal handling is stated once:
-#
-#   su -       runs initgroups, so the user's supplementary groups load. That
-#              is why this is not `incus exec --user`: without the docker group
-#              the stack hits permission denied on the socket.
-#   su --pty   with -c, plain su stays the terminal's foreground process and
-#              drops SIGWINCH, so a TUI never repaints on resize. --pty proxies
-#              the tty and forwards resizes to the child. (util-linux su only;
-#              busybox has no --pty, so an interactive shell needs a real one.)
-#   -t / -T    a pty only when BOTH our ends are terminals. A pty echoes NULs
-#              and turns \n into \r\n, so forcing one on stdin alone dirties
-#              `para sh x -c … | tee`, `> file` and `$(…)`. Explicit in both
-#              directions, because incus's auto mode ignores PARA_NONINTERACTIVE.
-#   -s bash    deterministic semantics for -c, whatever login shell the image
-#              gives $PARA_USER. Hooks get bash from run-hook instead.
+# The one door into the guest, so the terminal handling is stated once. `su -`
+# for initgroups (the docker group), --pty so a TUI gets SIGWINCH (util-linux
+# only), a pty only when both ends are terminals (docs/commands.md), -s bash for -c.
 ws_exec() { # ws_exec <name> [<command>]
   local ct="$CT_PREFIX$1"
   if [ "$#" -lt 2 ]; then
@@ -641,20 +637,21 @@ cmd_up() {
   validate_name "$name"
   require_project
   require_incus
+  local ct="$CT_PREFIX$name" ip exists=0
+  if ws_load "$name"; then exists=1; fi
   # Container names are machine-global, so refuse to adopt another project's.
   # An unstamped container has no owner (a launch that failed before stamp_ct,
   # or one made by hand), so it is adoptable. Only a DIFFERENT owner refuses.
-  if ws_load "$name" && [ -n "$ws_project" ] && [ "$ws_project" != "$PARA_PROJECT_NAME" ]; then
+  if [ "$exists" -eq 1 ] && [ -n "$ws_project" ] && [ "$ws_project" != "$PARA_PROJECT_NAME" ]; then
     die "workspace '$name' belongs to project '$ws_project'. Names are unique per machine, so pick another."
   fi
   trap 'up_hint $?' EXIT
 
-  local ct="$CT_PREFIX$name" ip
-  if instance_exists "$ct"; then
+  if [ "$exists" -eq 1 ]; then
     # Only start it when it isn't running: a blanket `|| true` here would also
     # swallow the real reason a stopped workspace refuses to come up, and the
     # next thing the user sees is a 120s wait_ready timeout blaming guest DNS.
-    if [ "${ws_state:-}" = RUNNING ]; then
+    if [ "$ws_state" = RUNNING ]; then
       stage "Workspace '$name' is running, reconverging…"
     else
       stage "Workspace '$name' exists, starting it…"
@@ -663,8 +660,7 @@ cmd_up() {
   else
     incus image info "$PARA_IMAGE_NAME" >/dev/null 2>&1 \
       || die "no image '$PARA_IMAGE_NAME'. Build it first with 'para image build'."
-    ip="$(alloc_ip)" \
-      || die "no free IP in the .$PARA_IP_LO-.$PARA_IP_HI band on $PARA_BRIDGE. Remove a workspace, or widen PARA_IP_LO/HI."
+    alloc_ip
     stage "Launching $ct at ${ip}…"
     incus launch "$PARA_IMAGE_NAME" "$ct" --storage "$PARA_POOL" \
       -c security.nesting=true -d eth0,ipv4.address="$ip"
@@ -741,20 +737,17 @@ rm_one() { # rm_one <name>
   local name="$1"
   validate_name "$name"
   local ct="$CT_PREFIX$name"
-  # Names are machine-global and `para ls` is project-scoped, so without this a
-  # workspace you cannot even see is one typo away from being destroyed. `up`
-  # refuses the same way; this is the destructive half of the pair.
-  # Same as `up`: only a different OWNER refuses. An unstamped container must
-  # stay removable, or a workspace whose launch died before stamp_ct could never
-  # be cleaned up with para at all.
-  if ws_load "$name" && [ -n "$ws_project" ] && [ "$ws_project" != "$PARA_PROJECT_NAME" ]; then
-    die "workspace '$name' belongs to project '$ws_project'. Remove it from there, or run: PARA_PROJECT_NAME=$ws_project para rm $name"
-  fi
-  # Teardown scripts rely on removing an absent workspace succeeding.
-  # Warn so users can spot a mistyped name.
-  if ! instance_exists "$ct"; then
+  # Teardown scripts rely on removing an absent workspace succeeding; the warn
+  # is for a mistyped name.
+  if ! ws_load "$name"; then
     warn "no workspace '$name' to remove (see: para ls)"
     return
+  fi
+  # The destructive half of `up`'s guard, same rule: names are machine-global
+  # and `para ls` is project-scoped, so a workspace you cannot see is one typo
+  # away. Only a DIFFERENT owner refuses, so an unstamped one stays removable.
+  if [ -n "$ws_project" ] && [ "$ws_project" != "$PARA_PROJECT_NAME" ]; then
+    die "workspace '$name' belongs to project '$ws_project'. Remove it from there, or run: PARA_PROJECT_NAME=$ws_project para rm $name"
   fi
   stage "Deleting ${ct}…"
   incus delete -f "$ct"
@@ -962,11 +955,9 @@ cmd_image_build() {
   stage "Image '$PARA_IMAGE_NAME' ready. Now: para up <name>"
 }
 
-# Stop, snapshot, publish to a temp alias, then swap. Each step is deliberate:
-# a force-stop because a container init that ignores the shutdown signal never
-# halts; a snapshot because publishing a just-stopped instance races its rootfs
-# settling; a temp alias because publishing over the live alias would leave the
-# box with no image at all if the publish failed.
+# Stop, snapshot, publish to a temp alias, then swap. The force-stop is for an
+# init that ignores the shutdown signal, the snapshot because a just-stopped
+# rootfs is still settling, the temp alias so a failed publish keeps the live image.
 image_publish() { # image_publish <base>
   incus stop -f "$builder"
   incus snapshot create "$builder" publish
@@ -1040,6 +1031,18 @@ cmd_add() {
   if [ "$list" -eq 1 ]; then add_list; return; fi
   require_project
 
+  # Every name resolved before anything is written, so a typo leaves no
+  # half-made project behind. Checked, because expand_layer's die runs inside
+  # a $( ) where bash strips set -e, so only its status reaches us.
+  local lines="" line
+  if [ -n "$names" ]; then
+    while IFS= read -r name; do
+      line="$(expand_layer "$name")" || exit 1
+      lines="${lines:+$lines
+}$line"
+    done <<<"$names"
+  fi
+
   local sp="$PARA_PROJECT_DIR/.paraspace" fresh=0
   if [ ! -f "$sp/stack" ]; then
     # Refused before anything is written, or a bare init in a directory with
@@ -1068,14 +1071,8 @@ cmd_add() {
     info "add: .paraspace/env"
   fi
 
-  local line
-  if [ -n "$names" ]; then
-    while IFS= read -r name; do
-      # Checked, because expand_layer's die runs inside a $( ) where bash
-      # strips set -e, so its non-zero status is all that reaches us.
-      line="$(expand_layer "$name")" || exit 1
-      stack_insert "$line"
-    done <<<"$names"
+  if [ -n "$lines" ]; then
+    while IFS= read -r line; do stack_insert "$line"; done <<<"$lines"
   fi
   if [ -n "$new" ]; then
     layer_stub "$new"
@@ -1103,7 +1100,8 @@ vendor_candidate() {
 # stack line, so the runtime never sees a bare name. More than one match dies
 # naming each, and the fix is writing the full path. docs/layers.md.
 expand_layer() { # expand_layer <name> -> one stack line
-  local name="$1" c matches=""
+  # A trailing slash is dropped, so the line matches the stack's normalized form.
+  local name="${1%/}" c matches=""
   for c in "node_modules/paraspace/layers/$name" "$(vendor_candidate "$name")" \
            "$name" "node_modules/$name"; do
     [ -n "$c" ] || continue
@@ -1403,9 +1401,8 @@ doctor_incus() {
 }
 
 # Nested Docker on btrfs, or on ZFS before 2.2, silently falls back to the vfs
-# storage driver, the slowest failure para has. And the shared volume needs
-# idmapped mounts, without which a workspace dies mid-boot with "Required
-# idmapping abilities not available".
+# storage driver, the slowest failure para has. The shared volume needs idmapped
+# mounts, or a workspace dies mid-boot with "Required idmapping abilities not available".
 doctor_storage() {
   local driver="$1" zv
   case "$(uname -s)/$driver" in
@@ -1613,7 +1610,6 @@ project_para_bin() { # project_para_bin <project-dir>
 # copy from handing off again. Silent; `para which` is how you see it.
 reexec_project_para() { # reexec_project_para "$@"
   local bin
-  PARA_PROJECT_DIR="${PARA_PROJECT_DIR:-$(find_project_root || true)}"
   [ -n "$PARA_PROJECT_DIR" ] || return 0
   bin="$(project_para_bin "$PARA_PROJECT_DIR")" || return 0
   if [ "$bin" -ef "$0" ]; then return 0; fi
@@ -1650,22 +1646,19 @@ main() {
   HELPERS="$(pkg_root)/libexec/helpers"
   # shellcheck source=/dev/null
   . "$HELPERS"
-  # init/add may be creating the project here, so the root they operate on is
-  # pinned before anything derives from it: the enclosing project, or the
-  # current directory.
-  case "${1:-}" in
-    init|add) PARA_PROJECT_DIR="${PARA_PROJECT_DIR:-$(find_project_root || pwd)}" ;;
-  esac
-  # Two verbs never hand off: completions, because shell rcs source it at
-  # startup from whatever directory the shell opens in, and which, whose point
-  # is naming what would run without executing anything from the checkout.
-  case "${1:-}" in
-    completions|which) ;;
-    *) reexec_project_para "$@" ;;
-  esac
+  # Read by para_env's ${!PARA_@}, so a project command can call back into
+  # para without relying on $PATH.
+  PARA_BIN="$(cd "$(dirname "$0")" && pwd)/${0##*/}"
   local cmd="${1:-}"
+  set_project_dir "$cmd"
+  # completions and which never hand off and read no project env: shell rcs
+  # source completions from whatever directory they open in, and which exists
+  # to name what would run without executing anything from the checkout.
+  case "$cmd" in
+    completions|which) ;;
+    *) reexec_project_para "$@"; load_config ;;
+  esac
   shift || true
-  load_config
   case "$cmd" in
     up)          cmd_up "$@" ;;
     down)        cmd_down "$@" ;;

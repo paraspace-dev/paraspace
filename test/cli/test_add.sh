@@ -58,7 +58,11 @@ test_add_is_convergent() {
   para_in "$p" add git
   assert_eq 0 "$PARA_RC" "adding it twice is fine" || return 1
   assert_contains "$PARA_OUT" "already in the stack" "and says it kept the line" || return 1
-  assert_eq 1 "$(grep -c 'layers/git' "$p/.paraspace/stack")" "one line, not two"
+  assert_eq 1 "$(grep -c 'layers/git' "$p/.paraspace/stack")" "one line, not two" || return 1
+  # A trailing slash, the spelling tab completion leaves, is the same layer.
+  para_in "$p" add git/
+  assert_eq 0 "$PARA_RC" "a trailing slash is fine too" || return 1
+  assert_eq 1 "$(grep -c 'layers/git' "$p/.paraspace/stack")" "still one line"
 }
 
 test_add_keeps_the_project_layer_last() {
@@ -92,6 +96,17 @@ test_add_refuses_an_unknown_layer() {
   assert_contains "$PARA_OUT" "no layer 'no-such-layer'" "the unknown name is named" || return 1
   assert_contains "$PARA_OUT" "--list" "and the command that lists them" || return 1
   assert_not_contains "$(cat "$p/.paraspace/stack")" "no-such-layer" "nothing was written"
+}
+
+test_init_with_an_unknown_layer_writes_nothing() {
+  # A rerun after the typo would find a stack already there and skip the
+  # scaffold, so a half-written project would never get its default base.
+  local d; d="$(scratch)"
+  a_linked_package "$d"
+  para_in "$d" init no-such-layer
+  [ "$PARA_RC" -ne 0 ] || { echo "  an unknown layer was accepted" >&2; return 1; }
+  assert_contains "$PARA_OUT" "no layer 'no-such-layer'" "the unknown name is named" || return 1
+  assert test ! -e "$d/.paraspace"
 }
 
 test_add_names_npm_install_when_the_package_is_absent() {

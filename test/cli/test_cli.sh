@@ -141,6 +141,44 @@ test_completions_do_not_nag() {
   assert_not_contains "$PARA_OUT" "npm install" "sourcing completions stays quiet"
 }
 
+test_which_and_completions_run_nothing_from_the_checkout() {
+  # The project's env file is bash, sourced by every verb that works on the
+  # project. These two run in a checkout you have not read yet (which) or at
+  # shell startup from wherever the shell opens (completions), so not by them.
+  local p; p="$(a_project)"
+  printf 'touch "%s/env-ran"\n' "$p" >> "$p/.paraspace/env"
+  para_in "$p" which
+  assert test ! -e "$p/env-ran" || return 1
+  para_in "$p" completions bash
+  assert test ! -e "$p/env-ran" || return 1
+  # The marker proves itself on a verb that does read the env.
+  para_in "$p" ls --names
+  assert test -e "$p/env-ran"
+}
+
+# bounded_env <env-args...>: env, under coreutils timeout where there is one,
+# so a para that loops hangs one test rather than the suite. macOS ships none.
+bounded_env() {
+  if command -v timeout >/dev/null 2>&1; then timeout 10 env "$@"; else env "$@"; fi
+}
+
+test_a_relative_project_dir_with_a_trailing_slash_is_the_project() {
+  # The "not inside a para project" error says to set PARA_PROJECT_DIR, so it
+  # arrives however a shell spells a path. The install probe walks dirname up
+  # to /, which a relative path never reaches, and the project name is the
+  # last path component, which a trailing slash makes empty.
+  local d out; d="$(scratch)"
+  mkdir -p "$d/my-app/.paraspace/layers/project"
+  printf 'PARA_CONTRACT=1\n' > "$d/my-app/.paraspace/env"
+  printf '.paraspace/layers/project\n' > "$d/my-app/.paraspace/stack"
+  [ -n "$PARA_FENCE" ] || PARA_FENCE="$(a_fenced_backend)"
+  out="$(cd "$d" && bounded_env -u PARA_PROJECT_NAME PATH="$PARA_FENCE:$PATH" \
+      PARA_PROJECT_DIR=./my-app/ "$PARA" doctor 2>&1)" || true
+  assert_contains "$out" "project dir        $d/my-app
+" "the path is absolute, with no trailing slash" || return 1
+  assert_contains "$out" "PARA_PROJECT_NAME  my-app" "and the name derives from it"
+}
+
 # ---------------------------------------------------------- project commands
 
 test_project_commands_extend_the_verb_set() {
@@ -407,34 +445,54 @@ test_init_converges_on_an_existing_project() {
   assert_contains "$(cat "$p/.paraspace/env")" "PARA_PROJECT_NAME=fixture" "the env was left alone"
 }
 
+# an_up_stub <rows> <status>: a PATH dir whose incus answers everything `para
+# up` asks before launching, with the given CSV rows and exit status for the
+# addresses-in-use query, and fails at launch recording its argv, so nothing is
+# created and the requested address is still observable. Echoes the dir.
+an_up_stub() {
+  local d; d="$(scratch)"
+  cat > "$d/incus" <<STUB
+#!/bin/sh
+case "\$*" in
+  "info")                 exit 0 ;;   # daemon reachable
+  *--all-projects*)       printf '%s\\n' '$1'; exit $2 ;;
+  "network get "*)        echo 10.9.9.1/24; exit 0 ;;
+  "image info "*)         exit 0 ;;
+  "storage volume show "*) exit 0 ;;
+  launch\ *)              echo "\$*" > "$d/launch-args"; exit 1 ;;
+  *)                      exit 0 ;;   # the workspace list: no workspaces
+esac
+STUB
+  chmod +x "$d/incus"
+  printf '%s\n' "$d"
+}
+
 test_up_allocates_an_ip_that_is_not_already_taken() {
   # The highest-consequence silent failure in the engine: a mis-parse here hands
   # a new workspace an address a LIVE one already holds. incus annotates the
   # runtime column as "10.9.9.200 (eth0)" and fills the device column only for
   # instances para pinned, so an address held by a RUNNING container para did
   # NOT create appears in the annotated form and nowhere else. That is the shape
-  # this pins: .200 is such a container, .201 a stopped para workspace. Driven through `para up` with a stub incus that fails at
-  # launch, so nothing is created and the requested address is still observable.
-  local d; d="$(scratch)"
-  cat > "$d/incus" <<STUB
-#!/bin/sh
-case "\$*" in
-  "info")                 exit 0 ;;   # daemon reachable
-  info\ *)                exit 1 ;;   # …but this instance does not exist
-  *--all-projects*)       printf '%s\\n' '"10.9.9.200 (eth0)",' ',10.9.9.201'; exit 0 ;;
-  "network get "*)        echo 10.9.9.1/24; exit 0 ;;
-  "image info "*)         exit 0 ;;
-  "storage volume show "*) exit 0 ;;
-  launch\ *)              echo "\$*" > "$d/launch-args"; exit 1 ;;
-  *)                      exit 0 ;;
-esac
-STUB
-  chmod +x "$d/incus"
+  # this pins: .200 is such a container, .201 a stopped para workspace.
+  local d; d="$(an_up_stub '"10.9.9.200 (eth0)",
+,10.9.9.201' 0)"
   ( cd "$(a_project 'PARA_ROUTES="8080"')" \
       && env -u PARA_PROJECT_DIR PATH="$d:$PATH" "$PARA" up ws >/dev/null 2>&1 ) || true
   [ -f "$d/launch-args" ] || { echo "  para never reached 'incus launch'" >&2; return 1; }
   assert_contains "$(cat "$d/launch-args")" "ipv4.address=10.9.9.202" \
     "skipped the running .200 and the stopped .201"
+}
+
+test_up_refuses_an_ip_when_incus_cannot_list_the_ones_in_use() {
+  # That query is all that stands between a new workspace and an address a live
+  # one holds, so a failed query stops the launch instead of reading as "none
+  # in use", which is what an empty capture would otherwise say.
+  local d out rc=0; d="$(an_up_stub '' 1)"
+  out="$(cd "$(a_project 'PARA_ROUTES="8080"')" \
+      && env -u PARA_PROJECT_DIR PATH="$d:$PATH" "$PARA" up ws 2>&1)" || rc=$?
+  [ "$rc" -ne 0 ] || { echo "  up succeeded without knowing the addresses in use" >&2; return 1; }
+  assert_contains "$out" "addresses in use" "the refusal names the failed query" || return 1
+  assert test ! -e "$d/launch-args"
 }
 
 test_refuses_a_contract_version_mismatch() {

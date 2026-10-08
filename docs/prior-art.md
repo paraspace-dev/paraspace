@@ -4,9 +4,9 @@ Isolated-workspace-per-task is a crowded idea, and it got more crowded during
 2026. This page places ParaSpace among the alternatives and, more usefully,
 names the ones you should pick instead.
 
-> Descriptions here come from each project's own docs at the time of writing.
-> This is a categorisation, not a feature audit. The space moves fast, so check
-> current docs before deciding on the strength of a row.
+> Descriptions here come from each project's own docs and source at the time of
+> writing. The space moves fast, so check current docs before deciding on the
+> strength of a cell.
 
 ## The general approaches
 
@@ -80,11 +80,12 @@ own files and its own place to run them.
   agent on its own git branch, driven as an MCP server plus a CLI, with terminal
   attach into any environment. Agent-driven by design, and built on application
   containers rather than system containers.
-- **[Sculptor](https://github.com/imbue-ai/sculptor)** (Imbue) gives you
-  isolated worktrees with a Docker container backend, a workspace terminal,
-  multi-agent management and diff/PR review. A desktop application rather than a
-  terminal-first substrate; its own docs call it an experimental research
-  preview.
+- **[Sculptor](https://github.com/imbue-ai/sculptor)** (Imbue) gives you a
+  git worktree per task with the agent running as a process on your host, plus
+  a workspace terminal, multi-agent management and diff/PR review. A desktop
+  application rather than a terminal-first substrate. Its docs describe moving
+  away from a container per agent, so it isolates the files and leaves the
+  runtime on your host.
 - **[Agent of Empires](https://github.com/agent-of-empires/agent-of-empires)**
   runs parallel agents in git worktrees with per-agent Docker, Podman or Apple
   Container sandboxing, shared authentication volumes, project hooks, custom
@@ -98,8 +99,8 @@ own files and its own place to run them.
   around agent security (it ships active threat detection, which ParaSpace does
   not).
 - **[Coasts](https://github.com/jsx-tool/coasts)** gives you worktree-aware
-  local environments, each with an isolated runtime and its own Docker daemon,
-  letting an existing Compose stack run unchanged. It normally shares the
+  local environments, each a privileged `docker:dind` container with its own
+  Docker daemon, letting an existing Compose stack run unchanged. It shares the
   worktree filesystem from the host and expects the agent to run on the host, so
   it isolates the *application* runtime more than it isolates the agent.
 
@@ -111,23 +112,21 @@ agent, over git worktrees, with an orchestrator on top).
 
 ## Where ParaSpace sits
 
-✅ yes · ⚠️ partial, or with caveats · ❌ no · ❓ not documented
+✅ yes · ⚠️ partial, or with caveats · ❌ no
 
-| | Isolation unit | Workspace files | Nests unprivileged | Interface | Per-workspace URL |
-|---|---|---|---|---|---|
-| par | none (host processes) | worktree | n/a (host Docker) | CLI + tmux | ❌ |
-| Container Use | app container | branch per env | ❓ | MCP + CLI | ❌ |
-| Sculptor | container backend | worktree | ❓ | desktop app | ⚠️ in-app |
-| Agent of Empires | Docker / Podman / Apple Container | worktree | ❓ | TUI + web | ⚠️ in-app |
-| Code on Incus | system container | host bind mount | ✅ | CLI | ⚠️ `localhost:<port>` |
-| Coasts | runtime + own Docker daemon | host worktree | ❓ own daemon per env | CLI | ⚠️ per-env ports |
-| **ParaSpace** | system container | clone inside | ✅ | native terminal | ✅ stable hostname |
+| | par | Container Use | Sculptor | Agent of Empires | Code on Incus | Coasts | **ParaSpace** |
+|---|---|---|---|---|---|---|---|
+| Isolation unit | none (host processes) | app container (Dagger) | none (host processes) | app container (Docker, Podman or Apple Container) | system container | privileged `docker:dind` container | system container |
+| Workspace files | worktree | branch per env, inside | worktree | worktree, bind-mounted | host bind mount | host worktree, bind-mounted | clone inside |
+| Nests unprivileged | n/a (host Docker) | ❌ none offered | n/a (host Docker) | ❌ opt-in `--privileged` | ✅ | ❌ `--privileged` | ✅ |
+| Interface | CLI + tmux | MCP + CLI | desktop app | TUI + web + CLI | CLI | CLI + web | native terminal |
+| Per-workspace URL | ❌ | ⚠️ random `127.0.0.1:<port>` | ❌ | ⚠️ published ports | ⚠️ `localhost:<port>` | ⚠️ per-env ports, `<name>.localhost` opt-in | ✅ stable hostname |
 
 "Nests unprivileged" means route 3 below, a nested daemon that costs neither the
-host socket nor `--privileged`. Plenty of these run containers inside a
-workspace; that column is about what it costs you.
+host socket nor `--privileged`. Several of these run containers inside a
+workspace; that row is about what it costs you.
 
-The emoji columns are the ones with a real yes/no. The rest describe *how*, and
+The emoji rows are the ones with a real yes/no. The rest describe *how*, and
 the "how" is usually what decides it.
 
 ### On nested containers
